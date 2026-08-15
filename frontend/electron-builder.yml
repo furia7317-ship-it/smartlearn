@@ -1,0 +1,53 @@
+appId: com.smartlearn.a3
+productName: 学枢
+copyright: 学枢团队
+
+directories:
+  output: dist-electron
+  buildResources: build-resources
+
+# 只打包桌面壳与静态站；主进程仅用 Electron/Node 内置模块，无需 node_modules
+files:
+  - electron/**/*
+  - out/**/*
+
+# 后端运行时/源码/离线模型/公共知识索引 → resources/（不进 asar，python.exe 须为真实可执行文件）
+extraResources:
+  - from: runtime/python
+    to: python
+  - from: runtime/assets
+    to: assets
+    filter:
+      - "**/*"
+      - "!smartlearn.db"
+      - "!backend.env"
+  - from: runtime/node
+    to: node
+  - from: remotion-runtime
+    to: remotion
+    filter:
+      - package.json
+      - package-lock.json
+      - render.mjs
+      - runtime.zip
+      - tsconfig.json
+      - src/**/*
+  - from: ../backend/app
+    to: backend/app
+  - from: ../knowledge
+    to: knowledge
+
+asar: true
+
+win:
+  target:
+    - nsis
+  icon: public/brand/xueshu-app-icon.png
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: 学枢-一体安装版-${version}.exe
+  shortcutName: 学枢
+  createDesktopShortcut: true

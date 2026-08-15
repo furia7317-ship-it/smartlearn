@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.pyc
+*.log
+.venv/
+.pytest_cache/
+.pytest-tmp/
+.run/
+*.egg-info/
+
+# 数据与产物（运行时生成，不进仓库）
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/
+chroma/
+/backend/media/
+/output/
+*.mp4
+*.pptx
+*.srt
+
+# 模型/嵌入缓存
+.cache/
+/models/
+
+# 密钥与本地配置
+.env
+.env.local
+.env.*
+!.env.example
+.envrc
+.npmrc
+.pypirc
+.netrc
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
+
+# 前端
+node_modules/
+dist/
+*.local
+.next/
+out/
+dist-electron/
+*.tsbuildinfo
+coverage/
+.coverage
+
+# Signing credentials never belong in source control.
+*.jks
+*.keystore
+
+# 桌面壳自带运行时（体积大，随安装包分发，不入库）
+frontend/runtime/
+
+# IDE
+.idea/
+.vscode/
+
+# Local QA, smoke-test, and generated review artifacts
+/NUL
+/tmp/
+/.codex-smoke/
+/.ruff_cache/
+/.superpowers/
+/artifacts/smartlearn-web-*
+/artifacts/smartlearn-frontend-*.tar.gz
+/artifacts/competition_doc/rendered*/
+/artifacts/competition_doc/updated-document-render-*/
+/artifacts/competition_doc/source-document-*/
+/outputs/doc-audit-*/
+/outputs/competition-docs/_suite_qa/
+/outputs/competition-docs/_render_word_v*/
+/outputs/competition-docs/_render_v*/

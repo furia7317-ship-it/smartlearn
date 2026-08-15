@@ -1,0 +1,1121 @@
+.page {
+  --path-paper: #fbf7ee;
+  --path-paper-strong: #fffaf2;
+  --path-ink: #2f281f;
+  --path-muted: #796d5d;
+  --path-rule: #d8ccb9;
+  --path-rule-strong: #b9aa93;
+  --path-complete: #3f6e50;
+  --path-active: #b9472d;
+  --path-active-soft: #f4e4d9;
+  --path-upcoming: #a99d89;
+  background: var(--path-paper);
+}
+
+.frame {
+  width: 100%;
+  max-width: none;
+  padding: 0 0 34px;
+}
+
+.pathWorkspace {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.subjectSidebar {
+  position: relative;
+  z-index: 12;
+  min-width: 0;
+}
+
+.subjectSidebarPanel {
+  height: calc(100dvh - 57px);
+  overflow: auto;
+  border-width: 0 1px 0 0;
+  border-color: var(--path-rule);
+  border-radius: 0;
+  padding: 22px 12px;
+  background: #f8f2e8;
+}
+
+.subjectSidebarPanel > div:first-child {
+  display: grid;
+  gap: 11px;
+}
+
+.subjectSidebarGenerate {
+  width: 100%;
+  justify-content: center;
+}
+
+.subjectSidebarList {
+  margin-top: 16px;
+}
+
+.subjectSidebarCard {
+  padding: 10px;
+  background: color-mix(in srgb, var(--path-paper-strong) 82%, transparent);
+}
+
+.subjectSidebarActions {
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.subjectSidebarActions button {
+  flex: 1 1 auto;
+  justify-content: center;
+  padding-inline: 7px;
+  white-space: nowrap;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 172px;
+  min-height: calc(100dvh - 57px);
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: var(--path-paper);
+}
+
+.layoutSummaryCollapsed {
+  grid-template-columns: minmax(0, 1fr) 46px;
+}
+
+.canvasColumn {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background-color: var(--path-paper);
+  background-image: url("/brand/path/path-canvas-network-v2.png");
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: cover;
+}
+
+.spineLead {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 0;
+  height: 192px;
+  border-left: 2px dotted var(--path-upcoming);
+}
+
+.spineLead::after {
+  position: absolute;
+  bottom: 66px;
+  left: -9px;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--path-paper-strong);
+  border-radius: 50%;
+  content: "";
+  background: var(--path-paper);
+  box-shadow: 0 0 0 2px var(--path-upcoming);
+}
+
+.canvasHeader {
+  position: relative;
+  z-index: 2;
+  min-height: 126px;
+  padding: 27px 32px 8px;
+}
+
+.canvasTitle {
+  width: min(48%, 560px);
+}
+
+.canvasTitle h2 {
+  color: var(--path-ink);
+  font-family: var(--font-display);
+  font-size: clamp(30px, 2.6vw, 40px);
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  line-height: 1.12;
+}
+
+.canvasTitle p {
+  max-width: 520px;
+  margin-top: 9px;
+  color: var(--path-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.canvasModeSwitch {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.canvasModeSwitch button {
+  position: relative;
+  min-height: 25px;
+  color: var(--path-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.canvasModeSwitch button + button::before {
+  position: absolute;
+  top: 7px;
+  left: -9px;
+  width: 1px;
+  height: 10px;
+  content: "";
+  background: var(--path-rule);
+}
+
+.canvasModeActive {
+  color: var(--path-active) !important;
+}
+
+.canvasViewport {
+  position: relative;
+  height: calc(100dvh - 183px);
+  min-height: 720px;
+  overflow: auto;
+}
+
+.canvas {
+  min-width: 760px;
+  padding: 0 42px 72px;
+  transform-origin: top center;
+  transition: transform 180ms ease;
+}
+
+.stageRow {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(270px, 1fr) 80px minmax(250px, 1fr);
+  min-height: 136px;
+  align-items: center;
+}
+
+.activeRow {
+  min-height: 248px;
+}
+
+.expandedRow {
+  min-height: 248px;
+}
+
+.spine {
+  position: relative;
+  z-index: 2;
+  align-self: stretch;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.spine::before {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 50%;
+  border-left: 2px solid var(--path-upcoming);
+  content: "";
+  transform: translateX(-50%);
+}
+
+.spineComplete::before {
+  border-color: var(--path-complete);
+}
+
+.spineCurrent::before {
+  border-color: var(--path-active);
+}
+
+.spineUpcoming::before {
+  border-left-style: dotted;
+  border-color: var(--path-upcoming);
+}
+
+.spineNode {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--path-paper-strong);
+  border-radius: 50%;
+  background: var(--path-upcoming);
+  box-shadow: 0 0 0 2px var(--path-upcoming);
+  transform: translate(-50%, -50%);
+}
+
+.nodeComplete {
+  background: var(--path-complete);
+  box-shadow: 0 0 0 2px var(--path-complete);
+}
+
+.nodeCurrent {
+  background: var(--path-active);
+  box-shadow:
+    0 0 0 2px var(--path-active),
+    0 0 0 8px color-mix(in srgb, var(--path-active) 11%, transparent);
+}
+
+.flowParticle {
+  position: absolute;
+  top: 15%;
+  left: calc(50% - 4px);
+  z-index: 4;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #fff7ec;
+  border-radius: 50%;
+  background: #d86434;
+  box-shadow: 0 0 10px rgb(216 100 52 / 0.75);
+  animation: path-data-flow 1.35s linear infinite;
+  will-change: transform;
+}
+
+.cardSlot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  grid-row: 1;
+}
+
+.cardSlotLeft {
+  grid-column: 1;
+  justify-content: flex-end;
+}
+
+.cardSlotRight {
+  grid-column: 3;
+  justify-content: flex-start;
+}
+
+.stageCard {
+  position: relative;
+  width: min(100%, 360px);
+  min-height: 116px;
+  padding: 16px 18px;
+  border: 1px solid var(--path-rule-strong);
+  border-radius: 6px;
+  color: var(--path-ink);
+  background: color-mix(in srgb, var(--path-paper-strong) 91%, transparent);
+  box-shadow: 0 4px 11px rgb(65 48 26 / 0.025);
+}
+
+.stageSelectButton {
+  display: block;
+  width: 100%;
+  color: inherit;
+  text-align: left;
+}
+
+.stageSelectButton:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid color-mix(in srgb, var(--path-active) 50%, transparent);
+  outline-offset: 5px;
+}
+
+.cardSelected {
+  border-color: color-mix(in srgb, var(--path-active) 72%, var(--path-rule));
+  background: color-mix(in srgb, #fffaf2 96%, transparent);
+  box-shadow:
+    0 8px 20px rgb(107 69 26 / 0.08),
+    0 0 0 3px color-mix(in srgb, var(--path-active) 10%, transparent);
+}
+
+.stageCard::before {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 12px;
+  height: 12px;
+  border: 3px solid var(--path-paper-strong);
+  border-radius: 50%;
+  content: "";
+  background: var(--path-upcoming);
+  box-shadow: 0 0 0 2px var(--path-upcoming);
+  transform: translateY(-50%);
+}
+
+.stageCard::after {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  width: 40px;
+  border-top: 2px solid var(--path-upcoming);
+  content: "";
+  transform: translateY(-50%);
+}
+
+.cardLeft::before {
+  right: -7px;
+}
+
+.cardLeft::after {
+  right: -40px;
+}
+
+.cardRight::before {
+  left: -7px;
+}
+
+.cardRight::after {
+  left: -40px;
+}
+
+.cardComplete {
+  border-color: color-mix(in srgb, var(--path-complete) 52%, var(--path-rule));
+}
+
+.cardComplete::before {
+  background: var(--path-complete);
+  box-shadow: 0 0 0 2px var(--path-complete);
+}
+
+.cardComplete::after {
+  border-color: var(--path-complete);
+}
+
+.cardCurrent {
+  width: min(100%, 420px);
+  min-height: 214px;
+  padding: 22px 23px 19px;
+  border-color: var(--path-active);
+  background: color-mix(in srgb, #fffaf2 94%, transparent);
+  box-shadow: 0 10px 24px rgb(142 65 38 / 0.07);
+}
+
+.cardCurrent::before {
+  background: var(--path-active);
+  box-shadow: 0 0 0 2px var(--path-active);
+}
+
+.cardCurrent::after {
+  border-color: var(--path-active);
+}
+
+.cardUpcoming::after {
+  border-top-style: dotted;
+}
+
+.stageHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.stageIndex {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  color: #fffaf1;
+  background: var(--path-upcoming);
+  font: 700 11px/1 var(--font-mono);
+}
+
+.cardComplete .stageIndex {
+  background: var(--path-complete);
+}
+
+.cardCurrent .stageIndex {
+  width: 46px;
+  height: 46px;
+  background: var(--path-active);
+  font-size: 14px;
+}
+
+.stageCopy {
+  min-width: 0;
+  flex: 1;
+}
+
+.cardCurrent .stageCopy {
+  padding-right: 42px;
+}
+
+.stageCopy h3 {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: 0.025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardCurrent .stageCopy h3 {
+  display: -webkit-box;
+  font-size: 22px;
+  letter-spacing: 0.025em;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cardCurrent .stageCopy p {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.stageCopy p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--path-muted);
+  font-size: 11px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.stageState {
+  flex-shrink: 0;
+  color: var(--path-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.cardComplete .stageState {
+  color: var(--path-complete);
+}
+
+.cardCurrent .stageState {
+  position: absolute;
+  top: 19px;
+  right: 19px;
+  color: var(--path-active);
+}
+
+.stageMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px solid color-mix(in srgb, var(--path-rule) 75%, transparent);
+  color: var(--path-muted);
+  font-size: 10px;
+}
+
+.stageMeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stageAction {
+  display: inline-flex;
+  min-width: 166px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 16px;
+  padding: 0 14px;
+  border-radius: 5px;
+  color: #fffaf1;
+  background: var(--path-active);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.branchSlot {
+  --branch-accent: var(--path-active);
+
+  position: relative;
+  display: grid;
+  grid-row: 1;
+  align-self: stretch;
+  align-content: center;
+  gap: 10px;
+}
+
+.branchSlotRight {
+  grid-column: 3;
+  padding-right: 92px;
+  padding-left: 18px;
+}
+
+.branchSlotLeft {
+  grid-column: 1;
+  justify-items: end;
+  padding-right: 18px;
+  padding-left: 92px;
+}
+
+.branchSlotComplete {
+  --branch-accent: var(--path-complete);
+}
+
+.branchSlotUpcoming {
+  --branch-accent: #98703a;
+}
+
+.branchSlotRight::before {
+  position: absolute;
+  top: 50%;
+  bottom: 50%;
+  left: -40px;
+  width: 59px;
+  border-top: 2px dotted var(--branch-accent);
+  content: "";
+  z-index: 0;
+}
+
+.branchSlotLeft::before {
+  position: absolute;
+  top: 50%;
+  right: -40px;
+  bottom: 50%;
+  z-index: 0;
+  width: 59px;
+  border-top: 2px dotted var(--branch-accent);
+  content: "";
+}
+
+.branchSlotRight::after {
+  position: absolute;
+  top: 25%;
+  right: auto;
+  bottom: 18px;
+  left: -40px;
+  width: 418px;
+  border-right: 2px dotted var(--path-upcoming);
+  border-bottom: 2px dotted var(--path-upcoming);
+  border-bottom-left-radius: 16px;
+  content: "";
+  pointer-events: none;
+  z-index: 0;
+}
+
+.branchSlotLeft::after {
+  position: absolute;
+  top: 25%;
+  right: -40px;
+  bottom: 18px;
+  z-index: 0;
+  width: 418px;
+  border-bottom: 2px dotted var(--path-upcoming);
+  border-left: 2px dotted var(--path-upcoming);
+  border-bottom-right-radius: 16px;
+  content: "";
+  pointer-events: none;
+}
+
+.branchSlotRight .mergeNode {
+  position: absolute;
+  bottom: 11px;
+  left: -47px;
+  z-index: 4;
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--path-paper-strong);
+  border-radius: 50%;
+  background: var(--path-upcoming);
+  box-shadow: 0 0 0 2px var(--path-upcoming);
+}
+
+.branchSlotLeft .mergeNode {
+  position: absolute;
+  right: -47px;
+  bottom: 11px;
+  z-index: 4;
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--path-paper-strong);
+  border-radius: 50%;
+  background: var(--path-upcoming);
+  box-shadow: 0 0 0 2px var(--path-upcoming);
+}
+
+.taskCard {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 310px);
+  min-height: 84px;
+  padding: 12px 13px;
+  border: 1px solid var(--path-rule-strong);
+  border-radius: 6px;
+  color: var(--path-ink);
+  background: #fffaf2;
+  text-align: left;
+}
+
+.taskCard::before {
+  position: absolute;
+  top: 50%;
+  left: -19px;
+  width: 18px;
+  border-top: 2px dotted var(--branch-accent);
+  content: "";
+}
+
+.taskCard::after {
+  position: absolute;
+  top: calc(50% - 5px);
+  left: -6px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--path-paper-strong);
+  border-radius: 50%;
+  content: "";
+  background: var(--branch-accent);
+  box-shadow: 0 0 0 1px var(--branch-accent);
+}
+
+.taskCard:hover,
+.taskCard:focus-visible {
+  border-color: color-mix(in srgb, var(--path-active) 58%, var(--path-rule));
+  outline: none;
+}
+
+.taskIcon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: #7b5a2d;
+  background: #eee5d5;
+}
+
+.taskCopy {
+  min-width: 0;
+}
+
+.taskCopy strong {
+  display: block;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskCopy span {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--path-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskTime {
+  color: var(--path-muted);
+  font: 650 10px/1 var(--font-mono);
+}
+
+.taskOutputPort {
+  position: absolute;
+  top: calc(50% - 5px);
+  right: -6px;
+  z-index: 2;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--path-paper-strong);
+  border-radius: 50%;
+  background: var(--path-upcoming);
+  box-shadow: 0 0 0 1px var(--path-upcoming);
+}
+
+.taskOutputPort::after {
+  position: absolute;
+  top: 2px;
+  left: 7px;
+  width: 42px;
+  border-top: 2px dotted var(--path-upcoming);
+  content: "";
+}
+
+.branchSlotLeft .taskCard::before {
+  right: -19px;
+  left: auto;
+}
+
+.branchSlotLeft .taskCard::after {
+  right: -6px;
+  left: auto;
+}
+
+.branchSlotLeft .taskOutputPort {
+  right: auto;
+  left: -6px;
+}
+
+.branchSlotLeft .taskOutputPort::after {
+  right: 7px;
+  left: auto;
+}
+
+.canvasControls {
+  position: sticky;
+  right: 16px;
+  bottom: 16px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  margin: -108px 16px 16px auto;
+  overflow: hidden;
+  border: 1px solid var(--path-rule);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--path-paper-strong) 96%, transparent);
+}
+
+.canvasControls button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: var(--path-muted);
+}
+
+.canvasControls button + button {
+  border-top: 1px solid var(--path-rule);
+  border-left: 0;
+}
+
+.canvasControls button:hover,
+.canvasControls button:focus-visible {
+  color: var(--path-ink);
+  background: #eee5d5;
+  outline: none;
+}
+
+.summaryRail {
+  position: relative;
+  min-width: 0;
+  padding: 35px 16px 24px;
+  border-left: 1px solid var(--path-rule);
+  background: color-mix(in srgb, #f8f2e8 96%, transparent);
+}
+
+.summaryRailCollapsed {
+  padding: 14px 7px;
+}
+
+.summaryToggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--path-rule);
+  border-radius: 999px;
+  color: var(--path-muted);
+  background: color-mix(in srgb, var(--path-paper) 92%, white);
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.summaryToggle:hover,
+.summaryToggle:focus-visible {
+  border-color: #a98550;
+  color: var(--path-ink);
+  background: #eee5d5;
+  outline: none;
+}
+
+.summaryRailCollapsed .summaryToggle {
+  position: sticky;
+  top: 12px;
+  right: auto;
+}
+
+.summarySection + .summarySection {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--path-rule);
+}
+
+.summarySection h3 {
+  color: var(--path-ink);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.summaryValue {
+  margin-top: 12px;
+  color: var(--path-ink);
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 650;
+}
+
+.summaryValue small {
+  margin-left: 4px;
+  color: var(--path-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.summaryCaption {
+  margin-top: 5px;
+  color: var(--path-muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.progressDial {
+  position: relative;
+  display: grid;
+  width: 98px;
+  height: 98px;
+  place-items: center;
+  margin: 13px auto 0;
+  color: var(--path-complete);
+}
+
+.progressDial > svg {
+  width: 98px;
+  height: 98px;
+  stroke-width: 1.15;
+}
+
+.progressDial strong {
+  position: absolute;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: var(--path-ink);
+  background: #f8f2e8;
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 600;
+}
+
+.progressDial small {
+  margin-left: 2px;
+  color: var(--path-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.legend {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.legend span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--path-muted);
+  font-size: 10px;
+}
+
+.legend i {
+  width: 28px;
+  border-top: 3px solid var(--path-upcoming);
+}
+
+.legendComplete i {
+  border-color: var(--path-complete);
+}
+
+.legendCurrent i {
+  border-color: var(--path-active);
+}
+
+.legendUpcoming i {
+  border-top-style: dotted;
+}
+
+.branchLegend {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  color: var(--path-muted);
+  font-size: 10px;
+}
+
+.branchLegendIcon {
+  color: #8a6a3d;
+}
+
+.pathTerminus {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  margin: 8px 0 0 calc(50% - 17px);
+  border: 2px solid var(--path-rule-strong);
+  border-radius: 50%;
+  color: var(--path-muted);
+  background: color-mix(in srgb, var(--path-paper-strong) 92%, transparent);
+}
+
+.management {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 16px;
+  align-items: start;
+  margin: 16px 18px 0;
+}
+
+.taskDetails {
+  overflow: hidden;
+  border: 1px solid var(--path-rule);
+  border-radius: 8px;
+  background: var(--path-paper);
+  margin: 16px 18px 0;
+}
+
+.taskDetails > summary {
+  display: flex;
+  min-height: 44px;
+  cursor: pointer;
+  align-items: center;
+  padding: 0 16px;
+  color: var(--path-muted);
+  font-size: 11px;
+  font-weight: 650;
+  list-style: none;
+}
+
+.taskDetails > summary::-webkit-details-marker {
+  display: none;
+}
+
+.taskDetails > summary::after {
+  margin-left: auto;
+  content: "＋";
+  color: #8a622d;
+  font-size: 16px;
+}
+
+.taskDetails[open] > summary::after {
+  content: "－";
+}
+
+.taskDetails > section {
+  margin: 0 14px 14px;
+  border-radius: 8px;
+}
+
+.emptyState {
+  min-height: calc(100dvh - 57px);
+  border-color: var(--path-rule);
+  background: var(--path-paper);
+}
+
+@keyframes path-data-flow {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 154px, 0);
+  }
+}
+
+@media (max-width: 1180px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .layoutSummaryCollapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .summaryRail {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    padding: 16px 22px;
+    border-top: 1px solid var(--path-rule);
+    border-left: 0;
+  }
+
+  .summaryRailCollapsed {
+    display: flex;
+    justify-content: flex-end;
+    min-height: 46px;
+    padding: 8px 14px;
+  }
+
+  .summaryRailCollapsed .summaryToggle {
+    position: static;
+  }
+
+  .summarySection + .summarySection {
+    margin: 0;
+    padding: 0 0 0 20px;
+    border-top: 0;
+    border-left: 1px solid var(--path-rule);
+  }
+}
+
+@media (max-width: 860px) {
+  .pathWorkspace {
+    grid-template-columns: 1fr;
+  }
+
+  .subjectSidebarPanel {
+    height: auto;
+    max-height: 330px;
+    border-width: 0 0 1px;
+  }
+
+  .frame {
+    width: 100%;
+  }
+
+  .canvasTitle {
+    width: min(72%, 560px);
+  }
+
+  .canvas {
+    min-width: 620px;
+    padding-inline: 20px;
+  }
+
+  .stageRow {
+    grid-template-columns: minmax(230px, 1fr) 56px minmax(230px, 1fr);
+  }
+
+  .branchSlotRight {
+    padding-right: 28px;
+  }
+
+  .branchSlotLeft {
+    padding-left: 28px;
+  }
+
+  .management {
+    grid-template-columns: 1fr;
+    margin-inline: 12px;
+  }
+
+  .taskDetails {
+    margin-inline: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flowParticle {
+    display: none;
+  }
+
+  .canvas {
+    transition: none;
+  }
+}

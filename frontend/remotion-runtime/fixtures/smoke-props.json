@@ -1,0 +1,19 @@
+{
+  "title": "数据结构入门",
+  "scenes": [
+    {
+      "title": "栈的核心规律",
+      "chapter_title": "数据结构 · 第一章",
+      "narration": "栈遵循后进先出。先画出入口，再观察元素进入和离开的顺序。",
+      "duration": 3,
+      "composition": "process",
+      "visual_anchor": "后进先出",
+      "carry_over": "下一节比较队列",
+      "reveal_sequence": ["压栈", "栈顶", "出栈"]
+    }
+  ],
+  "visual_system": {
+    "theme": "chalk-garden",
+    "recurring_motif": "手绘知识路径"
+  }
+}
