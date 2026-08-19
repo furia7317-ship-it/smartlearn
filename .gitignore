@@ -68,8 +68,12 @@ frontend/runtime/
 /NUL
 /tmp/
 /.codex-smoke/
+/.codex_tmp/
 /.ruff_cache/
 /.superpowers/
+/design-audit/discover-visual/
+/design-audit/resource-visual/
+/design-audit/sidebar-reference-gap/
 /artifacts/smartlearn-web-*
 /artifacts/smartlearn-frontend-*.tar.gz
 /artifacts/competition_doc/rendered*/
