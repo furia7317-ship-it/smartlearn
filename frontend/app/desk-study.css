@@ -1848,7 +1848,7 @@
 }
 
 .desktop-resource-center__frame {
-  width: min(1320px, calc(100% - 44px));
+  width: 100%;
   max-width: none;
   padding-top: 26px;
 }
@@ -2845,7 +2845,7 @@
 .desktop-resource-center__frame {
   position: relative;
   display: flex;
-  width: calc(100% - 24px);
+  width: 100%;
   min-height: 100%;
   container-type: inline-size;
   flex-direction: column;
@@ -4920,7 +4920,7 @@
 
 @media (max-width: 1110px) {
   .desktop-resource-center__frame {
-    width: calc(100% - 18px);
+    width: 100%;
   }
 
   .desktop-resource-workspace {

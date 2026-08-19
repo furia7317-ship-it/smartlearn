@@ -675,11 +675,11 @@ final result: passed
 
 **Visual findings**
 
-- The desktop frame now uses the full available content width with only the shell's narrow safety gutter; the previous 1560px cap no longer creates broad empty bands on wide displays.
+- The desktop frame now uses the full available content width and aligns flush with the desktop content shell; the previous 1560px cap and inner side gutters no longer create empty bands.
 - The large book remains the dominant element and the two entry cards plus learning activity retain their approved hierarchy.
 - The footer decoration joins the page on the same parchment-and-walnut axis as the book stage. Its ink library and mountain linework stays concentrated near the lower edge and does not compete with interactive content.
 - No new gradient, text, icon, or synthetic UI element was introduced in the generated raster.
-- Horizontal overflow: false at the 1536px desktop check. The 1941px wide check fills the available main canvas with the same narrow safety gutter.
+- Horizontal overflow: false at the 1536px desktop check. The 1941px wide check fills the available main canvas edge to edge.
 
 **Asset generation**
 
