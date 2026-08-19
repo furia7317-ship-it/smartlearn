@@ -100,6 +100,8 @@ type SortFilter = "recent" | "title";
 type ResourceBookState = "open" | "closing" | "closed" | "opening";
 
 const RESOURCE_ENTRY_EXIT_MS = 420;
+const RESOURCE_BOOK_MIN_HEIGHT = 704;
+const RESOURCE_BOOK_MAX_WIDE_HEIGHT = 780;
 
 const ORIGIN_FILTERS: { id: OriginFilter; label: string }[] = [
   { id: "all", label: "全部来源" },
@@ -255,6 +257,7 @@ function DesktopResourcesInner() {
   const selectedKeyRef = useRef("");
   const stableBookStateRef = useRef<ResourceCenterStableBookState>("open");
   const bookHeightRef = useRef(704);
+  const bookWidthFloorRef = useRef(RESOURCE_BOOK_MIN_HEIGHT);
   const bookTransitionLockRef = useRef(false);
   const bookTransitionSequenceRef = useRef(0);
   const entryExitTimerRef = useRef<number | null>(null);
@@ -357,7 +360,16 @@ function DesktopResourcesInner() {
     const workspace = bookShellRef.current?.querySelector<HTMLElement>(".desktop-resource-workspace");
     if (!workspace) return;
     const measure = () => {
-      const measured = Math.max(704, Math.min(1_600, Math.ceil(workspace.getBoundingClientRect().height)));
+      const bounds = workspace.getBoundingClientRect();
+      const widthFloor = Math.max(
+        RESOURCE_BOOK_MIN_HEIGHT,
+        Math.min(RESOURCE_BOOK_MAX_WIDE_HEIGHT, Math.ceil(bounds.width / 2))
+      );
+      const renderedHeight = Math.max(RESOURCE_BOOK_MIN_HEIGHT, Math.min(1_600, Math.ceil(bounds.height)));
+      let measured = bookHeightRef.current;
+      if (renderedHeight > widthFloor + 1) measured = renderedHeight;
+      else if (bookHeightRef.current <= bookWidthFloorRef.current + 1) measured = RESOURCE_BOOK_MIN_HEIGHT;
+      bookWidthFloorRef.current = widthFloor;
       if (Math.abs(measured - bookHeightRef.current) <= 1) return;
       bookHeightRef.current = measured;
       setBookHeight(measured);
@@ -954,7 +966,7 @@ function DesktopResourcesInner() {
           <div
             ref={bookShellRef}
             className={cn("desktop-resource-book-shell", `is-${bookState}`, entryExitActive && "is-entry-exiting", bookFlipReady && "has-book-flip-overlay")}
-            style={{ "--resource-book-height": `${bookHeight}px` } as CSSProperties}
+            style={{ "--resource-book-content-height": `${bookHeight}px` } as CSSProperties}
           >
             {(bookState === "closed" || entryExitActive || (bookState === "opening" && !bookFlipReady)) && (
               <section className="desktop-resource-closed-workbench" aria-labelledby="resource-workbench-title" aria-hidden={entryExitActive} inert={entryExitActive}>

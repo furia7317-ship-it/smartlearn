@@ -141,7 +141,12 @@ test("resource folio uses the same hard-cover page-flip mechanism as 智学云�
   assert.match(styles, /desktop-resource-page-flip\.is-ready/);
   assert.match(styles, /desktop-resource-page-flip\.stf__parent[\s\S]{0,100}position:\s*absolute/);
   assert.match(styles, /has-book-flip-overlay > \.desktop-resource-workspace[\s\S]{0,80}visibility:\s*hidden/);
-  assert.match(styles, /--resource-book-height:\s*704px/);
+  assert.match(styles, /desktop-resource-center__frame[\s\S]{0,100}width:\s*min\(1560px, calc\(100% - 24px\)\)/);
+  assert.match(styles, /desktop-resource-center__frame[\s\S]{0,140}container-type:\s*inline-size/);
+  assert.match(styles, /--resource-book-height:\s*max\([\s\S]{0,120}clamp\(704px, 50cqw, 780px\)/);
+  assert.match(resources, /--resource-book-content-height/);
+  assert.match(resources, /RESOURCE_BOOK_MAX_WIDE_HEIGHT = 780/);
+  assert.match(resources, /Math\.ceil\(bounds\.width \/ 2\)/);
   assert.match(styles, /desktop-resource-book-shell[\s\S]{0,180}min-height:\s*var\(--resource-book-height\)/);
   assert.match(resources, /bookTransitionLockRef/);
   assert.match(resources, /bookTransitionSequenceRef/);

@@ -2843,7 +2843,8 @@
 }
 
 .desktop-resource-center__frame {
-  width: min(1380px, calc(100% - 24px));
+  width: min(1560px, calc(100% - 24px));
+  container-type: inline-size;
   padding: 0 0 32px;
 }
 
@@ -3092,7 +3093,10 @@
 }
 
 .desktop-resource-book-shell {
-  --resource-book-height: 704px;
+  --resource-book-height: max(
+    var(--resource-book-content-height, 704px),
+    clamp(704px, 50cqw, 780px)
+  );
   position: relative;
   min-height: var(--resource-book-height);
   perspective: 1800px;
