@@ -25,6 +25,7 @@ import {
 import { MarketPublishDialog } from "@/components/market-publish-dialog";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { ShellLink as Link } from "@/components/shell-link";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import { importFromMarket, listMarket, type MarketFilter, type MarketListing } from "@/lib/learning-market";
 import { listMaterials, type StoredMaterial } from "@/lib/library";
 import { MATERIAL_TYPE_LABEL } from "@/lib/material-types";
@@ -38,6 +39,8 @@ const FILTERS: Array<{ id: MarketFilter; label: string; icon: LucideIcon }> = [
   { id: "bundle", label: "资源包", icon: PackageOpen },
   { id: "agent", label: "工作流", icon: Bot },
 ];
+const MARKET_FILTER_IDS: MarketFilter[] = ["all", "learning_path", "material", "bundle", "agent"];
+const MARKET_SORT_OPTIONS = ["latest", "popular"] as const;
 
 const KIND_LABEL: Record<MarketListing["kind"], string> = {
   learning_path: "学习路径",
@@ -103,11 +106,33 @@ export default function DesktopMarket() {
   const session = useOrchestratorContext();
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [library, setLibrary] = useState<StoredMaterial[]>([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [filter, setFilter] = useState<MarketFilter>("all");
-  const [sortBy, setSortBy] = useState<"latest" | "popular">("latest");
-  const [queryDraft, setQueryDraft] = useState("");
-  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useDesktopModuleStringState<string>(
+    "discover",
+    "market.selected",
+    ""
+  );
+  const [filter, setFilter] = useDesktopModuleStringState<MarketFilter>(
+    "discover",
+    "market.filter",
+    "all",
+    MARKET_FILTER_IDS
+  );
+  const [sortBy, setSortBy] = useDesktopModuleStringState<"latest" | "popular">(
+    "discover",
+    "market.sort",
+    "latest",
+    MARKET_SORT_OPTIONS
+  );
+  const [queryDraft, setQueryDraft] = useDesktopModuleStringState<string>(
+    "discover",
+    "market.queryDraft",
+    ""
+  );
+  const [query, setQuery] = useDesktopModuleStringState<string>(
+    "discover",
+    "market.query",
+    ""
+  );
   const [loading, setLoading] = useState(true);
   const [importingId, setImportingId] = useState("");
   const [publishOpen, setPublishOpen] = useState(false);

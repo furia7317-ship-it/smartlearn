@@ -32,6 +32,17 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "app://local",
     ]
+    # Portable Web may be opened through the machine/WSL private-network IP.
+    # Limit the dynamic allowance to RFC1918/loopback hosts and known frontend
+    # development ports instead of accepting arbitrary credentialed origins.
+    CORS_ORIGIN_REGEX: str = (
+        r"^http://(?:"
+        r"localhost|127\.0\.0\.1|\[::1\]|"
+        r"10(?:\.\d{1,3}){3}|"
+        r"192\.168(?:\.\d{1,3}){2}|"
+        r"172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}"
+        r"):(?:3000|5173)$"
+    )
 
     # ── 数据库 ──
     DATABASE_URL: str = "sqlite+aiosqlite:///./smartlearn.db"

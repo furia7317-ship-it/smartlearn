@@ -1,101 +1,149 @@
+import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Drama,
-  ShieldCheck,
-  Sparkles,
-  Store,
-  UsersRound,
-} from "lucide-react";
+import { ArrowRight, ChevronRight } from "lucide-react";
 
-const DISCOVERY_AREAS = [
+import styles from "./desktop-discover.module.css";
+
+const MARKET_ITEMS = [
   {
-    href: "/desktop/theater",
-    eyebrow: "沉浸式学习",
-    title: "互动教学",
-    description: "把知识点放进角色、情境和分支选择中，通过参与和反馈完成理解。",
-    action: "进入互动课堂",
-    icon: Drama,
-    accent: "border-[#bb704c]/35 bg-[#fff8f2] text-[#8f4428]",
+    title: "《算法之美》精读",
+    category: "计算机科学",
+    description: "从原型到实践，理解算法设计的核心思想。",
+    lessons: 24,
+    image: "/brand/discover/market-algorithm-v1.png",
+    alt: "山间亭台与层叠峰峦的水墨画",
   },
   {
-    href: "/desktop/market",
-    eyebrow: "优质内容发现",
-    title: "学习市场",
-    description: "浏览经过审核的课程资料与学习路径，按需收藏或导入自己的学习空间。",
-    action: "浏览学习市场",
-    icon: Store,
-    accent: "border-[#56806c]/35 bg-[#f4faf6] text-[#315f4b]",
+    title: "《史记》选读",
+    category: "人文历史",
+    description: "在历史的细节中，理解人性与抉择。",
+    lessons: 18,
+    image: "/brand/discover/market-history-v1.png",
+    alt: "宣纸、毛笔与砚台组成的古籍研读画面",
+  },
+  {
+    title: "《古诗词》鉴赏入门",
+    category: "文学素养",
+    description: "从意象到意境，读懂诗词的美与情感。",
+    lessons: 20,
+    image: "/brand/discover/market-poetry-v1.png",
+    alt: "群山、河谷与扁舟构成的水墨诗境",
   },
 ] as const;
 
 export default function DesktopDiscover() {
   return (
-    <div className="desktop-book-page thin-scroll h-full overflow-y-auto">
-      <div className="desktop-book-page__frame mx-auto max-w-[1280px] space-y-6 px-8 py-7">
-        <header className="rounded-2xl border border-[#d8c6aa] bg-[#fffaf1] px-7 py-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-5">
-            <div className="max-w-2xl">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#92642f]">
-                学习发现
-              </span>
-              <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-[#352719]">
-                发现新的学习方式
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-[#756552]">
-                这里集中放置探索型功能。需要完成当前任务时回到学习路径，需要答疑或生成资料时前往智能教师。
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#d9c7aa] bg-[#f5ecde] px-3 py-2 text-xs font-medium text-[#6d5130]">
-              <Sparkles className="size-4" />
-              两种探索入口
-            </span>
+    <main className={`${styles.page} thin-scroll`}>
+      <div className={styles.frame}>
+        <section className={styles.hero} aria-labelledby="discover-title">
+          <Image
+            src="/brand/discover/discover-scroll-hero-v1.png"
+            alt="群山、书院、卷轴知识图谱与古籍构成的探索主题画卷"
+            fill
+            priority
+            sizes="(min-width: 1180px) 1240px, 94vw"
+            className={styles.heroImage}
+          />
+          <div className={styles.heroContent}>
+            <span className={styles.eyebrow}>今日策展</span>
+            <h1 id="discover-title">发现新的学习方式</h1>
+            <p>从一次好奇出发，找到适合你的学习方式</p>
+            <Link href="/desktop/market" className={styles.heroAction}>
+              开始探索
+              <ArrowRight aria-hidden />
+            </Link>
           </div>
-        </header>
+          <Image
+            src="/brand/discover/discover-seal-v1.png"
+            alt=""
+            width={35}
+            height={59}
+            className={styles.heroSeal}
+            aria-hidden
+          />
+        </section>
 
-        <section className="grid gap-5 lg:grid-cols-2" aria-label="发现功能">
-          {DISCOVERY_AREAS.map((area) => {
-            const Icon = area.icon;
-            return (
-              <Link
-                key={area.href}
-                href={area.href}
-                className="group flex min-h-64 flex-col rounded-2xl border border-[#d9c9b1] bg-[#fffdf8] p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-[#a9783f] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9b692f]/45"
-              >
-                <span className={`grid size-12 place-items-center rounded-xl border ${area.accent}`}>
-                  <Icon className="size-6" />
-                </span>
-                <span className="mt-7 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8d765c]">
-                  {area.eyebrow}
-                </span>
-                <h2 className="mt-2 font-display text-2xl font-semibold text-[#392a1a]">{area.title}</h2>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-[#766754]">{area.description}</p>
-                <span className="mt-auto flex items-center gap-2 pt-7 text-sm font-semibold text-[#8f5723]">
-                  {area.action}
-                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-                </span>
+        <div className={styles.discoveryGrid}>
+          <section className={styles.featureCard} aria-labelledby="interactive-title">
+            <Image
+              src="/brand/discover/discover-maze-pine-v1.png"
+              alt="古松下带有朱砂旗帜的石砌迷宫"
+              fill
+              priority
+              sizes="(min-width: 1180px) 660px, 94vw"
+              className={styles.featureImage}
+            />
+            <div className={styles.featureContent}>
+              <span className={styles.recommendBadge}>本期推荐</span>
+              <span className={styles.featureKicker}>沉浸式学习</span>
+              <h2 id="interactive-title">互动教学</h2>
+              <p>把知识点放进角色、情境和分支选择中，<br />通过参与和反馈完成理解。</p>
+              <ul className={styles.featureTags} aria-label="互动教学特点">
+                <li>情境</li>
+                <li>分支</li>
+                <li>反馈</li>
+              </ul>
+              <Link href="/desktop/theater" className={styles.featureAction}>
+                进入互动课堂
+                <ArrowRight aria-hidden />
               </Link>
-            );
-          })}
-        </section>
+            </div>
+            <div className={styles.featureCaption}>
+              <strong>二叉树迷宫课堂</strong>
+              <span>在选择与反馈中理解结构与关系</span>
+            </div>
+          </section>
 
-        <section className="grid gap-3 rounded-2xl border border-[#d9c9b1] bg-[#f7efe2] p-5 text-[#5f4c37] md:grid-cols-2">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-[#315f4b]" />
-            <div>
-              <h2 className="text-sm font-semibold text-[#3f3020]">内容经过审核</h2>
-              <p className="mt-1 text-xs leading-5">学习市场只展示已发布内容，导入后仍进入你的资源中心统一管理。</p>
+          <section className={styles.marketCard} aria-labelledby="market-title">
+            <header className={styles.marketHeader}>
+              <h2 id="market-title">精选书目 / 课程</h2>
+              <Link href="/desktop/market">
+                学习市场
+                <ChevronRight aria-hidden />
+              </Link>
+            </header>
+
+            <div className={styles.marketList}>
+              {MARKET_ITEMS.map((item) => (
+                <Link key={item.title} href="/desktop/market" className={styles.marketItem}>
+                  <Image
+                    src={item.image}
+                    alt={item.alt}
+                    width={120}
+                    height={82}
+                    sizes="120px"
+                  />
+                  <span className={styles.marketCopy}>
+                    <strong>{item.title}</strong>
+                    <small>{item.category}</small>
+                    <span>{item.description}</span>
+                  </span>
+                  <span className={styles.lessonCount}>共 {item.lessons} 讲</span>
+                </Link>
+              ))}
             </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <UsersRound className="mt-0.5 size-5 shrink-0 text-[#8f4428]" />
-            <div>
-              <h2 className="text-sm font-semibold text-[#3f3020]">探索不打断主路径</h2>
-              <p className="mt-1 text-xs leading-5">互动学习的结果保留在当前账号中，主学习任务仍由学习路径承接。</p>
-            </div>
-          </div>
-        </section>
+
+            <Link href="/desktop/market" className={styles.marketAction}>
+              浏览学习市场
+              <ArrowRight aria-hidden />
+            </Link>
+          </section>
+        </div>
+
+        <figure className={styles.journey} aria-label="持续展开的学习长卷">
+          <Image
+            src="/brand/discover/discover-journey-panorama-v1.png"
+            alt="山水、亭台、书案和藏书门构成的学习漫游长卷"
+            fill
+            sizes="(min-width: 1180px) 1248px, 94vw"
+            className={styles.journeyImage}
+          />
+          <figcaption>
+            <span>学习漫游</span>
+            <strong>山水之间，探索继续</strong>
+          </figcaption>
+        </figure>
       </div>
-    </div>
+    </main>
   );
 }

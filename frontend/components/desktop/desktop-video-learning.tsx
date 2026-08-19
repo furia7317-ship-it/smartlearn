@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { Button } from "@/components/ui/button";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import { saveMaterial } from "@/lib/library";
 import {
   analyzeBilibiliVideo,
@@ -39,10 +40,14 @@ function displayDuration(seconds: number): string {
 
 export default function VideoLearningPage() {
   const { mode, hydrated, appendResources, recordWatchedVideo } = useOrchestratorContext();
-  const [query, setQuery] = useState(DEFAULT_QUERY);
+  const [query, setQuery] = useDesktopModuleStringState<string>(
+    "resources",
+    "video.query",
+    DEFAULT_QUERY
+  );
   const [results, setResults] = useState<BilibiliVideoResult[]>([]);
   const [selected, setSelected] = useState<BilibiliVideoResult | null>(null);
-  const [note, setNote] = useState("");
+  const [note, setNote] = useDesktopModuleStringState<string>("resources", "video.note", "");
   const [watchedSeconds, setWatchedSeconds] = useState(0);
   const [searching, setSearching] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);

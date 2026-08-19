@@ -16,6 +16,7 @@ import { DesktopEmptyState } from "@/components/desktop/desktop-empty-state";
 import { DesktopPaperCover } from "@/components/desktop/desktop-paper-cover";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { QuizRunner } from "@/components/quiz-runner";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   deletePaper,
@@ -39,6 +40,8 @@ interface OpenPaper {
   resourceId: string;
 }
 
+const PRACTICE_TABS = ["papers", "wrongbook"] as const;
+
 export default function DesktopPractice() {
   const { mode, hydrated, resources, practiceAttempts, recordPractice } =
     useOrchestratorContext();
@@ -52,6 +55,12 @@ export default function DesktopPractice() {
   const [papers, setPapers] = useState<PaperSummary[]>([]);
   const [loadingPapers, setLoadingPapers] = useState(true);
   const [open, setOpen] = useState<OpenPaper | null>(null);
+  const [activeTab, setActiveTab] = useDesktopModuleStringState<"papers" | "wrongbook">(
+    "practice",
+    "library.tab",
+    "papers",
+    PRACTICE_TABS
+  );
 
   const refresh = useCallback(() => {
     if (mode === "checking") return;
@@ -179,7 +188,7 @@ export default function DesktopPractice() {
           </Link>
         </section>
 
-        <Tabs defaultValue="papers">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "papers" | "wrongbook")}>
           <TabsList>
             <TabsTrigger value="papers">试题库</TabsTrigger>
             <TabsTrigger value="wrongbook">错题本</TabsTrigger>

@@ -19,6 +19,7 @@ import {
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import {
   autoImport,
   kbSearch,
@@ -202,7 +203,11 @@ function BookEditionAsk({ subject }: { subject: string }) {
 }
 
 function SearchDemo() {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useDesktopModuleStringState<string>(
+    "resources",
+    "knowledge.search",
+    ""
+  );
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
   const [hits, setHits] = useState<KbHit[]>([]);
   const [notFound, setNotFound] = useState(false);
@@ -648,7 +653,11 @@ function WebResultCard({
 }
 
 function WebFind({ onAddBook, shelfUrls }: { onAddBook: (result: WebResult) => void; shelfUrls: Set<string> }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useDesktopModuleStringState<string>(
+    "resources",
+    "knowledge.webQuery",
+    ""
+  );
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
   const [results, setResults] = useState<WebResult[]>([]);
   const [status, setStatus] = useState<Record<string, ImportState>>({});

@@ -5,6 +5,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, ListChecks } from "lucide-reac
 
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { ShellLink as Link } from "@/components/shell-link";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import { addLocalDays, buildLearningSchedule, localDateKey } from "@/lib/learning-schedule";
 import { cn } from "@/lib/utils";
 
@@ -19,8 +20,20 @@ function monthCells(month: Date): Date[] {
 export default function DesktopCalendar() {
   const { path, pathScheduleAnchor, completedMaterials, hydrated } = useOrchestratorContext();
   const [anchor] = useState(() => new Date());
-  const [month, setMonth] = useState(new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12));
-  const [selected, setSelected] = useState(localDateKey(anchor));
+  const [monthKey, setMonthKey] = useDesktopModuleStringState<string>(
+    "home",
+    "calendar.month",
+    localDateKey(anchor).slice(0, 7)
+  );
+  const [selected, setSelected] = useDesktopModuleStringState<string>(
+    "home",
+    "calendar.selected",
+    localDateKey(anchor)
+  );
+  const [monthYear, monthNumber] = monthKey.split("-").map(Number);
+  const month = Number.isInteger(monthYear) && monthNumber >= 1 && monthNumber <= 12
+    ? new Date(monthYear, monthNumber - 1, 1, 12)
+    : new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12);
   const schedule = useMemo(
     () => buildLearningSchedule(path, completedMaterials, pathScheduleAnchor || anchor),
     [anchor, completedMaterials, path, pathScheduleAnchor],
@@ -40,9 +53,9 @@ export default function DesktopCalendar() {
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <section className="rounded-2xl border bg-card p-5">
             <div className="flex items-center justify-between">
-              <button type="button" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1, 12))} aria-label="上个月" className="grid size-8 place-items-center rounded-lg border hover:bg-accent"><ChevronLeft className="size-4" /></button>
+              <button type="button" onClick={() => setMonthKey(localDateKey(new Date(month.getFullYear(), month.getMonth() - 1, 1, 12)).slice(0, 7))} aria-label="上个月" className="grid size-8 place-items-center rounded-lg border hover:bg-accent"><ChevronLeft className="size-4" /></button>
               <h2 className="font-display text-lg font-semibold">{month.getFullYear()} 年 {month.getMonth() + 1} 月</h2>
-              <button type="button" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1, 12))} aria-label="下个月" className="grid size-8 place-items-center rounded-lg border hover:bg-accent"><ChevronRight className="size-4" /></button>
+              <button type="button" onClick={() => setMonthKey(localDateKey(new Date(month.getFullYear(), month.getMonth() + 1, 1, 12)).slice(0, 7))} aria-label="下个月" className="grid size-8 place-items-center rounded-lg border hover:bg-accent"><ChevronRight className="size-4" /></button>
             </div>
             <div className="mt-4 grid grid-cols-7 gap-1.5">
               {WEEKDAYS.map((day) => <div key={day} className="py-2 text-center text-xs text-muted-foreground">{day}</div>)}

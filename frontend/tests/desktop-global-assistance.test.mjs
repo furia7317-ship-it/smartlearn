@@ -18,6 +18,17 @@ test("desktop shell exposes real health and a global teacher outside studio", as
   assert.match(launcher, /session\.send\(text\)/);
   assert.match(launcher, /<VoiceCallControl/);
   assert.match(launcher, /surfaceMode="inline"/);
+  assert.match(launcher, /clampTeacherLauncherPosition/);
+  assert.match(launcher, /POSITION_STORAGE_KEY/);
+  assert.match(launcher, /DISMISSED_SESSION_KEY/);
+  assert.match(launcher, /collapsedPositionRef/);
+  assert.match(launcher, /onClick=\{minimizeLauncher\}/);
+  assert.match(launcher, /onClick=\{dismissLauncher\}/);
+  assert.match(launcher, /onPointerDown=\{startDrag\}/);
+  assert.match(launcher, /aria-label="拖动智能教师窗口"/);
+  assert.match(launcher, /grid size-16/);
+  assert.match(launcher, /拖动气泡，点击提问/);
+  assert.doesNotMatch(launcher, /min-w-\[330px\]/);
   assert.doesNotMatch(launcher, /教师会结合当前课程、学习路径和已经生成的资料回答/);
 });
 

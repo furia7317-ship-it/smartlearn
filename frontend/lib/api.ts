@@ -4,9 +4,12 @@ import type { AgentResourceAction, AgentResourceCandidate } from "@/lib/agent-ac
 import type { AgentTraceProtocolV2 } from "@/lib/generated/agent-run-protocol";
 import type { TutorAttachment } from "@/lib/types";
 
+// Keep browser and API on the same hostname.  A page opened through a WSL/LAN
+// address must not silently send credentials to `localhost`, which is a
+// different browser site and also fails the backend CORS policy.
 const browserApiHost =
-  typeof window !== "undefined" && window.location.hostname === "127.0.0.1"
-    ? "127.0.0.1"
+  typeof window !== "undefined" && window.location.hostname
+    ? window.location.hostname
     : "localhost";
 const browserApiBase =
   typeof window !== "undefined" && window.location.protocol === "https:"

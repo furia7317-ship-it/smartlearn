@@ -76,22 +76,23 @@ test("consolidated desktop destinations are reachable from their owning surfaces
 });
 
 test("desktop-only video actions target the desktop route without relying on removed web pages", async () => {
-  const [resources, path] = await Promise.all([
-    read("../components/desktop/desktop-resources.tsx"),
+  const [shell, path] = await Promise.all([
+    read("../components/layout/desktop-shell.tsx"),
     read("../components/desktop/desktop-path.tsx"),
   ]);
 
-  assert.match(resources, /href="\/desktop\/video-learning"/);
+  assert.match(shell, /href="\/desktop\/video-learning"/);
   assert.match(path, /<NextLink[\s\S]{0,120}href="\/desktop\/video-learning"/);
   assert.doesNotMatch(path, /href="\/video-learning"/);
 });
 
 test("desktop shell matches the selected 书院案头 direction and exposes real tools", async () => {
-  const [shell, home, homeDossier, deskStudy] = await Promise.all([
+  const [shell, home, homeDossier, deskStudy, desktopBrandAssets] = await Promise.all([
     read("../components/layout/desktop-shell.tsx"),
     read("../app/desktop/page.tsx"),
     read("../components/desktop/desktop-home-dossier.tsx"),
     read("../app/desk-study.css"),
+    readdir(new URL("../public/brand/desktop/", import.meta.url)),
   ]);
 
   const navBlock = shell.match(/const NAV[\s\S]*?\n\];/)?.[0] || "";
@@ -106,7 +107,12 @@ test("desktop shell matches the selected 书院案头 direction and exposes real
   assert.match(shell, /目标与设置/);
   assert.doesNotMatch(shell, /href:\s*"\/desktop\/create",\s*label:\s*"资源生成"/);
   assert.match(shell, /MessageCircle/);
-  assert.match(deskStudy, /\.desktop-rail\s*\{[\s\S]*width:\s*112px/);
+  assert.match(deskStudy, /\.desktop-rail\s*\{[\s\S]*width:\s*178px/);
+  assert.match(shell, /xueshu-plaque-v3\.png/);
+  assert.doesNotMatch(shell, /desktop-book-rings|book-ring/);
+  assert.doesNotMatch(deskStudy, /\.desktop-book-rings/);
+  assert.equal(desktopBrandAssets.some((name) => name.startsWith("book-ring")), false);
+  assert.match(deskStudy, /\[data-desktop-page-shell\]/);
   assert.match(deskStudy, /\.desktop-topbar\s*\{[\s\S]*height:\s*58px/);
   assert.match(deskStudy, /\.desktop-topbar-tools \.desktop-user-link\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*height:\s*34px;[\s\S]*align-items:\s*center;[\s\S]*white-space:\s*nowrap;/);
   assert.match(deskStudy, /--background:\s*#f6f0e5/);
@@ -134,9 +140,27 @@ test("desktop shell matches the selected 书院案头 direction and exposes real
   assert.doesNotMatch(home, /desktop-reviewed-status/);
   assert.doesNotMatch(home, /协同智能体[\s\S]{0,80}12/);
   const resources = await read("../components/desktop/desktop-resources.tsx");
-  assert.match(resources, /className="desktop-toolbar-primary"[\s\S]{0,120}让教师生成资料/);
+  assert.doesNotMatch(resources, /className="desktop-toolbar-primary"[\s\S]{0,120}生成新资料/);
+  assert.match(resources, /aria-label="收起书页"/);
+  assert.match(resources, /aria-label="展开资源典藏"/);
   assert.doesNotMatch(resources, /这里只发布最终审核通过的版本/);
   assert.doesNotMatch(shell, /marketMode|desktop-scope-market/);
+});
+
+test("discover presents the selected editorial-scroll direction with real destinations", async () => {
+  const discover = await read("../components/desktop/desktop-discover.tsx");
+
+  assert.match(discover, /discover-scroll-hero-v1\.png/);
+  assert.match(discover, /discover-maze-pine-v1\.png/);
+  assert.match(discover, /market-algorithm-v1\.png/);
+  assert.match(discover, /discover-journey-panorama-v1\.png/);
+  assert.match(discover, /今日策展/);
+  assert.match(discover, /<Link href="\/desktop\/market" className=\{styles\.heroAction\}>/);
+  assert.match(discover, /href="\/desktop\/theater"/);
+  assert.match(discover, /href="\/desktop\/market"/);
+  assert.match(discover, /二叉树迷宫课堂/);
+  assert.match(discover, /MARKET_ITEMS\.map/);
+  assert.doesNotMatch(discover, /探索不打断主路径/);
 });
 
 test("resource center has compact filters, real preview, export, confirmed delete, and offline recovery", async () => {

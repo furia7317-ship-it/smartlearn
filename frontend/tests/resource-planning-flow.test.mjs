@@ -468,7 +468,10 @@ test("resource center renders one de-duplicated collection that opens original i
   assert.match(desktopResources, /pathCollectionOpen/);
   assert.match(desktopResources, /pathResourceIds/);
   assert.match(desktopResources, /stage\.resources\.map\(\(\{ item \}\)/);
-  assert.match(desktopResources, /onClick=\{\(\) => selectResource\(item\)\}/);
+  assert.match(
+    desktopResources,
+    /onClick=\{\(\) => void selectEntry\(\{ kind: "resource", key: `resource:\$\{item\.id\}`, resource: item \}\)\}/,
+  );
   assert.match(desktopResources, /<ResourceViewer item=\{openItem\}/);
   assert.doesNotMatch(desktopResources, /pathCollections\.map/);
 });

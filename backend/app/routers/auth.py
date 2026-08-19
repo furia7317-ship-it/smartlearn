@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import time
 from datetime import datetime, timezone
+from ipaddress import ip_address
 from typing import Annotated, Literal
 from uuid import uuid4
 
@@ -143,7 +144,16 @@ def _desktop_cookie_request(request: Request) -> bool:
 
 def _local_http_cookie_request(request: Request) -> bool:
     """Local portable Web runs on HTTP, where browsers reject Secure cookies."""
-    return request.url.scheme == "http" and request.url.hostname in {"127.0.0.1", "localhost"}
+    if request.url.scheme != "http":
+        return False
+    hostname = request.url.hostname or ""
+    if hostname == "localhost":
+        return True
+    try:
+        address = ip_address(hostname)
+    except ValueError:
+        return False
+    return address.is_loopback or address.is_private
 
 
 def _session_cookie_options(request: Request) -> dict[str, bool | str]:

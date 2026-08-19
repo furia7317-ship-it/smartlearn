@@ -49,6 +49,7 @@ import {
 
 import { useAuth } from "@/components/auth-provider";
 import { UserAvatar } from "@/components/user-avatar";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import type { DailyTaskItem, DailyTaskPlan } from "@/lib/daily-task-plan";
 import type { LearningActivityEvent } from "@/lib/learning-activity";
 import type { LearningAnalytics, MasteryEvidence } from "@/lib/learning-analytics";
@@ -62,6 +63,7 @@ type HomePage = "today" | "analysis" | "growth";
 type Period = "week" | "month" | "term" | "all";
 
 const PAGE_ORDER: HomePage[] = ["today", "analysis", "growth"];
+const PERIOD_ORDER: Period[] = ["week", "month", "term", "all"];
 const PAGE_META: Record<HomePage, { title: string; range: string }> = {
   today: { title: "今日案头", range: "今天" },
   analysis: { title: "学习分析", range: "近 30 天" },
@@ -189,9 +191,14 @@ export function DesktopHomeDossier({
   const [activePage, setActivePage] = useState<HomePage>("today");
   const activePageRef = useRef<HomePage>("today");
   const [pageDirection, setPageDirection] = useState<DesktopPagerDirection>(1);
-  const [search, setSearch] = useState("");
-  const [period, setPeriod] = useState<Period>("week");
-  const [subject, setSubject] = useState("all");
+  const [search, setSearch] = useDesktopModuleStringState<string>("home", "dossier.search", "");
+  const [period, setPeriod] = useDesktopModuleStringState<Period>(
+    "home",
+    "dossier.period",
+    "week",
+    PERIOD_ORDER
+  );
+  const [subject, setSubject] = useDesktopModuleStringState<string>("home", "dossier.subject", "all");
   const [sessionNow] = useState(() => Date.now());
   const pageSwap = useMemo(() => getDesktopPagerSwap(Boolean(reducedMotion)), [reducedMotion]);
 

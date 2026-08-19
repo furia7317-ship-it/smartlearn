@@ -210,9 +210,10 @@ test("studio conversation uses the available desktop width", async () => {
   assert.doesNotMatch(chat, /max-w-\[760px\]/);
 });
 
-test("local preview allows the 127.0.0.1 browser origin", async () => {
+test("local preview allows loopback and the current WSL browser origin", async () => {
   const config = await source("../next.config.ts");
-  assert.match(config, /allowedDevOrigins:\s*\[\s*["']127\.0\.0\.1["']\s*\]/);
+  assert.match(config, /allowedDevOrigins:\s*\[[^\]]*["']127\.0\.0\.1["']/);
+  assert.match(config, /allowedDevOrigins:\s*\[[^\]]*["']172\.24\.20\.109["']/);
 });
 
 test("desktop launcher enters the exported desktop route", async () => {

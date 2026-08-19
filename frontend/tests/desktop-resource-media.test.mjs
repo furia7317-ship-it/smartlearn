@@ -1,0 +1,190 @@
+import assert from "node:assert/strict";
+import { access, readFile } from "node:fs/promises";
+import test from "node:test";
+
+const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
+
+test("resource center separates RAG knowledge base from user resources", async () => {
+  const [shell, resources] = await Promise.all([
+    read("../components/layout/desktop-shell.tsx"),
+    read("../components/desktop/desktop-resources.tsx"),
+  ]);
+
+  assert.match(shell, /href="\/desktop\/kb"/);
+  assert.match(shell, /href="\/desktop\/video-learning"/);
+  assert.match(resources, /AI 生成依据：课程知识库/);
+  assert.doesNotMatch(resources, /知识库文档/);
+  assert.match(resources, /external-video/);
+  assert.match(resources, /外部视频链接/);
+});
+
+test("closed resource book exposes only AI generation and knowledge base page entrances", async () => {
+  const [resources, styles] = await Promise.all([
+    read("../components/desktop/desktop-resources.tsx"),
+    read("../app/desk-study.css"),
+  ]);
+
+  const start = resources.indexOf('<section className="desktop-resource-closed-workbench"');
+  const end = resources.indexOf("</section>", start);
+  const workbench = resources.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.equal((workbench.match(/<Link /g) || []).length, 2);
+  assert.match(workbench, /href="\/desktop\/studio"/);
+  assert.match(workbench, /AI 生成资料/);
+  assert.match(workbench, /href="\/desktop\/kb"/);
+  assert.match(workbench, /进入知识库/);
+  assert.match(workbench, /resource-entry-ai-engraving-v1\.webp/);
+  assert.match(workbench, /resource-entry-kb-engraving-v1\.webp/);
+  assert.doesNotMatch(workbench, /上传资料|生成视频|添加视频链接|新建集合|批量选择/);
+  assert.match(styles, /desktop-resource-closed-workbench[\s\S]{0,180}inset:\s*0 calc\(50% \+ 46px\) 0 56px/);
+  assert.match(styles, /desktop-resource-closed-workbench__entrances[\s\S]{0,180}grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+});
+
+test("generated videos expose playback, copy, download, and source-link actions", async () => {
+  const resources = await read("../components/desktop/desktop-resources.tsx");
+
+  assert.match(resources, /media_file_url/);
+  assert.match(resources, /本地成片链接/);
+  assert.match(resources, /copyText\(mediaFileUrl/);
+  assert.match(resources, /download><Download/);
+  assert.match(resources, /内置浏览器打开/);
+  assert.match(resources, /openInBrowser\(url\)/);
+  assert.match(resources, /BROWSER_URL_KEY/);
+  assert.match(resources, /sl_studio_panels_v3/);
+  assert.match(resources, /open: "browser"/);
+  assert.doesNotMatch(resources, /sl_studio_panel_v1/);
+  await access(new URL("../public/brand/resources/merge-sort-video-poster-v1.png", import.meta.url));
+});
+
+test("resource folio keeps dense resource actions unobstructed", async () => {
+  const [shell, resources, styles] = await Promise.all([
+    read("../components/layout/desktop-shell.tsx"),
+    read("../components/desktop/desktop-resources.tsx"),
+    read("../app/desk-study.css"),
+  ]);
+
+  assert.match(shell, /!pathname\.startsWith\("\/desktop\/resources"\)/);
+  assert.match(resources, /desktop-resource-left-page/);
+  assert.match(resources, /desktop-resource-left-page__body/);
+  assert.match(styles, /resource-spread-v3\.png/);
+  assert.match(styles, /resource-center-hero-v3\.webp/);
+  assert.match(styles, /desktop-resource-preview__tools/);
+  assert.match(styles, /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /grid-template-columns:\s*168px minmax\(0, 1fr\)/);
+  assert.match(styles, /padding:\s*0 18px 22px/);
+  assert.match(styles, /padding:\s*20px 24px 24px 28px/);
+  await access(new URL("../public/brand/resources/resource-spread-v3.png", import.meta.url));
+  await access(new URL("../public/brand/resources/resource-center-hero-v3.webp", import.meta.url));
+});
+
+test("resource folio uses the same hard-cover page-flip mechanism as 智学云枢", async () => {
+  const [resources, flip, styles, packageJson] = await Promise.all([
+    read("../components/desktop/desktop-resources.tsx"),
+    read("../components/desktop/resource-book-flip.tsx"),
+    read("../app/desk-study.css"),
+    read("../package.json"),
+  ]);
+
+  const header = resources.slice(
+    resources.indexOf('<header className="desktop-resource-center__header">'),
+    resources.indexOf("</header>")
+  );
+  assert.doesNotMatch(header, /生成新资料/);
+  assert.match(resources, /type ResourceBookState = "open" \| "closing" \| "closed" \| "opening"/);
+  assert.match(resources, /aria-label="收起书页"/);
+  assert.match(resources, /aria-label="展开资源典藏"/);
+  assert.match(resources, /resource-book-cover-v3\.webp/);
+  assert.match(resources, /ResourceBookFlip/);
+  assert.match(resources, /bookFlipReady && "has-book-flip-overlay"/);
+  assert.match(packageJson, /"page-flip": "\^2\.0\.7"/);
+  assert.match(flip, /import \{ PageFlip \} from "page-flip"/);
+  assert.match(flip, /coverPage\.dataset\.density = "hard"/);
+  assert.match(flip, /host\.append\(coverPage, leftPage, rightPage\)/);
+  assert.match(flip, /return <div ref=\{hostRef\} className="desktop-resource-page-flip"/);
+  assert.match(flip, /pageFlip\.destroy\(\)[\s\S]{0,120}parent\.insertBefore\(host, nextSibling\)/);
+  assert.match(flip, /showCover:\s*true/);
+  assert.match(flip, /drawShadow:\s*true/);
+  assert.match(flip, /maxShadowOpacity:\s*0\.5/);
+  assert.match(flip, /const flipDuration = reduceMotion \? 1 : 800/);
+  assert.match(flip, /flippingTime:\s*flipDuration/);
+  assert.match(flip, /pageFlip\.on<number>\("flip"/);
+  assert.match(flip, /cloneVisualPage/);
+  assert.match(flip, /pageFlip\.flipNext\("top"\)/);
+  assert.match(flip, /pageFlip\.flipPrev\("top"\)/);
+  assert.match(styles, /desktop-resource-book-closed[\s\S]{0,420}background:\s*transparent/);
+  assert.match(styles, /desktop-resource-book-closed[\s\S]{0,180}inset:\s*0 0 0 50%/);
+  assert.match(styles, /desktop-resource-book-closed > img[\s\S]{0,240}width:\s*113\.11%/);
+  assert.match(styles, /desktop-resource-book-closed > img[\s\S]{0,280}object-fit:\s*fill/);
+  assert.match(styles, /desktop-resource-book-closed > span[\s\S]{0,120}top:\s*34\.9%/);
+  assert.match(styles, /desktop-resource-book-closed > span[\s\S]{0,360}background:\s*transparent/);
+  assert.match(styles, /desktop-resource-book-closed:hover[\s\S]{0,180}scale\(1\.03\) rotateY\(-5deg\)/);
+  assert.match(styles, /prefers-reduced-motion:\s*no-preference/);
+  assert.match(styles, /desktop-resource-page-flip\.is-ready/);
+  assert.match(styles, /desktop-resource-page-flip\.stf__parent[\s\S]{0,100}position:\s*absolute/);
+  assert.match(styles, /has-book-flip-overlay > \.desktop-resource-workspace[\s\S]{0,80}visibility:\s*hidden/);
+  assert.match(styles, /--resource-book-height:\s*704px/);
+  assert.match(styles, /desktop-resource-book-shell[\s\S]{0,180}min-height:\s*var\(--resource-book-height\)/);
+  assert.match(resources, /bookTransitionLockRef/);
+  assert.match(resources, /bookTransitionSequenceRef/);
+  assert.match(resources, /ResizeObserver\(measure\)/);
+  assert.match(flip, /if \(disposed \|\| completed\) return/);
+  assert.match(flip, /const remaining = flipDuration - \(performance\.now\(\) - startedAt\)/);
+  assert.doesNotMatch(resources, /focusMode|专注阅读|focusExitRef|focusToggleRef/);
+  await access(new URL("../public/brand/resources/resource-book-cover-v3.webp", import.meta.url));
+});
+
+test("resource catalog persists real collections and only renders selectors in batch mode", async () => {
+  const [resources, collectionsApi, backendRouter, backendModel, backendMain] = await Promise.all([
+    read("../components/desktop/desktop-resources.tsx"),
+    read("../lib/resource-collections.ts"),
+    read("../../backend/app/routers/resource_collections.py"),
+    read("../../backend/app/models/learning.py"),
+    read("../../backend/app/main.py"),
+  ]);
+
+  assert.match(resources, /学习路径合集/);
+  assert.match(resources, /buildPathResourceCollection/);
+  assert.match(resources, /新建集合/);
+  assert.match(resources, /我的集合/);
+  assert.match(resources, /createResourceCollection/);
+  assert.match(resources, /updateResourceCollection/);
+  assert.match(resources, /desktop-resource-collection-editor__resources/);
+  assert.match(resources, /\{marketSelecting && <span className=\{cn\("desktop-resource-selectbox"/);
+  assert.doesNotMatch(resources, /desktop-resource-selectbox", selected && !marketSelecting/);
+  assert.match(collectionsApi, /credentials: "include"/);
+  assert.match(collectionsApi, /api\/resource-collections/);
+  assert.match(backendRouter, /invalid_collection_resources/);
+  assert.match(backendRouter, /GeneratedMaterial\.student_id == student_id/);
+  assert.match(backendModel, /class ResourceCollection/);
+  assert.match(backendMain, /resource_collections\.router/);
+  assert.doesNotMatch(resources, /window\.prompt/);
+});
+
+test("desktop modules restore their stable state after navigation", async () => {
+  const [shell, transition, resources, resourceView, moduleView, moduleHook] = await Promise.all([
+    read("../components/layout/desktop-shell.tsx"),
+    read("../components/layout/desktop-page-transition.tsx"),
+    read("../components/desktop/desktop-resources.tsx"),
+    read("../lib/resource-center-view.ts"),
+    read("../lib/desktop-module-view.ts"),
+    read("../hooks/use-desktop-module-view-state.ts"),
+  ]);
+
+  assert.match(shell, /getDesktopModuleReturnHref/);
+  assert.match(shell, /rememberDesktopModuleHref/);
+  assert.match(transition, /onScrollCapture=\{rememberScroll\}/);
+  assert.match(transition, /scrollPath: window\.location\.pathname/);
+  assert.match(resources, /readResourceCenterView/);
+  assert.match(resources, /saveResourceCenterView/);
+  assert.match(resources, /restoredSelectedKeyRef/);
+  assert.match(resources, /ref=\{resourceScrollRef\}/);
+  assert.match(resourceView, /sessionStorage/);
+  assert.match(resourceView, /bookState: ResourceCenterStableBookState/);
+  assert.match(resourceView, /bookHeight: number/);
+  assert.match(resourceView, /selectedKey: string/);
+  assert.match(moduleView, /type DesktopModuleId/);
+  assert.match(moduleView, /"home"[\s\S]*"studio"[\s\S]*"path"[\s\S]*"resources"[\s\S]*"practice"[\s\S]*"discover"/);
+  assert.match(moduleView, /scrollTops: Record<string, number>/);
+  assert.match(moduleView, /values: Record<string, unknown>/);
+  assert.match(moduleHook, /useDesktopModuleStringState/);
+});

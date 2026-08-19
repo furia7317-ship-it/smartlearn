@@ -72,10 +72,13 @@ import {
 } from "@/lib/master-learning-path";
 import { reflectionHref } from "@/lib/reflection";
 import type { OrchestratorMode } from "@/hooks/use-orchestrator";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import type { PathStep, ResourceItem } from "@/lib/types";
 import { getDesktopViewSwap } from "@/lib/web-motion";
 import { cn } from "@/lib/utils";
 import styles from "./desktop-path.module.css";
+
+const PATH_VIEW_OPTIONS = ["master", "subjects"] as const;
 
 /**
  * 桌面专属「学习路径」——完全独立于 web 的 /path：自己的布局、自己的 StepCard/GoalsSection
@@ -1296,9 +1299,18 @@ export default function DesktopPath() {
     taskKey?: string;
   } | null>(null);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
-  const [view, setView] = useState<"master" | "subjects">("subjects");
+  const [view, setView] = useDesktopModuleStringState<"master" | "subjects">(
+    "path",
+    "workspace.view",
+    "subjects",
+    PATH_VIEW_OPTIONS
+  );
   const viewSwap = getDesktopViewSwap(Boolean(useReducedMotion()));
-  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const [selectedSubjectId, setSelectedSubjectId] = useDesktopModuleStringState<string>(
+    "path",
+    "workspace.subject",
+    ""
+  );
   const [activationSubject, setActivationSubject] = useState<SubjectLearningPath | null>(null);
   const [replanSubject, setReplanSubject] = useState<SubjectLearningPath | null>(null);
   const [supplementSubject, setSupplementSubject] = useState<SubjectLearningPath | null>(null);

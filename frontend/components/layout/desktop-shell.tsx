@@ -12,7 +12,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import {
+  BookMarked,
   Compass,
+  Database,
   House,
   Library,
   Loader2,
@@ -26,6 +28,7 @@ import {
   Settings,
   SquareLibrary,
   UserRound,
+  Video,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +44,10 @@ import { useUserSettings } from "@/hooks/use-user-settings";
 import { useMaterialGenerator } from "@/hooks/use-material-generator";
 import { UserAvatar } from "@/components/user-avatar";
 import { checkBackend } from "@/lib/api";
+import {
+  getDesktopModuleReturnHref,
+  rememberDesktopModuleHref,
+} from "@/lib/desktop-module-view";
 import {
   DESKTOP_BOOK_CLOSE_DURATION_MS,
   DESKTOP_BOOK_OPEN_DURATION_MS,
@@ -180,6 +187,10 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const displayName = name.trim() || "同学";
   const profileImmersive = pathname.startsWith("/desktop/profile");
   const homeImmersive = pathname === "/desktop" || pathname === "/desktop/";
+  const resourceContext =
+    pathname.startsWith("/desktop/resources") ||
+    pathname.startsWith("/desktop/video-learning") ||
+    pathname.startsWith("/desktop/kb");
   const currentCourse = session.masterPath.length > 0
     ? "总学习路径"
     : session.subjectPaths.length > 0
@@ -194,19 +205,23 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
 
   const navigateFromRail = (item: DesktopNavItem) => {
     if (isNavItemActive(item) || bookPhase !== "idle") return;
+    rememberDesktopModuleHref(
+      `${window.location.pathname}${window.location.search}${window.location.hash}`
+    );
+    const href = getDesktopModuleReturnHref(item.href);
     if (reducedMotion) {
-      router.push(item.href);
+      router.push(href);
       return;
     }
 
-    pendingBookRouteRef.current = item;
+    pendingBookRouteRef.current = { href, label: item.label };
     setBookLabel(item.label);
     setBookPhase("closing");
     window.clearTimeout(bookCloseTimerRef.current);
     window.clearTimeout(bookFallbackTimerRef.current);
     bookCloseTimerRef.current = window.setTimeout(() => {
       setBookPhase("closed");
-      router.push(item.href);
+      router.push(href);
       bookFallbackTimerRef.current = window.setTimeout(() => {
         setBookPhase((current) => (current === "closed" ? "opening" : current));
       }, 800);
@@ -218,7 +233,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
     const pending = pendingBookRouteRef.current;
     if (!pending) return;
     const current = normalizeRouteKey(pathname);
-    const target = normalizeRouteKey(pending.href);
+    const target = normalizeRouteKey(pending.href.split(/[?#]/, 1)[0]);
     const arrived =
       target === "/desktop"
         ? current === target
@@ -285,17 +300,15 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
       <aside className={cn("desktop-rail", railCollapsed && "is-collapsed")} aria-label="桌面主导航">
         <Link href="/desktop" className="desktop-brand" aria-label="返回首页">
           <Image
-            src="/brand/xueshu-app-icon.png"
+            src="/brand/desktop/xueshu-plaque-v3.png"
             alt=""
-            width={32}
-            height={32}
+            width={112}
+            height={86}
             priority
-            className="desktop-brand__icon"
+            className="desktop-brand__plaque"
           />
-          <span className="desktop-brand__copy">
-            <strong>学枢</strong>
-            <small>XUESHU</small>
-          </span>
+          <span className="sr-only">学枢</span>
+          <span className="sr-only">XUESHU</span>
         </Link>
 
         <button
@@ -322,23 +335,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         </LayoutGroup>
       </aside>
 
-      {!railCollapsed && (
-        <div className="desktop-book-rings" aria-hidden>
-          {Array.from({ length: 5 }, (_, index) => (
-            <img
-              key={index}
-              src="/brand/desktop/book-ring-v2.png"
-              alt=""
-              width={96}
-              height={69}
-              loading="eager"
-            />
-          ))}
-        </div>
-      )}
-
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        {!profileImmersive && !homeImmersive && <header className="desktop-topbar">
+      <div className="relative flex min-w-0 flex-1 flex-col" data-desktop-page-shell>
+        {!profileImmersive && !homeImmersive && <header className={cn("desktop-topbar", resourceContext && "is-resource-context")}>
           <form className="desktop-global-search" role="search" onSubmit={submitSearch}>
             <Search aria-hidden className="size-4 shrink-0" />
             <label className="sr-only" htmlFor="desktop-global-search">
@@ -355,6 +353,34 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
           </form>
 
           <nav className="desktop-topbar-tools" aria-label="快捷入口">
+            {resourceContext && (
+              <div className="desktop-resource-shortcuts" aria-label="资源中心快捷入口">
+                <Link href="/desktop/resources?origin=referenced" className="desktop-resource-shortcut">
+                  <BookMarked aria-hidden className="size-[16px]" />
+                  <span>知识来源</span>
+                </Link>
+                <Link
+                  href="/desktop/video-learning"
+                  className={cn(
+                    "desktop-resource-shortcut",
+                    pathname.startsWith("/desktop/video-learning") && "is-active"
+                  )}
+                >
+                  <Video aria-hidden className="size-[16px]" />
+                  <span>视频学习</span>
+                </Link>
+                <Link
+                  href="/desktop/kb"
+                  className={cn(
+                    "desktop-resource-shortcut is-knowledge-base",
+                    pathname.startsWith("/desktop/kb") && "is-active"
+                  )}
+                >
+                  <Database aria-hidden className="size-[16px]" />
+                  <span>知识库</span>
+                </Link>
+              </div>
+            )}
             {materialGenerator.running && (
               <Link
                 href="/desktop/studio"
@@ -365,10 +391,12 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
                 <span>资源生成中</span>
               </Link>
             )}
-            <Link href="/desktop/path" className="desktop-course-chip" title="打开总学习路径">
-              <SquareLibrary aria-hidden className="size-[18px]" />
-              <span>{currentCourse}</span>
-            </Link>
+            {!resourceContext && (
+              <Link href="/desktop/path" className="desktop-course-chip" title="打开总学习路径">
+                <SquareLibrary aria-hidden className="size-[18px]" />
+                <span>{currentCourse}</span>
+              </Link>
+            )}
             <span
               className={cn(
                 "desktop-service-state",
@@ -428,7 +456,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
           <DesktopPageTransition>{children}</DesktopPageTransition>
         </main>
-        {!pathname.startsWith("/desktop/studio") && <DesktopTeacherLauncher />}
+        {!pathname.startsWith("/desktop/studio") && !pathname.startsWith("/desktop/resources") && (
+          <DesktopTeacherLauncher railCollapsed={railCollapsed} />
+        )}
         <DesktopBookTransition phase={bookPhase} label={bookLabel} />
       </div>
     </div>

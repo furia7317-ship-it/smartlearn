@@ -61,8 +61,20 @@ export interface MaterialInput {
 export interface StoredMaterial extends ResourceItem {
   knowledge_points: string;
   created_at: string;
+  source: string;
+  external_video?: ExternalVideoSummary | null;
   exam_id?: string | null;
   review_approved: true;
+}
+
+export interface ExternalVideoSummary {
+  bvid: string;
+  title: string;
+  url: string;
+  embed_url: string;
+  author: string;
+  duration: string;
+  summary: string;
 }
 
 export interface ReflectionInput {
@@ -88,6 +100,11 @@ function summaryToItem(s: Record<string, unknown>): StoredMaterial {
     data: (s.data as ResourceData) ?? undefined,
     knowledge_points: String(s.knowledge_points ?? ""),
     created_at: String(s.created_at ?? ""),
+    source: String(s.source ?? ""),
+    external_video:
+      s.external_video && typeof s.external_video === "object"
+        ? (s.external_video as ExternalVideoSummary)
+        : null,
     exam_id: (s.exam_id as string | null) ?? null,
     review_approved: true,
   };

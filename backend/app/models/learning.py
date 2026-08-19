@@ -288,6 +288,23 @@ class GeneratedMaterial(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class ResourceCollection(Base):
+    """One learner-owned collection of approved resource-center materials."""
+
+    __tablename__ = "resource_collections"
+    __table_args__ = (
+        UniqueConstraint("student_id", "name", name="uq_resource_collection_student_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    student_id: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(64))
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    resource_ids: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(nullable=True, onupdate=func.now())
+
+
 class LearningMarketListing(Base):
     """A reviewed resource snapshot shared to the community learning market."""
 

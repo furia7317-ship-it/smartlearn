@@ -6,6 +6,7 @@ import { DesktopHomeDossier } from "@/components/desktop/desktop-home-dossier";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { ResourceViewer } from "@/components/resource-viewer";
 import { useUserSettings } from "@/hooks/use-user-settings";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import { fetchBehaviorDashboard } from "@/lib/api";
 import { buildPathDashboardPlan } from "@/lib/daily-task-plan";
 import {
@@ -42,7 +43,11 @@ export default function DesktopHome() {
   const [serverActivities, setServerActivities] = useState<LearningActivityEvent[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [openItem, setOpenItem] = useState<ResourceItem | null>(null);
-  const [selectedTaskKey, setSelectedTaskKey] = useState("");
+  const [selectedTaskKey, setSelectedTaskKey] = useDesktopModuleStringState<string>(
+    "home",
+    "dossier.task",
+    ""
+  );
   const displayName = name.trim() || "同学";
 
   useEffect(() => {

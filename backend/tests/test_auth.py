@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 
 from fastapi import FastAPI, Request, Response
 from sqlalchemy import func, select
@@ -131,6 +132,37 @@ def test_local_portable_web_uses_http_compatible_session_cookie():
     assert "httponly" in cookie
     assert "secure" not in cookie
     assert "samesite=lax" in cookie
+
+
+def test_private_network_portable_web_uses_http_compatible_session_cookie():
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "scheme": "http",
+            "server": ("172.24.20.109", 8000),
+            "path": "/api/auth/login",
+            "headers": [(b"origin", b"http://172.24.20.109:3000")],
+        }
+    )
+    response = Response()
+
+    _set_session_cookie(response, "portable-lan-session-token", request)
+
+    cookie = response.headers["set-cookie"].lower()
+    assert "httponly" in cookie
+    assert "secure" not in cookie
+    assert "samesite=lax" in cookie
+
+
+def test_cors_regex_allows_only_known_private_frontend_origins():
+    from app.core.config import settings
+
+    assert re.fullmatch(settings.CORS_ORIGIN_REGEX, "http://172.24.20.109:3000")
+    assert re.fullmatch(settings.CORS_ORIGIN_REGEX, "http://192.168.1.25:5173")
+    assert not re.fullmatch(settings.CORS_ORIGIN_REGEX, "https://172.24.20.109:3000")
+    assert not re.fullmatch(settings.CORS_ORIGIN_REGEX, "http://172.24.20.109:8080")
+    assert not re.fullmatch(settings.CORS_ORIGIN_REGEX, "http://example.com:3000")
 
 
 def test_registration_onboarding_refresh_and_logout_use_one_cookie_session(tmp_path):

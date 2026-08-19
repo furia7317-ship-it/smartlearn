@@ -325,26 +325,6 @@
   pointer-events: none;
 }
 
-.desktop-book-rings {
-  position: absolute;
-  z-index: 45;
-  top: 0;
-  bottom: 0;
-  left: 137px;
-  display: flex;
-  width: 98px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-around;
-  padding: 52px 0 40px;
-  pointer-events: none;
-  filter: drop-shadow(2px 4px 3px rgb(24 14 5 / .42));
-}
-.desktop-book-rings img {
-  width: 94px;
-  height: auto;
-  object-fit: contain;
-}
 .desktop-rail-profile {
   position: relative;
   z-index: 3;
