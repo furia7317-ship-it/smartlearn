@@ -58,7 +58,6 @@ The final rail crop covers the left `280 px`, including the plaque, active page 
 - `frontend/public/brand/desktop/xueshu-plaque-v3.png`
 
 final result: passed
----
 
 # 资源中心闭书页视觉回归（2026-08-19 下午）
 
@@ -655,5 +654,37 @@ final result: passed
 - [x] Preserve simultaneous entrance exit and book opening.
 - [x] Verify target and narrower desktop viewports.
 - [x] Check console output and reduced-motion fallback.
+
+final result: passed
+
+---
+
+# Resource Center Desktop Frame Follow-up QA
+
+**Change requested**
+
+- Expand the resource-center canvas for desktop widths so the lower composition no longer leaves large empty side gutters.
+- Add a generated lower-edge decoration while keeping the approved large leather book and existing workbench content unchanged.
+
+**Implementation evidence**
+
+- Standard desktop screenshot: `D:/816/tmp/resource-center-design-qa/desktop-frame-footer-1536x1024.png`
+- Wide desktop screenshot: `D:/816/tmp/resource-center-design-qa/desktop-frame-footer-wide.png`
+- Browser URL: `http://127.0.0.1:3000/desktop/resources/?category=materials`
+- Generated asset: `frontend/public/brand/resources/resource-center-footer-decor-v1.webp`
+
+**Visual findings**
+
+- The desktop frame now uses the full available content width with only the shell's narrow safety gutter; the previous 1560px cap no longer creates broad empty bands on wide displays.
+- The large book remains the dominant element and the two entry cards plus learning activity retain their approved hierarchy.
+- The footer decoration joins the page on the same parchment-and-walnut axis as the book stage. Its ink library and mountain linework stays concentrated near the lower edge and does not compete with interactive content.
+- No new gradient, text, icon, or synthetic UI element was introduced in the generated raster.
+- Horizontal overflow: false at the 1536px desktop check. The 1941px wide check fills the available main canvas with the same narrow safety gutter.
+
+**Asset generation**
+
+- Mode: built-in ImageGen.
+- Prompt direction: a quiet Chinese academy footer on warm rice paper, faint ink architecture and mountains along the lower corners, and a dark walnut plinth at the bottom; no people, book, interface, copy, gradient, or glossy AI-style decoration.
+- Production format: WebP, 91 KB.
 
 final result: passed

@@ -2843,9 +2843,27 @@
 }
 
 .desktop-resource-center__frame {
-  width: min(1560px, calc(100% - 24px));
+  position: relative;
+  display: flex;
+  width: calc(100% - 24px);
+  min-height: 100%;
   container-type: inline-size;
-  padding: 0 0 32px;
+  flex-direction: column;
+  padding: 0;
+}
+
+.desktop-resource-center__frame::after {
+  display: block;
+  width: 100%;
+  height: clamp(150px, 12cqw, 230px);
+  flex: none;
+  background-color: #e7dece;
+  background-image: url("/brand/resources/resource-center-footer-decor-v1.webp");
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  background-size: cover;
+  content: "";
+  pointer-events: none;
 }
 
 .desktop-resource-center__header {
@@ -4902,7 +4920,7 @@
 
 @media (max-width: 1110px) {
   .desktop-resource-center__frame {
-    width: min(100% - 18px, 1380px);
+    width: calc(100% - 18px);
   }
 
   .desktop-resource-workspace {

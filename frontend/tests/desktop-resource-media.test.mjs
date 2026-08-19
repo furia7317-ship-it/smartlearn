@@ -39,6 +39,7 @@ test("closed resource book exposes only AI generation and knowledge base page en
   assert.match(workbench, /查看全部动态/);
   assert.doesNotMatch(workbench, /上传资料|生成视频|添加视频链接|新建集合|批量选择/);
   assert.match(styles, /resource-center-library-backdrop-v1\.webp/);
+  assert.match(styles, /resource-center-footer-decor-v1\.webp/);
   assert.match(styles, /desktop-resource-closed-workbench[\s\S]{0,180}inset:\s*8px calc\(50% \+ 42px\) 34px 0/);
   assert.match(styles, /desktop-resource-closed-workbench__entrances[\s\S]{0,180}grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(styles, /@keyframes desktop-resource-closed-entry-arrive/);
@@ -145,7 +146,7 @@ test("resource folio uses the same hard-cover page-flip mechanism as 智学云�
   assert.match(styles, /desktop-resource-page-flip\.is-ready/);
   assert.match(styles, /desktop-resource-page-flip\.stf__parent[\s\S]{0,100}position:\s*absolute/);
   assert.match(styles, /has-book-flip-overlay > \.desktop-resource-workspace[\s\S]{0,80}visibility:\s*hidden/);
-  assert.match(styles, /desktop-resource-center__frame[\s\S]{0,100}width:\s*min\(1560px, calc\(100% - 24px\)\)/);
+  assert.match(styles, /desktop-resource-center__frame[\s\S]{0,140}width:\s*calc\(100% - 24px\)/);
   assert.match(styles, /desktop-resource-center__frame[\s\S]{0,140}container-type:\s*inline-size/);
   assert.match(styles, /--resource-book-height:\s*max\([\s\S]{0,120}clamp\(648px, 50cqw, 720px\)/);
   assert.match(resources, /--resource-book-content-height/);
@@ -153,6 +154,7 @@ test("resource folio uses the same hard-cover page-flip mechanism as 智学云�
   assert.match(resources, /Math\.ceil\(bounds\.width \/ 2\)/);
   assert.match(styles, /desktop-resource-book-shell[\s\S]{0,180}min-height:\s*var\(--resource-book-height\)/);
   assert.match(resources, /bookTransitionLockRef/);
+  await access(new URL("../public/brand/resources/resource-center-footer-decor-v1.webp", import.meta.url));
   assert.match(resources, /bookTransitionSequenceRef/);
   assert.match(resources, /ResizeObserver\(measure\)/);
   assert.match(flip, /if \(disposed \|\| completed\) return/);
