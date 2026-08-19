@@ -12,11 +12,12 @@ test("desktop shell has a transform-only route transition that respects reduced 
 
   assert.match(transition, /useReducedMotion/);
   assert.match(transition, /useAnimationControls/);
+  assert.match(transition, /useLayoutEffect/);
   assert.match(transition, /requestAnimationFrame/);
   assert.match(transition, /initial=\{false\}/);
   assert.match(
     transition,
-    /if \(reducedMotion\)[\s\S]{0,240}?controls\.set\([\s\S]{0,240}?return;/,
+    /if \(reducedMotion \|\| suppressMotion\)[\s\S]{0,240}?controls\.set\([\s\S]{0,240}?return;/,
     "reduced motion must jump to the settled state and skip the animation",
   );
   assert.doesNotMatch(transition, /AnimatePresence/);
@@ -35,7 +36,7 @@ test("desktop shell has a transform-only route transition that respects reduced 
   assert.match(shell, /DesktopPageTransition/);
   assert.match(
     shell,
-    /<main[\s\S]{0,160}?<DesktopPageTransition>\s*\{children\}\s*<\/DesktopPageTransition>/,
+    /<main[\s\S]{0,200}?<DesktopPageTransition suppressMotion=\{bookPhase !== "idle"\}>\s*\{children\}\s*<\/DesktopPageTransition>/,
     "the desktop <main> must mount the route transition around its children",
   );
 });
@@ -121,6 +122,7 @@ test("desktop rail navigation closes and reopens a transform-only book", async (
   ]);
 
   assert.match(shell, /navigateFromRail/);
+  assert.match(shell, /router\.prefetch\(href\)/, "primary desktop modules should be warmed before navigation");
   assert.match(shell, /DesktopBookTransition/);
   assert.match(shell, /bookPhase/);
   assert.match(
@@ -154,6 +156,18 @@ test("desktop rail navigation closes and reopens a transform-only book", async (
   assert.ok(motion.DESKTOP_BOOK_OPEN_DURATION_MS <= 450);
   assert.ok(motion.DESKTOP_BOOK_CLOSE_DURATION_MS <= 240);
   assert.ok(motion.DESKTOP_BOOK_OPEN_DURATION_MS <= 280);
+  assert.ok(motion.DESKTOP_BOOK_CLOSE_DURATION_MS <= 180);
+  assert.ok(motion.DESKTOP_BOOK_OPEN_DURATION_MS <= 200);
+  assert.match(
+    shell,
+    /router\.push\(href\);[\s\S]{0,240}?bookCloseTimerRef\.current\s*=\s*window\.setTimeout/,
+    "route loading must start before the closing animation completes",
+  );
+  assert.match(
+    shell,
+    /<DesktopPageTransition suppressMotion=\{bookPhase !== "idle"\}>/,
+    "the full-page transform must not compete with the book overlay",
+  );
 });
 
 test("heavy desktop pages animate only their outermost view container", async () => {

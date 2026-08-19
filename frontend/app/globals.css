@@ -371,13 +371,15 @@
   justify-items: center;
   gap: 24px;
   overflow: hidden;
+  contain: strict;
   background:
     radial-gradient(circle at 50% 44%, rgb(255 250 239 / 0.96), rgb(238 228 211 / 0.96) 58%, rgb(222 207 184 / 0.97));
   pointer-events: auto;
-  animation: desktop-book-overlay-in 120ms ease-out both;
+  will-change: opacity;
+  animation: desktop-book-overlay-in 80ms ease-out both;
 }
 .desktop-book-transition[data-phase="opening"] {
-  animation: desktop-book-overlay-out 420ms ease-in both;
+  animation: desktop-book-overlay-out 220ms ease-in both;
 }
 .desktop-book-transition__stage {
   position: relative;
@@ -414,13 +416,13 @@
   will-change: transform;
 }
 .desktop-book-transition[data-phase="closing"] .desktop-book-transition__turning-cover {
-  animation: desktop-book-close 220ms cubic-bezier(0.55, 0.02, 0.42, 1) both;
+  animation: desktop-book-close 160ms cubic-bezier(0.55, 0.02, 0.42, 1) both;
 }
 .desktop-book-transition[data-phase="closed"] .desktop-book-transition__turning-cover {
   transform: rotateY(-178deg) translateZ(1px);
 }
 .desktop-book-transition[data-phase="opening"] .desktop-book-transition__turning-cover {
-  animation: desktop-book-open 260ms cubic-bezier(0.2, 0.78, 0.24, 1) both;
+  animation: desktop-book-open 180ms cubic-bezier(0.2, 0.78, 0.24, 1) both;
 }
 .desktop-book-transition__page-face,
 .desktop-book-transition__cover-face {

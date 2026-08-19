@@ -100,7 +100,14 @@ const NAV: DesktopNavItem[] = [
 
 const RAIL_COLLAPSED_KEY = "sl_desktop_rail_collapsed_v1";
 const SERVICE_POLL_INTERVAL_MS = 15_000;
+const BOOK_ROUTE_FALLBACK_MS = 700;
 type ServiceState = "checking" | "live" | "offline";
+type PendingBookRoute = {
+  href: string;
+  label: string;
+  arrived: boolean;
+  closeComplete: boolean;
+};
 
 function RailLink({
   item,
@@ -162,7 +169,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const [bookPhase, setBookPhase] =
     useState<DesktopBookTransitionPhase>("idle");
   const [bookLabel, setBookLabel] = useState("");
-  const pendingBookRouteRef = useRef<{ href: string; label: string } | null>(null);
+  const pendingBookRouteRef = useRef<PendingBookRoute | null>(null);
   const bookCloseTimerRef = useRef<number | undefined>(undefined);
   const bookOpenTimerRef = useRef<number | undefined>(undefined);
   const bookFallbackTimerRef = useRef<number | undefined>(undefined);
@@ -203,6 +210,13 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const isNavItemActive = (item: DesktopNavItem) =>
     isActive(item.href) || item.activePrefixes?.some((prefix) => pathname.startsWith(prefix)) === true;
 
+  useEffect(() => {
+    const targets = new Set(
+      NAV.map((item) => getDesktopModuleReturnHref(item.href))
+    );
+    targets.forEach((href) => router.prefetch(href));
+  }, [router]);
+
   const navigateFromRail = (item: DesktopNavItem) => {
     if (isNavItemActive(item) || bookPhase !== "idle") return;
     rememberDesktopModuleHref(
@@ -214,22 +228,36 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    pendingBookRouteRef.current = { href, label: item.label };
+    const pending: PendingBookRoute = {
+      href,
+      label: item.label,
+      arrived: false,
+      closeComplete: false,
+    };
+    pendingBookRouteRef.current = pending;
     setBookLabel(item.label);
     setBookPhase("closing");
     window.clearTimeout(bookCloseTimerRef.current);
     window.clearTimeout(bookFallbackTimerRef.current);
+
+    // 与参考应用一致：导航和遮罩过场同时开始，不再等合书结束后才请求下一页。
+    router.push(href);
     bookCloseTimerRef.current = window.setTimeout(() => {
-      setBookPhase("closed");
-      router.push(href);
-      bookFallbackTimerRef.current = window.setTimeout(() => {
-        setBookPhase((current) => (current === "closed" ? "opening" : current));
-      }, 800);
+      if (pendingBookRouteRef.current !== pending) return;
+      pending.closeComplete = true;
+      setBookPhase(pending.arrived ? "opening" : "closed");
     }, DESKTOP_BOOK_CLOSE_DURATION_MS);
+
+    bookFallbackTimerRef.current = window.setTimeout(() => {
+      if (pendingBookRouteRef.current !== pending) return;
+      pending.closeComplete = true;
+      setBookPhase((current) =>
+        current === "closing" || current === "closed" ? "opening" : current
+      );
+    }, BOOK_ROUTE_FALLBACK_MS);
   };
 
   useEffect(() => {
-    if (bookPhase !== "closed") return;
     const pending = pendingBookRouteRef.current;
     if (!pending) return;
     const current = normalizeRouteKey(pathname);
@@ -239,6 +267,8 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         ? current === target
         : current === target || current.startsWith(`${target}/`);
     if (!arrived) return;
+    pending.arrived = true;
+    if (!pending.closeComplete || bookPhase === "opening") return;
     const frame = window.requestAnimationFrame(() => setBookPhase("opening"));
     return () => window.cancelAnimationFrame(frame);
   }, [bookPhase, pathname]);
@@ -454,7 +484,9 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         </header>}
 
         <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
-          <DesktopPageTransition>{children}</DesktopPageTransition>
+          <DesktopPageTransition suppressMotion={bookPhase !== "idle"}>
+            {children}
+          </DesktopPageTransition>
         </main>
         {!pathname.startsWith("/desktop/studio") && !pathname.startsWith("/desktop/resources") && (
           <DesktopTeacherLauncher railCollapsed={railCollapsed} />

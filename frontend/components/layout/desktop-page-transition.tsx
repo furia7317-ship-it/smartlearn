@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type UIEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, type UIEvent } from "react";
 import { motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { usePathname } from "next/navigation";
 
@@ -36,7 +36,13 @@ function scrollNodeKey(node: HTMLElement, index: number): string {
  * 桌面壳路由过场：与 WebPageTransition 同范式。
  * 只动 transform，绝不整页隐藏；起始态先 set 再 rAF 启动，避免首帧闪跳。
  */
-export function DesktopPageTransition({ children }: { children: React.ReactNode }) {
+export function DesktopPageTransition({
+  children,
+  suppressMotion = false,
+}: {
+  children: React.ReactNode;
+  suppressMotion?: boolean;
+}) {
   const pathname = usePathname();
   const routeKey = normalizeRouteKey(pathname);
   const reducedMotion = useReducedMotion();
@@ -45,9 +51,9 @@ export function DesktopPageTransition({ children }: { children: React.ReactNode 
   const scrollSaveTimerRef = useRef<number | undefined>(undefined);
   const pendingScrollTopsRef = useRef<Record<string, number>>({});
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = frameRef.current;
-    if (reducedMotion) {
+    if (reducedMotion || suppressMotion) {
       controls.set(DESKTOP_PAGE_SETTLED);
       node?.setAttribute("data-transition", "idle");
       return;
@@ -71,7 +77,7 @@ export function DesktopPageTransition({ children }: { children: React.ReactNode 
       cancelled = true;
       window.cancelAnimationFrame(frame);
     };
-  }, [controls, reducedMotion, routeKey]);
+  }, [controls, reducedMotion, routeKey, suppressMotion]);
 
   useEffect(() => {
     const moduleId = getDesktopModuleId(routeKey);

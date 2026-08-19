@@ -68,23 +68,23 @@ export const WEB_REVEAL = {
 
 /* ── 桌面壳动效（与 web 壳共用节奏，令牌见 globals.css :root） ── */
 
-export const DESKTOP_PAGE_DURATION = 0.22;
+export const DESKTOP_PAGE_DURATION = 0.14;
 
-/** 左侧导航翻书过场：只驱动 transform/opacity，保证合拢与展开都能稳定跑满帧。 */
-export const DESKTOP_BOOK_CLOSE_DURATION_MS = 220;
-export const DESKTOP_BOOK_OPEN_DURATION_MS = 260;
+/** 左侧导航翻书过场：路由与合书并行，时长只负责视觉节奏，不再阻塞导航。 */
+export const DESKTOP_BOOK_CLOSE_DURATION_MS = 160;
+export const DESKTOP_BOOK_OPEN_DURATION_MS = 180;
 
 /** 路由过场终态：只有 transform，永远不隐藏页面。 */
 export const DESKTOP_PAGE_SETTLED = { x: 0, scale: 1 };
 
 /** 常规桌面路由的入场起始态（横向轻推，呼应左侧栏导航方向）。 */
-export const DESKTOP_PAGE_ENTER = { x: 18, scale: 0.995 };
+export const DESKTOP_PAGE_ENTER = { x: 8, scale: 0.999 };
 
 /**
  * 位移敏感路由的入场起始态：只留一点点缩放。
  * - /desktop/studio 的 <webview> 是 position:fixed 挂在根层、不在 <main> 内，位移会让它错位；
  */
-export const DESKTOP_PAGE_ENTER_STILL = { x: 0, scale: 0.998 };
+export const DESKTOP_PAGE_ENTER_STILL = { x: 0, scale: 0.9995 };
 
 const DESKTOP_STILL_ROUTES = ["/desktop/studio"];
 
