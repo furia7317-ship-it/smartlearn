@@ -3,6 +3,9 @@
 import { useEffect, useRef } from "react";
 import { PageFlip } from "page-flip";
 
+const RESOURCE_PAPER_PAGE_COUNT = 12;
+const RESOURCE_BOOK_FLIP_TOTAL_MS = 800;
+
 type ResourceBookFlipProps = {
   direction: "opening" | "closing";
   onReady: () => void;
@@ -29,6 +32,25 @@ function cloneVisualPage(source: HTMLElement | null, target: HTMLElement | null)
     video.pause();
   });
   target.appendChild(clone);
+}
+
+function createPaperRiffle(direction: ResourceBookFlipProps["direction"]): HTMLDivElement {
+  const riffle = document.createElement("div");
+  riffle.className = `desktop-resource-page-riffle is-${direction}`;
+
+  for (let index = 0; index < RESOURCE_PAPER_PAGE_COUNT; index += 1) {
+    const leaf = document.createElement("i");
+    const fanAngle = (index - (RESOURCE_PAPER_PAGE_COUNT - 1) / 2) * 1.8;
+    leaf.className = `desktop-resource-page-riffle__leaf is-paper-tone-${(index % 3) + 1}`;
+    leaf.style.setProperty("--resource-paper-duration", `${RESOURCE_BOOK_FLIP_TOTAL_MS}ms`);
+    leaf.style.setProperty("--resource-paper-open-mid", `${-96 + fanAngle}deg`);
+    leaf.style.setProperty("--resource-paper-close-mid", `${-84 - fanAngle}deg`);
+    leaf.style.setProperty("--resource-paper-lift", `${-3 - (index % 4)}px`);
+    leaf.style.zIndex = String(RESOURCE_PAPER_PAGE_COUNT - index);
+    riffle.appendChild(leaf);
+  }
+
+  return riffle;
 }
 
 export function ResourceBookFlip({ direction, onReady, onComplete }: ResourceBookFlipProps) {
@@ -62,6 +84,7 @@ export function ResourceBookFlip({ direction, onReady, onComplete }: ResourceBoo
     leftPage.className = "desktop-resource-flip-page is-left-page";
     const rightPage = document.createElement("div");
     rightPage.className = "desktop-resource-flip-page is-right-page";
+    const paperRiffle = createPaperRiffle(direction);
     host.append(coverPage, leftPage, rightPage);
 
     cloneVisualPage(shell.querySelector<HTMLElement>(".desktop-resource-left-page"), leftPage);
@@ -72,7 +95,7 @@ export function ResourceBookFlip({ direction, onReady, onComplete }: ResourceBoo
     const pageWidth = Math.max(320, Math.round(usePortrait ? bounds.width : bounds.width / 2));
     const pageHeight = Math.max(560, Math.round(bounds.height));
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const flipDuration = reduceMotion ? 1 : 800;
+    const flipDuration = reduceMotion ? 1 : RESOURCE_BOOK_FLIP_TOTAL_MS;
     let started = false;
     let completed = false;
     let disposed = false;
@@ -119,9 +142,10 @@ export function ResourceBookFlip({ direction, onReady, onComplete }: ResourceBoo
           if (disposed) return;
           started = true;
           startedAt = performance.now();
+          paperRiffle.classList.add("is-running");
           if (direction === "opening") pageFlip.flipNext("top");
           else pageFlip.flipPrev("top");
-          fallbackTimer = window.setTimeout(finish, flipDuration + 450);
+          fallbackTimer = window.setTimeout(finish, flipDuration + 650);
         });
       });
     });
@@ -134,6 +158,7 @@ export function ResourceBookFlip({ direction, onReady, onComplete }: ResourceBoo
     });
 
     pageFlip.loadFromHTML([coverPage, leftPage, rightPage]);
+    host.querySelector<HTMLElement>(".stf__block")?.appendChild(paperRiffle);
 
     return () => {
       disposed = true;

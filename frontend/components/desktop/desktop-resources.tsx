@@ -99,6 +99,8 @@ type OriginFilter = "all" | "generated" | "video" | "web" | "referenced";
 type SortFilter = "recent" | "title";
 type ResourceBookState = "open" | "closing" | "closed" | "opening";
 
+const RESOURCE_ENTRY_EXIT_MS = 420;
+
 const ORIGIN_FILTERS: { id: OriginFilter; label: string }[] = [
   { id: "all", label: "全部来源" },
   { id: "generated", label: "AI 生成" },
@@ -255,6 +257,7 @@ function DesktopResourcesInner() {
   const bookHeightRef = useRef(704);
   const bookTransitionLockRef = useRef(false);
   const bookTransitionSequenceRef = useRef(0);
+  const entryExitTimerRef = useRef<number | null>(null);
   const resourceHrefRef = useRef("/desktop/resources");
   const viewRestoredRef = useRef(false);
   const query = (searchParams.get("q") ?? "").trim();
@@ -289,6 +292,7 @@ function DesktopResourcesInner() {
   const [bookState, setBookState] = useState<ResourceBookState>("open");
   const [bookHeight, setBookHeight] = useState(704);
   const [bookFlipReady, setBookFlipReady] = useState(false);
+  const [entryExitActive, setEntryExitActive] = useState(false);
   const [viewRestored, setViewRestored] = useState(false);
   const [collections, setCollections] = useState<ResourceCollection[]>([]);
   const [collectionEditorOpen, setCollectionEditorOpen] = useState(false);
@@ -322,6 +326,10 @@ function DesktopResourcesInner() {
         scrollTop: resourceScrollRef.current?.scrollTop ?? restoredScrollTopRef.current,
       });
     };
+  }, []);
+
+  useEffect(() => () => {
+    if (entryExitTimerRef.current !== null) window.clearTimeout(entryExitTimerRef.current);
   }, []);
 
   const resourceQueryString = searchParams.toString();
@@ -720,6 +728,15 @@ function DesktopResourcesInner() {
     bookTransitionLockRef.current = true;
     bookTransitionSequenceRef.current += 1;
     setBookFlipReady(false);
+    if (direction === "opening" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setEntryExitActive(true);
+      setBookState("opening");
+      entryExitTimerRef.current = window.setTimeout(() => {
+        entryExitTimerRef.current = null;
+        setEntryExitActive(false);
+      }, RESOURCE_ENTRY_EXIT_MS);
+      return;
+    }
     setBookState(direction);
   };
 
@@ -936,12 +953,11 @@ function DesktopResourcesInner() {
         ) : (
           <div
             ref={bookShellRef}
-            className={cn("desktop-resource-book-shell", `is-${bookState}`, bookFlipReady && "has-book-flip-overlay")}
+            className={cn("desktop-resource-book-shell", `is-${bookState}`, entryExitActive && "is-entry-exiting", bookFlipReady && "has-book-flip-overlay")}
             style={{ "--resource-book-height": `${bookHeight}px` } as CSSProperties}
           >
-            {(bookState === "closed" || (bookState === "opening" && !bookFlipReady)) && (
-              <>
-                <section className="desktop-resource-closed-workbench" aria-labelledby="resource-workbench-title">
+            {(bookState === "closed" || entryExitActive || (bookState === "opening" && !bookFlipReady)) && (
+              <section className="desktop-resource-closed-workbench" aria-labelledby="resource-workbench-title" aria-hidden={entryExitActive} inert={entryExitActive}>
                   <header>
                     <span>资源工作台</span>
                     <h2 id="resource-workbench-title">选择一种方式，开始构建学习资源</h2>
@@ -964,18 +980,20 @@ function DesktopResourcesInner() {
                       <span className="desktop-resource-closed-entry__action">立即进入 <ArrowRight aria-hidden /></span>
                     </Link>
                   </div>
-                </section>
-                <button
-                  type="button"
-                  className="desktop-resource-book-closed"
-                  onClick={() => runBookTransition("opening")}
-                  aria-label="展开资源典藏"
-                  tabIndex={bookState === "opening" ? -1 : 0}
-                >
-                  <img src="/brand/resources/resource-book-cover-v3.webp" alt="" />
-                  <span><strong>资源典藏</strong><small>点击展开书页</small></span>
-                </button>
-              </>
+              </section>
+            )}
+            {(bookState === "closed" || (bookState === "opening" && !bookFlipReady)) && (
+              <button
+                type="button"
+                className="desktop-resource-book-closed"
+                onClick={() => runBookTransition("opening")}
+                aria-label="展开资源典藏"
+                disabled={entryExitActive}
+                tabIndex={bookState === "opening" || entryExitActive ? -1 : 0}
+              >
+                <img src="/brand/resources/resource-book-cover-v3.webp" alt="" />
+                <span><strong>资源典藏</strong><small>点击展开书页</small></span>
+              </button>
             )}
             {bookState !== "closed" && (
               <>
@@ -1105,7 +1123,9 @@ function DesktopResourcesInner() {
                 if (
                   activeBookTransitionId > 0 &&
                   activeBookTransitionId === bookTransitionSequenceRef.current
-                ) setBookFlipReady(true);
+                ) {
+                  setBookFlipReady(true);
+                }
               }}
               onComplete={() => {
                 if (
@@ -1113,6 +1133,7 @@ function DesktopResourcesInner() {
                   activeBookTransitionId !== bookTransitionSequenceRef.current
                 ) return;
                 bookTransitionLockRef.current = false;
+                setEntryExitActive(false);
                 setBookFlipReady(false);
                 setBookState(bookState === "closing" ? "closed" : "open");
               }}

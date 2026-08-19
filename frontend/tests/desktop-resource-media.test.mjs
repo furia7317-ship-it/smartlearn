@@ -38,6 +38,18 @@ test("closed resource book exposes only AI generation and knowledge base page en
   assert.doesNotMatch(workbench, /上传资料|生成视频|添加视频链接|新建集合|批量选择/);
   assert.match(styles, /desktop-resource-closed-workbench[\s\S]{0,180}inset:\s*0 calc\(50% \+ 46px\) 0 56px/);
   assert.match(styles, /desktop-resource-closed-workbench__entrances[\s\S]{0,180}grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /@keyframes desktop-resource-closed-entry-arrive/);
+  assert.match(styles, /desktop-resource-book-shell\.is-closed \.desktop-resource-closed-entry[\s\S]{0,220}animation:\s*desktop-resource-closed-entry-arrive/);
+  assert.match(styles, /desktop-resource-closed-entry\.is-kb[\s\S]{0,100}--resource-entry-delay:\s*190ms/);
+  assert.match(styles, /desktop-resource-closed-entry::after[\s\S]{0,420}desktop-resource-closed-entry-glint/);
+  assert.match(styles, /@keyframes desktop-resource-closed-entry-leave/);
+  assert.match(styles, /desktop-resource-book-shell\.is-entry-exiting \.desktop-resource-closed-entry[\s\S]{0,260}animation:\s*desktop-resource-closed-entry-leave/);
+  assert.match(styles, /desktop-resource-closed-entry\.is-kb[\s\S]{0,120}--resource-entry-exit-delay:\s*0ms/);
+  assert.match(styles, /@media \(prefers-reduced-motion:\s*no-preference\)/);
+  assert.match(resources, /RESOURCE_ENTRY_EXIT_MS = 420/);
+  assert.match(resources, /setEntryExitActive\(true\);\s*setBookState\("opening"\);\s*entryExitTimerRef\.current = window\.setTimeout/);
+  assert.match(resources, /setTimeout\(\(\) => \{[\s\S]{0,160}setEntryExitActive\(false\)/);
+  assert.match(resources, /entryExitActive && "is-entry-exiting"/);
 });
 
 test("generated videos expose playback, copy, download, and source-link actions", async () => {
@@ -99,18 +111,25 @@ test("resource folio uses the same hard-cover page-flip mechanism as 智学云�
   assert.match(packageJson, /"page-flip": "\^2\.0\.7"/);
   assert.match(flip, /import \{ PageFlip \} from "page-flip"/);
   assert.match(flip, /coverPage\.dataset\.density = "hard"/);
+  assert.match(flip, /RESOURCE_PAPER_PAGE_COUNT = 12/);
+  assert.match(flip, /createPaperRiffle/);
   assert.match(flip, /host\.append\(coverPage, leftPage, rightPage\)/);
   assert.match(flip, /return <div ref=\{hostRef\} className="desktop-resource-page-flip"/);
   assert.match(flip, /pageFlip\.destroy\(\)[\s\S]{0,120}parent\.insertBefore\(host, nextSibling\)/);
   assert.match(flip, /showCover:\s*true/);
   assert.match(flip, /drawShadow:\s*true/);
   assert.match(flip, /maxShadowOpacity:\s*0\.5/);
-  assert.match(flip, /const flipDuration = reduceMotion \? 1 : 800/);
+  assert.match(flip, /RESOURCE_BOOK_FLIP_TOTAL_MS = 800/);
+  assert.match(flip, /--resource-paper-duration", `\$\{RESOURCE_BOOK_FLIP_TOTAL_MS\}ms`/);
+  assert.doesNotMatch(flip, /resource-paper-delay/);
   assert.match(flip, /flippingTime:\s*flipDuration/);
   assert.match(flip, /pageFlip\.on<number>\("flip"/);
   assert.match(flip, /cloneVisualPage/);
   assert.match(flip, /pageFlip\.flipNext\("top"\)/);
   assert.match(flip, /pageFlip\.flipPrev\("top"\)/);
+  assert.match(flip, /paperRiffle\.classList\.add\("is-running"\)/);
+  assert.match(flip, /pageFlip\.loadFromHTML\(\[coverPage, leftPage, rightPage\]\)/);
+  assert.match(flip, /querySelector<HTMLElement>\("\.stf__block"\)[\s\S]{0,40}appendChild\(paperRiffle\)/);
   assert.match(styles, /desktop-resource-book-closed[\s\S]{0,420}background:\s*transparent/);
   assert.match(styles, /desktop-resource-book-closed[\s\S]{0,180}inset:\s*0 0 0 50%/);
   assert.match(styles, /desktop-resource-book-closed > img[\s\S]{0,240}width:\s*113\.11%/);
@@ -129,6 +148,10 @@ test("resource folio uses the same hard-cover page-flip mechanism as 智学云�
   assert.match(resources, /ResizeObserver\(measure\)/);
   assert.match(flip, /if \(disposed \|\| completed\) return/);
   assert.match(flip, /const remaining = flipDuration - \(performance\.now\(\) - startedAt\)/);
+  assert.match(styles, /desktop-resource-flip-page\.is-cover > span[\s\S]{0,180}top:\s*34\.9%/);
+  assert.match(styles, /desktop-resource-page-riffle\.is-opening\.is-running/);
+  assert.match(styles, /desktop-resource-paper-bundle-open/);
+  assert.match(styles, /desktop-resource-paper-bundle-close/);
   assert.doesNotMatch(resources, /focusMode|专注阅读|focusExitRef|focusToggleRef/);
   await access(new URL("../public/brand/resources/resource-book-cover-v3.webp", import.meta.url));
 });
