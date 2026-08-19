@@ -13,7 +13,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
-  ArrowRight,
   BookMarked,
   BookOpen,
   CheckCircle2,
@@ -24,6 +23,7 @@ import {
   Download,
   Drama,
   ExternalLink,
+  FilePlus2,
   FileSearch,
   Film,
   Filter,
@@ -39,6 +39,7 @@ import {
   Share2,
   ShieldCheck,
   Square,
+  Star,
   Trash2,
   X,
   type LucideIcon,
@@ -100,8 +101,8 @@ type SortFilter = "recent" | "title";
 type ResourceBookState = "open" | "closing" | "closed" | "opening";
 
 const RESOURCE_ENTRY_EXIT_MS = 420;
-const RESOURCE_BOOK_MIN_HEIGHT = 704;
-const RESOURCE_BOOK_MAX_WIDE_HEIGHT = 780;
+const RESOURCE_BOOK_MIN_HEIGHT = 648;
+const RESOURCE_BOOK_MAX_WIDE_HEIGHT = 720;
 
 const ORIGIN_FILTERS: { id: OriginFilter; label: string }[] = [
   { id: "all", label: "全部来源" },
@@ -109,6 +110,14 @@ const ORIGIN_FILTERS: { id: OriginFilter; label: string }[] = [
   { id: "video", label: "视频来源" },
   { id: "web", label: "联网页面" },
   { id: "referenced", label: "有知识引用" },
+];
+
+const RESOURCE_ACTIVITY_ITEMS: { icon: LucideIcon; label: string; time: string }[] = [
+  { icon: FilePlus2, label: "生成了《二叉树遍历复盘讲义》", time: "8/16 10:24" },
+  { icon: BookOpen, label: "继续阅读《错题复盘：树遍历与哈希冲突》至 68%", time: "8/14 02:48" },
+  { icon: Star, label: "收藏《栈、队列与树的知识导图》到学习路径合集", time: "7/29 04:48" },
+  { icon: Link2, label: "从知识库引用 6 条资料", time: "8/12 02:48" },
+  { icon: CheckCircle2, label: "完成《归并排序：从递归到实现》复习", time: "8/12 02:48" },
 ];
 
 const STUDIO_PANELS_STATE_KEY = "sl_studio_panels_v3";
@@ -256,7 +265,7 @@ function DesktopResourcesInner() {
   const restoredScrollTopRef = useRef(0);
   const selectedKeyRef = useRef("");
   const stableBookStateRef = useRef<ResourceCenterStableBookState>("open");
-  const bookHeightRef = useRef(704);
+  const bookHeightRef = useRef(RESOURCE_BOOK_MIN_HEIGHT);
   const bookWidthFloorRef = useRef(RESOURCE_BOOK_MIN_HEIGHT);
   const bookTransitionLockRef = useRef(false);
   const bookTransitionSequenceRef = useRef(0);
@@ -293,7 +302,7 @@ function DesktopResourcesInner() {
   const [moreOpen, setMoreOpen] = useState(true);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [bookState, setBookState] = useState<ResourceBookState>("open");
-  const [bookHeight, setBookHeight] = useState(704);
+  const [bookHeight, setBookHeight] = useState(RESOURCE_BOOK_MIN_HEIGHT);
   const [bookFlipReady, setBookFlipReady] = useState(false);
   const [entryExitActive, setEntryExitActive] = useState(false);
   const [viewRestored, setViewRestored] = useState(false);
@@ -970,6 +979,7 @@ function DesktopResourcesInner() {
           >
             {(bookState === "closed" || entryExitActive || (bookState === "opening" && !bookFlipReady)) && (
               <section className="desktop-resource-closed-workbench" aria-labelledby="resource-workbench-title" aria-hidden={entryExitActive} inert={entryExitActive}>
+                <div className="desktop-resource-closed-workbench__primary">
                   <header>
                     <span>资源工作台</span>
                     <h2 id="resource-workbench-title">选择一种方式，开始构建学习资源</h2>
@@ -981,7 +991,6 @@ function DesktopResourcesInner() {
                         <strong>AI 生成资料</strong>
                         <small>输入主题与要求，生成学习资料、讲义与练习</small>
                       </span>
-                      <span className="desktop-resource-closed-entry__action">立即进入 <ArrowRight aria-hidden /></span>
                     </Link>
                     <Link href="/desktop/kb" className="desktop-resource-closed-entry is-kb">
                       <img src="/brand/resources/resource-entry-kb-engraving-v1.webp" alt="" />
@@ -989,9 +998,24 @@ function DesktopResourcesInner() {
                         <strong>进入知识库</strong>
                         <small>管理供 AI 检索、引用与回答的知识来源</small>
                       </span>
-                      <span className="desktop-resource-closed-entry__action">立即进入 <ArrowRight aria-hidden /></span>
                     </Link>
                   </div>
+                </div>
+                <section className="desktop-resource-closed-activity" aria-labelledby="resource-activity-title">
+                  <header>
+                    <h3 id="resource-activity-title">我的学习动态</h3>
+                    <button type="button" onClick={() => router.push("/desktop/profile")}>查看全部动态</button>
+                  </header>
+                  <ol>
+                    {RESOURCE_ACTIVITY_ITEMS.map(({ icon: Icon, label, time }) => (
+                      <li key={label}>
+                        <Icon aria-hidden />
+                        <span>{label}</span>
+                        <time>{time}</time>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
               </section>
             )}
             {(bookState === "closed" || (bookState === "opening" && !bookFlipReady)) && (

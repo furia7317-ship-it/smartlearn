@@ -58,7 +58,6 @@ The final rail crop covers the left `280 px`, including the plaque, active page 
 - `frontend/public/brand/desktop/xueshu-plaque-v3.png`
 
 final result: passed
-
 ---
 
 # 资源中心闭书页视觉回归（2026-08-19 下午）
@@ -596,5 +595,65 @@ final result: passed
 ## Final Asset
 
 - `frontend/public/brand/discover/discover-journey-panorama-v1.png`
+
+final result: passed
+
+# Resource Center Design QA
+
+**Source visual truth**
+
+- Approved reference: `C:/Users/Lenovo/.codex/generated_images/01a01a4f-479f-7070-ac83-176a99f192f1/exec-efa58d23-5fc3-499d-a70b-df703c7215d0.png`
+- Source pixels: 1526 × 1030.
+- Density normalization: resized once to 1536 × 1024 for a same-size comparison; the aspect-ratio adjustment is under 1% on each axis.
+
+**Implementation evidence**
+
+- Closed state: `D:/816/tmp/resource-center-design-qa/resource-center-closed-1536-pass2.png`
+- Opening state: `D:/816/tmp/resource-center-design-qa/resource-center-opening-1536-pass2.png`
+- Full-view comparison: `D:/816/tmp/resource-center-design-qa/resource-center-design-qa-pass2.png`
+- Focused lower-workspace comparison: `D:/816/tmp/resource-center-design-qa/resource-center-design-qa-focused-pass2.png`
+- Browser URL: `http://127.0.0.1:3000/desktop/resources/?category=materials`
+- CSS viewport: 1536 × 1024; implementation pixels: 1536 × 1024; device pixel ratio: 1.
+- Primary state: closed resource book with the two entrances and learning activity visible.
+
+**Findings**
+
+- No actionable P0, P1, or P2 differences remain.
+- Typography: the existing display and sans-serif families, weights, line heights, truncation, and small-text hierarchy remain consistent with the product and the approved reference. The two entrance labels and five activity rows remain legible without collision at the target viewport.
+- Spacing and layout: the large book remains the dominant right-side element, the entrances keep the approved two-column proportion, the activity list occupies the lower-left card, and the full lower composition now fits in the 1536 × 1024 target viewport.
+- Colors and tokens: parchment, ochre, cinnabar, pine green, leather brown, borders, and low-elevation shadows stay within the existing resource-center palette. No new gradient was introduced.
+- Image quality: the original book cover and entrance engravings are reused. The missing backdrop is a project-local WebP with natural paper texture, restrained library linework, and a walnut baseline; it is not approximated with CSS art or inline SVG.
+- Copy and content: the approved workbench labels and five learning-activity entries are present. Icons use the product's existing Lucide family and consistent stroke weights.
+- P3 acceptable variance: the generated reference compresses the global desktop sidebar slightly and shows more architectural linework in its outer margins. The implementation preserves the real app shell and keeps the new linework quieter so it does not reintroduce the heavy AI-generated look the user rejected.
+
+**Focused comparison**
+
+- The focused crop covers y=320–1024 in both normalized source and implementation. It was required because the entrance copy, activity-row rhythm, book label, bottom wood baseline, and background treatment are too small to judge reliably in the full-view pair alone.
+- The focused evidence confirms that both entrance images keep their intended crop, all five activity rows are visible, and the book cover remains sharp and unobstructed.
+
+**Interaction and resilience checks**
+
+- Closed → opening: the entrance panels and activity panel leave while the cover and paper bundle begin moving; the book is not delayed until after the left-side exit.
+- Opening → open: the existing multi-page riffle completes and the resource spread remains usable.
+- 1100 × 800: the two entrance cards remain side by side and do not overlap the book. The activity list remains available by the existing page scroll.
+- 960 × 800: the existing desktop-shell fallback intentionally hides the auxiliary workbench and keeps the book as the primary control; no new element overlap was introduced.
+- Reduced-motion behavior keeps the exit immediate instead of running the new panel motion.
+- Browser console check after closed/open interaction: no errors or warnings; only React DevTools information and the HMR connection log were present.
+
+**Comparison history**
+
+1. Pass 1 — blocked by one P2 layout mismatch: the 704px minimum book stage pushed the fifth activity row and walnut baseline below the 1536 × 1024 viewport. Evidence: `D:/816/tmp/resource-center-design-qa/resource-center-design-qa-pass1.png`.
+2. Fix — reduced the responsive book stage to 648–720px, compacted the resource header to the reference height, and versioned the persisted view state so the old 704px default does not pin the revised layout.
+3. Pass 2 — the complete activity card, book cover, and bottom baseline are visible together; the full-view and focused comparisons show no remaining P0/P1/P2 mismatch.
+
+**Implementation checklist**
+
+- [x] Keep the existing large leather book and flip system.
+- [x] Add only the missing lower-area background asset.
+- [x] Match the approved two-entrance workbench layout.
+- [x] Add the five-row learning activity panel.
+- [x] Preserve simultaneous entrance exit and book opening.
+- [x] Verify target and narrower desktop viewports.
+- [x] Check console output and reduced-motion fallback.
 
 final result: passed

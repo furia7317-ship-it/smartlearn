@@ -35,8 +35,11 @@ test("closed resource book exposes only AI generation and knowledge base page en
   assert.match(workbench, /进入知识库/);
   assert.match(workbench, /resource-entry-ai-engraving-v1\.webp/);
   assert.match(workbench, /resource-entry-kb-engraving-v1\.webp/);
+  assert.match(workbench, /我的学习动态/);
+  assert.match(workbench, /查看全部动态/);
   assert.doesNotMatch(workbench, /上传资料|生成视频|添加视频链接|新建集合|批量选择/);
-  assert.match(styles, /desktop-resource-closed-workbench[\s\S]{0,180}inset:\s*0 calc\(50% \+ 46px\) 0 56px/);
+  assert.match(styles, /resource-center-library-backdrop-v1\.webp/);
+  assert.match(styles, /desktop-resource-closed-workbench[\s\S]{0,180}inset:\s*8px calc\(50% \+ 42px\) 34px 0/);
   assert.match(styles, /desktop-resource-closed-workbench__entrances[\s\S]{0,180}grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(styles, /@keyframes desktop-resource-closed-entry-arrive/);
   assert.match(styles, /desktop-resource-book-shell\.is-closed \.desktop-resource-closed-entry[\s\S]{0,220}animation:\s*desktop-resource-closed-entry-arrive/);
@@ -50,6 +53,7 @@ test("closed resource book exposes only AI generation and knowledge base page en
   assert.match(resources, /setEntryExitActive\(true\);\s*setBookState\("opening"\);\s*entryExitTimerRef\.current = window\.setTimeout/);
   assert.match(resources, /setTimeout\(\(\) => \{[\s\S]{0,160}setEntryExitActive\(false\)/);
   assert.match(resources, /entryExitActive && "is-entry-exiting"/);
+  await access(new URL("../public/brand/resources/resource-center-library-backdrop-v1.webp", import.meta.url));
 });
 
 test("generated videos expose playback, copy, download, and source-link actions", async () => {
@@ -143,9 +147,9 @@ test("resource folio uses the same hard-cover page-flip mechanism as 智学云�
   assert.match(styles, /has-book-flip-overlay > \.desktop-resource-workspace[\s\S]{0,80}visibility:\s*hidden/);
   assert.match(styles, /desktop-resource-center__frame[\s\S]{0,100}width:\s*min\(1560px, calc\(100% - 24px\)\)/);
   assert.match(styles, /desktop-resource-center__frame[\s\S]{0,140}container-type:\s*inline-size/);
-  assert.match(styles, /--resource-book-height:\s*max\([\s\S]{0,120}clamp\(704px, 50cqw, 780px\)/);
+  assert.match(styles, /--resource-book-height:\s*max\([\s\S]{0,120}clamp\(648px, 50cqw, 720px\)/);
   assert.match(resources, /--resource-book-content-height/);
-  assert.match(resources, /RESOURCE_BOOK_MAX_WIDE_HEIGHT = 780/);
+  assert.match(resources, /RESOURCE_BOOK_MAX_WIDE_HEIGHT = 720/);
   assert.match(resources, /Math\.ceil\(bounds\.width \/ 2\)/);
   assert.match(styles, /desktop-resource-book-shell[\s\S]{0,180}min-height:\s*var\(--resource-book-height\)/);
   assert.match(resources, /bookTransitionLockRef/);
