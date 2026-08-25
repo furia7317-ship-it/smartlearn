@@ -1119,3 +1119,1889 @@
     transition: none;
   }
 }
+
+/* Horizontal knowledge dependency graph */
+.page {
+  background: #fcfaf5;
+}
+
+.frame {
+  padding-bottom: 0;
+}
+
+.layout {
+  grid-template-columns: minmax(0, 1fr) 272px;
+  min-height: calc(100dvh - 57px);
+  background: #fcfaf5;
+}
+
+.canvasColumn {
+  background-color: #fcfaf5;
+  background-image: none;
+}
+
+.canvasHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 24px;
+  min-height: 224px;
+  padding: 25px 30px 16px;
+  border-bottom: 1px solid var(--path-rule);
+  background: #fffdf9;
+}
+
+.canvasTitle {
+  width: auto;
+}
+
+.canvasTitle h2 {
+  font-size: clamp(30px, 2.35vw, 36px);
+  font-weight: 650;
+  letter-spacing: 0.035em;
+}
+
+.canvasTitle p {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.canvasModeSwitch {
+  flex-shrink: 0;
+  margin-top: 0;
+}
+
+.canvasModeSwitch button {
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.canvasToolbar {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.subjectToolbar {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.subjectSelect {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--path-rule);
+  border-radius: 6px;
+  color: var(--path-muted);
+  background: #fffdf9;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.subjectSelect select {
+  width: 142px;
+  border: 0;
+  outline: 0;
+  color: var(--path-ink);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.subjectSelect select:disabled {
+  color: var(--path-muted);
+}
+
+.subjectGenerate,
+.subjectManage > summary {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 1px solid #a97b3f;
+  border-radius: 6px;
+  color: #fffaf1;
+  background: #9b6b2c;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.subjectGenerate:hover,
+.subjectGenerate:focus-visible {
+  background: #815723;
+  outline: none;
+}
+
+.subjectManage {
+  position: relative;
+}
+
+.subjectManage > summary {
+  border-color: var(--path-rule-strong);
+  color: var(--path-ink);
+  background: #fffdf9;
+  cursor: pointer;
+  list-style: none;
+}
+
+.subjectManage > summary::-webkit-details-marker {
+  display: none;
+}
+
+.subjectManage[open] > summary,
+.subjectManage > summary:hover,
+.subjectManage > summary:focus-visible {
+  background: #eee5d5;
+  outline: none;
+}
+
+.subjectManage > div {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  width: 150px;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid var(--path-rule);
+  border-radius: 7px;
+  background: var(--path-paper-strong);
+  box-shadow: 0 12px 28px rgb(55 41 23 / 0.16);
+}
+
+.subjectManage > div > button {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border-radius: 4px;
+  color: var(--path-ink);
+  font-size: 10px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.subjectManage > div > button:hover,
+.subjectManage > div > button:focus-visible {
+  background: #eee5d5;
+  outline: none;
+}
+
+.subjectManage > div > .subjectDelete {
+  color: #a33d2b;
+}
+
+.canvasStats {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding-top: 3px;
+}
+
+.canvasStats > span {
+  display: grid;
+  min-width: 68px;
+  gap: 6px;
+  padding-left: 18px;
+  border-left: 1px solid var(--path-rule);
+}
+
+.canvasStats small {
+  color: var(--path-muted);
+  font-size: 11px;
+}
+
+.canvasStats strong {
+  color: var(--path-ink);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.canvasStats i {
+  margin-left: 2px;
+  color: var(--path-muted);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.canvasLegend {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 8px 17px;
+  align-items: center;
+  color: var(--path-muted);
+  font-size: 11px;
+}
+
+.canvasLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.canvasLegend i {
+  width: 18px;
+  border-top: 2px solid var(--path-upcoming);
+}
+
+.canvasLegend .legendComplete i {
+  border-color: var(--path-complete);
+}
+
+.canvasLegend .legendCurrent i {
+  border-color: var(--path-active);
+}
+
+.legendAvailable i {
+  border-color: #3f6e50 !important;
+}
+
+.legendLocked i {
+  border-top-style: dotted !important;
+  border-color: var(--path-upcoming) !important;
+}
+
+.canvasViewport {
+  position: relative;
+  height: calc(100dvh - 281px);
+  min-height: 480px;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  cursor: grab;
+  user-select: none;
+}
+
+.canvasViewportPanning,
+.canvasViewportPanning .knowledgeNode {
+  cursor: grabbing;
+}
+
+.graphStage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.graphSurface {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 760px;
+  margin: 0;
+  transform-origin: left top;
+  will-change: transform;
+}
+
+.graphEdgeGroup {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.graphEdge {
+  position: absolute;
+  z-index: 0;
+  display: block;
+  height: 0;
+  border-top: 2px solid var(--path-complete);
+}
+
+.graphEdge::before {
+  position: absolute;
+  top: -2px;
+  left: -6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  content: "";
+  background: #b8873f;
+  animation: graph-pipe-flow-x 2.15s linear infinite;
+  animation-delay: var(--edge-flow-delay, 0s);
+}
+
+.graphEdgeVertical {
+  width: 0 !important;
+  border-top: 0;
+  border-left: 2px solid var(--path-complete);
+}
+
+.graphEdgeVertical::before {
+  top: -6px;
+  left: -2px;
+  width: 6px;
+  height: 6px;
+  animation-name: graph-pipe-flow-y;
+}
+
+.graphEdgeVerticalReverse::before {
+  animation-direction: reverse;
+}
+
+.graphEdgeMuted {
+  border-color: #a8967d;
+  border-top-style: dashed;
+}
+
+.graphEdgeVertical.graphEdgeMuted {
+  border-top: 0;
+  border-left-color: #a8967d;
+  border-left-style: dashed;
+}
+
+.graphEdgeMuted::before {
+  opacity: 0.4;
+  background: #9b8b74;
+}
+
+.graphEdgeCurrent {
+  border-color: var(--path-active);
+}
+
+.graphEdgeVertical.graphEdgeCurrent {
+  border-left-color: var(--path-active);
+}
+
+.graphEdgeCurrent::before {
+  background: #b8873f;
+}
+
+.graphEdgeArrow::after {
+  display: none;
+}
+
+.graphEdgeArrow.graphEdgeMuted::after {
+  border-left-color: #a8967d;
+}
+
+.canvasZoomHint {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 7;
+  width: max-content;
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--path-rule) 78%, transparent);
+  border-radius: 4px;
+  color: #786750;
+  background: #fffdf9;
+  font-size: 10px;
+  pointer-events: none;
+}
+
+.canvasViewport > .canvasControls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  margin: 0;
+}
+
+.canvasViewport .knowledgeNode {
+  cursor: pointer;
+}
+
+.canvasViewport .canvasControls button {
+  cursor: pointer;
+}
+
+.canvasControls .canvasZoomLevel {
+  display: flex;
+  width: 50px;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes graph-pipe-flow-x {
+  0% {
+    left: -6px;
+    opacity: 0;
+  }
+
+  12%,
+  82% {
+    opacity: 0.95;
+  }
+
+  100% {
+    left: calc(100% - 4px);
+    opacity: 0;
+  }
+}
+
+@keyframes graph-pipe-flow-y {
+  0% {
+    top: -6px;
+    opacity: 0;
+  }
+
+  12%,
+  82% {
+    opacity: 0.95;
+  }
+
+  100% {
+    top: calc(100% - 4px);
+    opacity: 0;
+  }
+}
+
+.knowledgeNode {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  width: 132px;
+  height: 100px;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 11px 11px;
+  border: 1px solid var(--path-rule-strong);
+  border-top: 2px solid var(--path-complete);
+  border-radius: 6px;
+  color: var(--path-ink);
+  background: #fffdf9;
+  box-shadow: 0 2px 6px rgb(56 43 28 / 0.055);
+  text-align: left;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.knowledgeNode::after,
+.knowledgeNodePort {
+  position: absolute;
+  top: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  border: 1px solid #fffdf9;
+  border-radius: 50%;
+  content: "";
+  background: #3f6e50;
+  box-shadow: 0 0 0 1px #3f6e50;
+}
+
+.knowledgeNodePort {
+  left: -5px;
+}
+
+.knowledgeNode::after {
+  right: -5px;
+}
+
+.knowledgeNode:hover,
+.knowledgeNode:focus-visible {
+  z-index: 3;
+  outline: none;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgb(56 43 28 / 0.11);
+}
+
+.knowledgeNode > strong {
+  display: block;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledgeNode > p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--path-muted);
+  font-size: 10px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.knowledgeNode > small {
+  overflow: hidden;
+  margin-top: 7px;
+  color: #8c7b64;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledgeNodeStatus {
+  position: absolute;
+  top: -20px;
+  left: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--path-muted);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.knowledgeNodeStatus > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+.knowledgeNodeComplete {
+  border-color: var(--path-rule-strong);
+  border-top-color: var(--path-complete);
+}
+
+.knowledgeNodeComplete .knowledgeNodeStatus {
+  color: var(--path-complete);
+}
+
+.knowledgeNodeAvailable {
+  border-top-color: color-mix(in srgb, var(--path-complete) 72%, var(--path-rule-strong));
+}
+
+.knowledgeNodeCurrent {
+  border-color: var(--path-active);
+  border-top-color: var(--path-active);
+  border-left-width: 3px;
+  box-shadow: 0 4px 12px rgb(142 65 38 / 0.1);
+}
+
+.knowledgeNodeSelected {
+  outline: none;
+  animation: knowledge-node-select 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.knowledgeNodeSelected:not(.knowledgeNodeCurrent) {
+  outline: 2px solid color-mix(in srgb, var(--path-active) 18%, transparent);
+  outline-offset: 2px;
+}
+
+@keyframes knowledge-node-select {
+  0% {
+    background: #fff7eb;
+    box-shadow: 0 0 0 0 rgb(142 65 38 / 0.28), 0 2px 6px rgb(56 43 28 / 0.055);
+  }
+
+  55% {
+    box-shadow: 0 0 0 6px rgb(142 65 38 / 0.1), 0 7px 16px rgb(56 43 28 / 0.11);
+  }
+
+  100% {
+    background: #fffdf9;
+    box-shadow: 0 4px 12px rgb(142 65 38 / 0.1);
+  }
+}
+
+.knowledgeNodeCurrent::after,
+.knowledgeNodeCurrent .knowledgeNodePort {
+  background: var(--path-active);
+  box-shadow: 0 0 0 1px var(--path-active);
+}
+
+.knowledgeNodeCurrent .knowledgeNodeStatus {
+  color: var(--path-active);
+}
+
+.knowledgeNodeLocked {
+  border-top-width: 1px;
+  border-style: dashed;
+  border-color: #aa9d88;
+  color: #6f6659;
+  background: #faf7f0;
+  box-shadow: none;
+}
+
+.knowledgeNodeLocked::after,
+.knowledgeNodeLocked .knowledgeNodePort {
+  background: #aa9d88;
+  box-shadow: 0 0 0 1px #aa9d88;
+}
+
+.resourceDrawer {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  max-height: calc(100dvh - 57px);
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--path-rule);
+  background: #fffdf9;
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid var(--path-rule);
+}
+
+.drawerHeader > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.drawerEyebrow {
+  color: #98703a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.drawerHeader h3 {
+  margin-top: 5px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.drawerHeader p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 7px;
+  color: var(--path-muted);
+  font-size: 11px;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.drawerHeader button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 4px;
+  color: var(--path-muted);
+}
+
+.drawerHeader button:hover,
+.drawerHeader button:focus-visible {
+  color: var(--path-ink);
+  background: #eee5d5;
+  outline: none;
+}
+
+.drawerNodeStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  color: var(--path-active);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.drawerNodeStatus i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+.drawerNodeStatusComplete {
+  color: var(--path-complete);
+}
+
+.drawerNodeStatusLocked {
+  color: var(--path-upcoming);
+}
+
+.drawerActions {
+  display: grid;
+  gap: 8px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--path-rule);
+}
+
+.drawerActions > button,
+.drawerActions > a {
+  display: inline-flex;
+  min-height: 39px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #a97b3f;
+  border-radius: 5px;
+  color: #fffaf1;
+  background: #9b6b2c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.drawerActions > a:last-child {
+  border-color: var(--path-rule-strong);
+  color: var(--path-ink);
+  background: transparent;
+}
+
+.drawerBody {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px 24px;
+}
+
+.drawerBody > h4,
+.knowledgeRelations h4 {
+  color: var(--path-ink);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.resourceGroup {
+  margin-top: 15px;
+}
+
+.resourceGroup h5 {
+  margin-bottom: 7px;
+  color: var(--path-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.resourceGroup > div {
+  overflow: hidden;
+  border: 1px solid var(--path-rule);
+  border-radius: 6px;
+  background: #fffdf9;
+}
+
+.resourceRow {
+  display: grid;
+  width: 100%;
+  min-height: 58px;
+  grid-template-columns: 28px minmax(0, 1fr) auto 14px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  color: var(--path-ink);
+  text-align: left;
+}
+
+.resourceRow + .resourceRow {
+  border-top: 1px solid color-mix(in srgb, var(--path-rule) 70%, transparent);
+}
+
+.resourceRow:hover,
+.resourceRow:focus-visible {
+  background: #f7f1e7;
+  outline: none;
+}
+
+.resourceRowIcon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 6px;
+  color: #805c2b;
+  background: #eee5d5;
+}
+
+.resourceRowCopy {
+  min-width: 0;
+}
+
+.resourceRowCopy strong,
+.resourceRowCopy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resourceRowCopy strong {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.resourceRowCopy small {
+  margin-top: 4px;
+  color: var(--path-muted);
+  font-size: 9px;
+}
+
+.resourceRowState {
+  color: #967b59;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.resourceRowComplete {
+  color: var(--path-complete);
+}
+
+.resourceRowDisabled {
+  opacity: 0.62;
+}
+
+.knowledgeRelations {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--path-rule);
+}
+
+.knowledgeRelations dl {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.knowledgeRelations dl > div {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 8px;
+  color: var(--path-muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.knowledgeRelations dt {
+  color: var(--path-ink);
+  font-weight: 700;
+}
+
+.drawerEmpty {
+  margin-top: 12px;
+  padding: 18px 12px;
+  border: 1px dashed var(--path-rule-strong);
+  border-radius: 6px;
+  color: var(--path-muted);
+  font-size: 10px;
+  line-height: 1.65;
+  text-align: center;
+}
+
+.drawerOverview {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  color: var(--path-muted);
+  text-align: center;
+}
+
+.drawerOverviewIcon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--path-rule-strong);
+  border-radius: 50%;
+  color: #805c2b;
+  background: #eee5d5;
+}
+
+.drawerOverview h3 {
+  margin-top: 14px;
+  color: var(--path-ink);
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.drawerOverview p {
+  max-width: 220px;
+  margin-top: 8px;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.drawerOverview strong {
+  margin-top: 28px;
+  color: var(--path-complete);
+  font-family: var(--font-display);
+  font-size: 30px;
+}
+
+.drawerOverview strong small {
+  color: var(--path-muted);
+  font-size: 11px;
+}
+
+.drawerOverview > span:last-child {
+  margin-top: 4px;
+  font-size: 9px;
+}
+
+.emptyWorkspace {
+  min-height: calc(100dvh - 57px);
+  background: var(--path-paper);
+}
+
+.emptyToolbar {
+  display: flex;
+  min-height: 60px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--path-rule);
+}
+
+.emptyState {
+  min-height: calc(100dvh - 117px);
+}
+
+@media (max-width: 1120px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 276px;
+  }
+
+  .canvasHeader {
+    padding-inline: 22px;
+  }
+
+  .canvasStats {
+    gap: 10px;
+  }
+
+  .canvasStats > span {
+    min-width: 56px;
+    padding-left: 11px;
+  }
+
+  .canvasToolbar {
+    flex-wrap: wrap;
+  }
+
+  .subjectToolbar {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 880px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resourceDrawer {
+    max-height: none;
+    border-top: 1px solid var(--path-rule);
+    border-left: 0;
+  }
+
+  .drawerBody {
+    max-height: 440px;
+  }
+
+  .canvasHeader {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .canvasStats {
+    grid-row: auto;
+  }
+
+  .subjectToolbar {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .subjectSelect {
+    flex: 1 1 220px;
+  }
+
+  .subjectSelect select {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knowledgeNode {
+    transition: none;
+  }
+
+  .knowledgeNodeSelected {
+    animation: none;
+  }
+
+  .graphEdge::before {
+    display: none;
+  }
+}
+
+/* Selected learning-path direction: page-owned header, landscape canvas and task rail. */
+.page {
+  height: 100%;
+  overflow: hidden !important;
+  background: #f4eddf;
+}
+
+.frame {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  padding: 0;
+}
+
+.pathTopbar {
+  position: relative;
+  z-index: 40;
+  display: grid;
+  min-height: 72px;
+  flex: 0 0 72px;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(210px, 1fr);
+  align-items: center;
+  padding: 0 26px 0 32px;
+  border-bottom: 1px solid #bcae96;
+  color: #2f281f;
+  background: rgb(250 246 237 / 0.97);
+  box-shadow: 0 2px 9px rgb(74 54 31 / 0.08);
+}
+
+.pathTopbar::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: url("/brand/path/path-header-ornament-v2.png") center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+
+.pathTopbarTitle {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.pathTopbarTitle h1 {
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.pathTopbarTitle > span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid #a95239;
+  color: #9b3f2d;
+  font-family: var(--font-display);
+  font-size: 11px;
+  line-height: 1;
+  transform: rotate(-3deg);
+}
+
+.pathTopbarNav {
+  display: flex;
+  height: 100%;
+  align-items: stretch;
+  gap: 31px;
+}
+
+.pathTopbarNav > button,
+.pathTopbarNav > a,
+.pathCourseManager > summary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #5f5140;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pathTopbarNav > button:hover,
+.pathTopbarNav > button:focus-visible,
+.pathTopbarNav > a:hover,
+.pathTopbarNav > a:focus-visible,
+.pathCourseManager > summary:hover,
+.pathCourseManager > summary:focus-visible {
+  color: #8e4126;
+  outline: none;
+}
+
+.pathTopbarNav .pathTopbarActive {
+  color: #8e4126;
+}
+
+.pathTopbarNav .pathTopbarActive::after {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  left: 2px;
+  height: 2px;
+  content: "";
+  background: #9d432c;
+  box-shadow: 0 -1px 0 rgb(157 67 44 / 0.14);
+}
+
+.pathCourseManager,
+.pathNoticeMenu,
+.pathUserMenu {
+  position: relative;
+}
+
+.pathCourseManager > summary,
+.pathNoticeMenu > summary,
+.pathUserMenu > summary {
+  height: 100%;
+  cursor: pointer;
+  list-style: none;
+}
+
+.pathCourseManager > summary::-webkit-details-marker,
+.pathNoticeMenu > summary::-webkit-details-marker,
+.pathUserMenu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pathCourseManager > div {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  width: max-content;
+  min-width: 560px;
+  padding: 12px;
+  border: 1px solid #c8b99f;
+  border-radius: 6px;
+  background: #fffaf0;
+  box-shadow: 0 16px 34px rgb(55 41 23 / 0.18);
+  transform: translateX(-50%);
+}
+
+.pathCourseManager > div {
+  display: grid;
+  gap: 9px;
+}
+
+.pathVideoHistory {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #c8b99f;
+  border-radius: 5px;
+  color: #574836;
+  background: #f8f1e5;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.pathVideoHistory span {
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 999px;
+  color: #fffaf0;
+  background: #8d6a39;
+  font-size: 8px;
+}
+
+.pathTopbarTools {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 17px;
+}
+
+.pathTopbarTools > a,
+.pathNoticeMenu > summary {
+  display: grid;
+  width: 30px;
+  height: 34px;
+  place-items: center;
+  border-radius: 4px;
+  color: #5b4c3a;
+}
+
+.pathTopbarTools > a:hover,
+.pathTopbarTools > a:focus-visible,
+.pathNoticeMenu > summary:hover,
+.pathNoticeMenu > summary:focus-visible {
+  color: #8e4126;
+  background: rgb(219 204 180 / 0.42);
+  outline: none;
+}
+
+.pathNoticeMenu > div,
+.pathUserMenu > div {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  width: 236px;
+  padding: 13px 14px;
+  border: 1px solid #c8b99f;
+  border-radius: 6px;
+  background: #fffaf0;
+  box-shadow: 0 14px 30px rgb(55 41 23 / 0.18);
+}
+
+.pathNoticeMenu > div strong,
+.pathNoticeMenu > div p {
+  display: block;
+}
+
+.pathNoticeMenu > div strong {
+  font-family: var(--font-display);
+  font-size: 14px;
+}
+
+.pathNoticeMenu > div p {
+  margin-top: 6px;
+  color: #7e6e59;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.pathUserMenu > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #3f3428;
+}
+
+.pathUserMenu > summary strong {
+  max-width: 84px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pathUserMenu > div {
+  display: grid;
+  width: 160px;
+  gap: 3px;
+  padding: 6px;
+}
+
+.pathUserMenu > div > a {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  border-radius: 4px;
+  color: #4b3d2d;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.pathUserMenu > div > a:hover,
+.pathUserMenu > div > a:focus-visible {
+  background: #eee4d3;
+  outline: none;
+}
+
+.planningNotice {
+  position: absolute;
+  top: 82px;
+  left: 50%;
+  z-index: 35;
+  display: flex;
+  max-width: min(680px, 70vw);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid rgb(142 65 38 / 0.24);
+  border-radius: 6px;
+  background: #fffaf0;
+  box-shadow: 0 10px 24px rgb(60 44 26 / 0.12);
+  transform: translateX(-50%);
+}
+
+.pathBody,
+.pathLoading {
+  min-height: 0;
+  flex: 1;
+}
+
+.pathLoading {
+  display: grid;
+  place-items: center;
+  color: #74644f;
+  background: #f8f2e7;
+  font-size: 13px;
+}
+
+.layout {
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) 304px;
+  background: #f8f2e7;
+}
+
+.canvasColumn {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  background-color: #f6f0e4;
+  background-image:
+    linear-gradient(90deg, rgb(250 246 237 / 0.12), rgb(250 246 237 / 0.02)),
+    url("/brand/path/path-learning-landscape-v1.png");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+}
+
+.canvasHeader {
+  display: block;
+  min-height: 154px;
+  flex: 0 0 154px;
+  padding: 27px 34px 16px;
+  border-bottom: 0;
+  background: linear-gradient(180deg, rgb(250 246 237 / 0.88) 0%, rgb(250 246 237 / 0.42) 76%, transparent 100%);
+}
+
+.canvasTitle {
+  width: min(640px, 76%);
+}
+
+.canvasTitle h2 {
+  font-size: clamp(28px, 2.1vw, 34px);
+  font-weight: 650;
+  letter-spacing: 0.075em;
+}
+
+.canvasTitle p {
+  margin-top: 7px;
+  color: #675b4c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.courseChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.courseChips button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid rgb(159 142 116 / 0.66);
+  border-radius: 999px;
+  color: #5f5242;
+  background: rgb(255 251 242 / 0.7);
+  font-size: 10px;
+  font-weight: 650;
+  box-shadow: 0 2px 8px rgb(74 54 31 / 0.04);
+}
+
+.courseChips button::before {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  content: "";
+  background: #a9803f;
+}
+
+.courseChips button small {
+  color: #8b7658;
+  font-size: 9px;
+}
+
+.courseChips button:hover,
+.courseChips button:focus-visible,
+.courseChips .courseChipActive {
+  border-color: #a98a5a;
+  color: #3f3428;
+  background: rgb(248 241 228 / 0.94);
+  outline: none;
+}
+
+.courseChips .courseChipActive small {
+  color: #7d684a;
+}
+
+.canvasViewport {
+  height: auto;
+  min-height: 0;
+  flex: 1;
+  background: transparent;
+}
+
+.graphSurface {
+  min-width: 820px;
+}
+
+.knowledgeNode {
+  width: 144px;
+  height: 174px;
+  justify-content: flex-start;
+  padding: 25px 13px 12px;
+  border: 1px solid #b7a88f;
+  border-top: 1px solid #b7a88f;
+  border-radius: 4px;
+  color: #352c22;
+  background: linear-gradient(rgb(255 252 244 / 0.94), rgb(247 239 225 / 0.94));
+  box-shadow: 0 4px 12px rgb(58 42 24 / 0.12), inset 0 0 0 3px rgb(255 253 246 / 0.7);
+  text-align: center;
+}
+
+.knowledgeNode::before {
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgb(148 124 88 / 0.22);
+  content: "";
+  pointer-events: none;
+}
+
+.knowledgeNodeIndex {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 2px solid #ddc99e;
+  border-radius: 50%;
+  color: #fff7df;
+  background: #78613a;
+  box-shadow: 0 0 0 2px #8e7445, 0 3px 7px rgb(58 42 24 / 0.22);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+
+.knowledgeNode > strong {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.25;
+  white-space: normal;
+}
+
+.knowledgeNodeStatus {
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: 1;
+  justify-content: center;
+  margin-top: 5px;
+  font-size: 8px;
+}
+
+.knowledgeNode > p {
+  position: relative;
+  z-index: 1;
+  margin-top: 7px;
+  color: #746653;
+  font-size: 9px;
+  line-height: 1.4;
+  -webkit-line-clamp: 2;
+}
+
+.knowledgeNodeProgress {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 4px;
+  margin-top: auto;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ddd3be;
+}
+
+.knowledgeNodeProgress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #3f6e50;
+}
+
+.knowledgeNode > small {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  font-size: 8px;
+}
+
+.knowledgeNodeCurrent {
+  border: 2px solid #a95131;
+  box-shadow: 0 8px 18px rgb(142 65 38 / 0.16), inset 0 0 0 2px rgb(255 253 246 / 0.74);
+}
+
+.knowledgeNodeLocked {
+  border-style: solid;
+  color: #63594b;
+  background: rgb(247 242 232 / 0.9);
+  opacity: 0.84;
+}
+
+.knowledgeNode:hover,
+.knowledgeNode:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgb(58 42 24 / 0.17), inset 0 0 0 3px rgb(255 253 246 / 0.7);
+}
+
+.knowledgeNodeSelected:not(.knowledgeNodeCurrent) {
+  outline-color: rgb(142 65 38 / 0.34);
+}
+
+.graphEdge {
+  border-top-width: 3px;
+  border-color: rgb(74 108 72 / 0.86);
+  filter: drop-shadow(0 1px 0 rgb(255 252 244 / 0.8));
+}
+
+.graphEdgeVertical {
+  border-left-width: 3px;
+  border-left-color: rgb(74 108 72 / 0.86);
+}
+
+.graphEdge::before {
+  background: #b67a32;
+  box-shadow: 0 0 0 2px rgb(255 244 212 / 0.66), 0 0 7px rgb(182 122 50 / 0.55);
+}
+
+.canvasLegend {
+  position: absolute;
+  bottom: 17px;
+  left: 18px;
+  z-index: 8;
+  display: flex;
+  width: max-content;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid rgb(178 160 133 / 0.62);
+  border-radius: 4px;
+  color: #6b5e4e;
+  background: rgb(255 251 243 / 0.84);
+  backdrop-filter: blur(4px);
+  font-size: 9px;
+}
+
+.canvasLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.canvasLegend i {
+  width: 14px;
+}
+
+.canvasZoomHint {
+  right: 16px;
+  bottom: 55px;
+  left: auto;
+  border-color: rgb(178 160 133 / 0.62);
+  background: rgb(255 251 243 / 0.84);
+  backdrop-filter: blur(4px);
+}
+
+.canvasViewport > .canvasControls {
+  right: 16px;
+  bottom: 16px;
+  overflow: hidden;
+  border: 1px solid rgb(178 160 133 / 0.62);
+  border-radius: 4px;
+  background: rgb(255 251 243 / 0.88);
+  backdrop-filter: blur(4px);
+}
+
+.resourceDrawer {
+  height: 100%;
+  max-height: none;
+  border-left: 1px solid #bcae96;
+  background: linear-gradient(rgb(250 246 237 / 0.96), rgb(247 240 227 / 0.98));
+  box-shadow: -5px 0 14px rgb(66 48 28 / 0.05);
+}
+
+.drawerBody {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 13px 14px 22px;
+}
+
+.railSection {
+  border: 1px solid #d0c2aa;
+  border-radius: 5px;
+  background: rgb(255 251 243 / 0.72);
+  box-shadow: 0 3px 10px rgb(66 48 28 / 0.05);
+}
+
+.railSectionTitle {
+  display: flex;
+  min-height: 41px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid #ded2bf;
+}
+
+.railSectionTitle > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #3d3327;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.railSectionTitle > span svg {
+  color: #92713e;
+}
+
+.railSectionTitle > button,
+.railSectionTitle > a,
+.railSectionTitle > small {
+  color: #826f55;
+  font-size: 9px;
+}
+
+.currentProgressCard {
+  padding: 13px 13px 14px;
+}
+
+.currentProgressCard h3 {
+  margin-top: 5px;
+  color: #30271e;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.currentProgressCard > p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 6px;
+  color: #766955;
+  font-size: 10px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.currentProgressBar {
+  height: 5px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ddd2bd;
+}
+
+.currentProgressBar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #3f6e50;
+}
+
+.currentProgressMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: #83745f;
+  font-size: 9px;
+}
+
+.currentProgressMeta strong {
+  color: #3f6e50;
+  font-size: 10px;
+}
+
+.primaryStudyAction {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 11px;
+  border: 1px solid #8f301c;
+  border-radius: 4px;
+  color: #fffaf0;
+  background: #a64025;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 3px 8px rgb(131 47 25 / 0.2);
+}
+
+.primaryStudyAction:hover,
+.primaryStudyAction:focus-visible {
+  background: #8f301c;
+  outline: none;
+}
+
+.todayTaskList,
+.nodeResourceList {
+  display: grid;
+}
+
+.todayTaskList > button,
+.todayTaskList > a,
+.nodeResourceList > button,
+.nodeResourceList > a {
+  display: grid;
+  min-height: 51px;
+  grid-template-columns: 27px minmax(0, 1fr) 14px;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+  color: #3d3327;
+  text-align: left;
+}
+
+.todayTaskList > button + button,
+.todayTaskList > button + a,
+.todayTaskList > a + button,
+.todayTaskList > a + a,
+.nodeResourceList > button + button,
+.nodeResourceList > button + a,
+.nodeResourceList > a + button,
+.nodeResourceList > a + a {
+  border-top: 1px solid #e3dac9;
+}
+
+.todayTaskList > button:hover,
+.todayTaskList > button:focus-visible,
+.todayTaskList > a:hover,
+.todayTaskList > a:focus-visible,
+.nodeResourceList > button:hover,
+.nodeResourceList > button:focus-visible,
+.nodeResourceList > a:hover,
+.nodeResourceList > a:focus-visible {
+  background: #f3eadb;
+  outline: none;
+}
+
+.todayTaskState {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid #c8b99f;
+  border-radius: 50%;
+  color: #8c7148;
+}
+
+.todayTaskComplete {
+  border-color: #53775e;
+  color: #fffaf0;
+  background: #53775e;
+}
+
+.todayTaskList strong,
+.todayTaskList small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todayTaskList strong {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.todayTaskList small {
+  margin-top: 4px;
+  color: #84745e;
+  font-size: 8px;
+}
+
+.nodeResourceList > button,
+.nodeResourceList > a {
+  min-height: 52px;
+  grid-template-columns: 28px minmax(0, 1fr) 14px;
+}
+
+.nodeResourceList .resourceRowIcon {
+  border-radius: 4px;
+  background: #ece1cf;
+}
+
+.compactRelations {
+  display: grid;
+  gap: 5px;
+  margin: 0 10px 10px;
+  padding-top: 9px;
+  border-top: 1px solid #e3dac9;
+}
+
+.compactRelations > div {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 5px;
+  color: #776a57;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.compactRelations dt {
+  color: #42372a;
+  font-weight: 700;
+}
+
+@media (max-width: 1180px) {
+  .pathTopbar {
+    grid-template-columns: 168px minmax(0, 1fr) 190px;
+    padding-inline: 20px;
+  }
+
+  .pathTopbarNav {
+    gap: 18px;
+  }
+
+  .pathTopbarTitle h1 {
+    font-size: 23px;
+  }
+
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 286px;
+  }
+}
+
+@media (max-width: 980px) {
+  .pathTopbarNav {
+    gap: 12px;
+  }
+
+  .pathTopbarNav > button,
+  .pathTopbarNav > a,
+  .pathCourseManager > summary {
+    font-size: 11px;
+  }
+
+  .pathUserMenu > summary strong {
+    display: none;
+  }
+}

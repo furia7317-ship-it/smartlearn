@@ -218,6 +218,9 @@ export interface PathStep {
   desc: string;
   types: ResourceType[];
   state: "current" | "todo";
+  /** Knowledge points and prerequisite labels are used to render the desktop path as a dependency graph. */
+  knowledge_points?: string[];
+  prerequisites?: string[];
   subject_ids?: string[];
   subject_titles?: string[];
   objective?: string;

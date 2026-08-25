@@ -482,23 +482,28 @@ function mergeMasterStep(
   contributions: Array<{ subject: SubjectLearningPath; step: PathStep }>,
   dayIndex: number,
 ): PathStep {
+  const isSingleSubject = contributions.length === 1;
   const subjectTitles = contributions.map(({ subject }) => subject.title);
   const tasks = contributions.flatMap(({ subject, step }) =>
     (step.steps ?? []).map((task) => ({
       ...task,
-      title: `${subject.title} · ${task.title}`,
+      title: isSingleSubject ? task.title : `${subject.title} · ${task.title}`,
     })),
   );
-  const title = contributions.length === 1
-    ? `${contributions[0].subject.title} · ${contributions[0].step.title}`
+  const title = isSingleSubject
+    ? contributions[0].step.title
     : `${contributions.length} 个科目协同学习`;
   return {
     day: `D${dayIndex + 1}`,
     title,
-    desc: contributions
-      .map(({ subject, step }) => `${subject.title}：${step.objective || step.desc}`)
-      .join("；"),
-    objective: contributions.map(({ subject, step }) => `${subject.title}：${step.objective || step.title}`).join("；"),
+    desc: isSingleSubject
+      ? contributions[0].step.desc
+      : contributions
+          .map(({ subject, step }) => `${subject.title}：${step.objective || step.desc}`)
+          .join("；"),
+    objective: isSingleSubject
+      ? contributions[0].step.objective
+      : contributions.map(({ subject, step }) => `${subject.title}：${step.objective || step.title}`).join("；"),
     minutes: contributions.reduce((total, { step }) => total + (step.minutes ?? 0), 0),
     types: Array.from(new Set(contributions.flatMap(({ step }) => step.types))),
     state: dayIndex === 0 ? "current" : "todo",

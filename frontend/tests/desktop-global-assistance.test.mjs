@@ -32,16 +32,17 @@ test("desktop shell exposes real health and a global teacher outside studio", as
   assert.doesNotMatch(launcher, /教师会结合当前课程、学习路径和已经生成的资料回答/);
 });
 
-test("path summary collapses without hiding the learning canvas", async () => {
+test("path keeps the knowledge canvas visible beside the node resource drawer", async () => {
   const [path, styles] = await Promise.all([
     read("../components/desktop/desktop-path.tsx"),
     read("../components/desktop/desktop-path.module.css"),
   ]);
 
-  assert.match(path, /const \[summaryOpen, setSummaryOpen\] = useState\(true\)/);
-  assert.match(path, /aria-label=\{summaryOpen \? "收起路径摘要" : "展开路径摘要"\}/);
-  assert.match(styles, /\.layoutSummaryCollapsed/);
-  assert.match(styles, /\.summaryRailCollapsed/);
+  assert.match(path, /aria-label="学习路径知识依赖图"/);
+  assert.match(path, /aria-label=\{`\$\{selectedNode\.step\.title\}学习资料`\}/);
+  assert.match(path, /查看全部资料/);
+  assert.match(styles, /\.layout\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 272px/s);
+  assert.match(styles, /\.resourceDrawer/);
 });
 
 test("resource viewer keeps its teacher control but removes the fixed audit footer", async () => {

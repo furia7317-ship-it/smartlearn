@@ -194,6 +194,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
   const displayName = name.trim() || "同学";
   const profileImmersive = pathname.startsWith("/desktop/profile");
   const homeImmersive = pathname === "/desktop" || pathname === "/desktop/";
+  const pathImmersive = pathname.startsWith("/desktop/path");
   const resourceContext =
     pathname.startsWith("/desktop/resources") ||
     pathname.startsWith("/desktop/video-learning") ||
@@ -366,7 +367,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="relative flex min-w-0 flex-1 flex-col" data-desktop-page-shell>
-        {!profileImmersive && !homeImmersive && <header className={cn("desktop-topbar", resourceContext && "is-resource-context")}>
+        {!profileImmersive && !homeImmersive && !pathImmersive && <header className={cn("desktop-topbar", resourceContext && "is-resource-context")}>
           <form className="desktop-global-search" role="search" onSubmit={submitSearch}>
             <Search aria-hidden className="size-4 shrink-0" />
             <label className="sr-only" htmlFor="desktop-global-search">

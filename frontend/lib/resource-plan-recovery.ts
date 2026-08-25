@@ -129,6 +129,12 @@ export function scheduleSnapshotToPath(schedule: unknown[], planId?: string): Pa
       title: String(day.title ?? `第 ${index + 1} 天`),
       desc: String(day.objective ?? "按规划完成当天学习任务"),
       objective: String(day.objective ?? ""),
+      knowledge_points: Array.isArray(day.knowledge_points)
+        ? day.knowledge_points.map(String).map((item) => item.trim()).filter(Boolean)
+        : [],
+      prerequisites: Array.isArray(day.prerequisites)
+        ? day.prerequisites.map(String).map((item) => item.trim()).filter(Boolean)
+        : [],
       minutes: Number(day.minutes ?? 60),
       types: Array.from(new Set(steps.flatMap((step) => step.resource_types))),
       state: index === 0 ? ("current" as const) : ("todo" as const),
@@ -147,7 +153,21 @@ export function resourcePlanRecordToPath(record: ResourcePlanRecord): PathStep[]
     record.execution.schedule ?? [],
     record.plan.plan_id,
   );
-  if (scheduled.length > 0) return scheduled;
+  if (scheduled.length > 0) {
+    const plannedDays = new Map(record.plan.days.map((day) => [day.day, day]));
+    return scheduled.map((step) => {
+      const planned = plannedDays.get(step.day);
+      return {
+        ...step,
+        knowledge_points: step.knowledge_points?.length
+          ? step.knowledge_points
+          : planned?.knowledge_points ?? [],
+        prerequisites: step.prerequisites?.length
+          ? step.prerequisites
+          : planned?.prerequisites ?? [],
+      };
+    });
+  }
   if (record.plan.days.length === 0 || record.plan.status === "cancelled") return [];
 
   const tasksById = new Map(
@@ -165,6 +185,8 @@ export function resourcePlanRecordToPath(record: ResourcePlanRecord): PathStep[]
       day: day.day,
       title: day.title,
       objective: day.objective,
+      knowledge_points: day.knowledge_points,
+      prerequisites: day.prerequisites,
       minutes: day.minutes,
       steps: tasks.map((task) => ({
         id: task.task_id,
