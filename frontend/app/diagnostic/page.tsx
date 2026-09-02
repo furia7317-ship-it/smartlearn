@@ -25,7 +25,10 @@ import {
   type DiagnosticGradeReport,
 } from "@/lib/diagnostic-exam";
 import { optionAnswerValue } from "@/lib/learning-baseline-gate";
-import { type DiagnosticAnalysis } from "@/lib/library";
+import {
+  invalidateLibraryListCache,
+  type DiagnosticAnalysis,
+} from "@/lib/library";
 import { MASTERY_LEVELS, type MasteryLevel } from "@/lib/material-types";
 import { getStudentId } from "@/lib/student-identity";
 import { cn } from "@/lib/utils";
@@ -145,6 +148,7 @@ export default function DiagnosticPage() {
       }
       setExamId(generatedExamId);
       setQuestions(generatedQuestions);
+      invalidateLibraryListCache("papers");
       setStage("questions");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "生成摸底题失败，请重试");
@@ -184,6 +188,7 @@ export default function DiagnosticPage() {
       if (streamError) throw new Error(streamError);
       if (!graded) throw new Error("后端未返回摸底评分，请重试提交");
 
+      invalidateLibraryListCache("papers", "assessments", "goals");
       const finalAnalysis = diagnosticAnalysisFromGrade(finalOverall, finalMastery, finalReport);
       setOverall(finalOverall);
       setAnalysis(finalAnalysis);

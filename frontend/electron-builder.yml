@@ -3,6 +3,9 @@ productName: 学枢
 copyright: 学枢团队
 
 directories:
+  # 独立的最小应用目录由 prepare:electron-app 生成。根 package.json 的前端
+  # dependencies 只参与构建，不应被 electron-builder 自动装入 app.asar。
+  app: .electron-app
   output: dist-electron
   buildResources: build-resources
 
@@ -10,11 +13,18 @@ directories:
 files:
   - electron/**/*
   - out/**/*
+  # electron-builder 会在双 package.json 布局下回退扫描 projectDir；显式排除
+  # node_modules，确保根目录的前端构建依赖不会再次进入 app.asar。
+  - "!node_modules/**/*"
 
 # 后端运行时/源码/离线模型/公共知识索引 → resources/（不进 asar，python.exe 须为真实可执行文件）
 extraResources:
   - from: runtime/python
     to: python
+    filter:
+      - "**/*"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
   - from: runtime/assets
     to: assets
     filter:
@@ -38,6 +48,14 @@ extraResources:
     to: knowledge
 
 asar: true
+
+# app.asar 中没有原生 Node 依赖，无需对根目录的构建依赖执行 Electron rebuild。
+npmRebuild: false
+
+# 桌面端只提供中英文界面，避免把 Electron 的全部 locale 一并分发。
+electronLanguages:
+  - zh-CN
+  - en-US
 
 win:
   target:

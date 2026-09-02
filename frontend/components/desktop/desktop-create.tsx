@@ -5,6 +5,7 @@ import { ShellLink as Link } from "@/components/shell-link";
 import { ArrowUpRight, Check, Download, Library, Loader2, Settings2, Sparkles, Wand2 } from "lucide-react";
 
 import { DesktopResourceCard } from "@/components/desktop/desktop-resource-card";
+import { ResourceCenterBackButton } from "@/components/desktop/resource-center-back-button";
 import { AgentRunInspector } from "@/components/agent-run-inspector";
 import { ResourceViewer } from "@/components/resource-viewer";
 import {
@@ -61,6 +62,7 @@ export default function DesktopCreate() {
       {/* 左：表单面板 */}
       <aside className="flex w-[400px] shrink-0 flex-col border-r bg-surface-2/30">
         <header className="flex items-center gap-2.5 border-b px-6 py-5">
+          <ResourceCenterBackButton />
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
             <Wand2 className="size-5" />
           </span>

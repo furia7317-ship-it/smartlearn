@@ -1,15 +1,99 @@
 from __future__ import annotations
 
-import pytest
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+import asyncio
 
+import pytest
+from fastapi import FastAPI
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from starlette.testclient import TestClient
+
+from app.core.config import get_db
+from app.models.base import Base
 from app.models.learning import ConversationSessionRecord
+from app.routers.auth import router as auth_router
 from app.routers.conversations import (
     ConversationSessionPayload,
     ConversationStatePayload,
     get_conversation_state,
+    router as conversations_router,
     save_conversation_state,
 )
+
+
+def test_conversation_routes_require_the_authenticated_account_scope(tmp_path):
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'conversations.db'}")
+    sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async def prepare_database():
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+
+    async def override_db():
+        async with sessions() as session:
+            yield session
+
+    asyncio.run(prepare_database())
+    app = FastAPI()
+    app.include_router(auth_router, prefix="/api/auth")
+    app.include_router(conversations_router, prefix="/api/conversations")
+    app.dependency_overrides[get_db] = override_db
+
+    account_id = "local_11111111-1111-4111-8111-111111111111"
+    foreign_id = "local_22222222-2222-4222-8222-222222222222"
+    with TestClient(app) as client:
+        assert client.get(f"/api/conversations/{account_id}").status_code == 401
+        registered = client.post(
+            "/api/auth/register",
+            json={
+                "login": "conversation-owner@example.com",
+                "password": "password-123",
+                "anonymous_student_id": account_id,
+            },
+        )
+        assert registered.status_code == 201
+        assert registered.json()["id"] == account_id
+
+        own = client.put(
+            "/api/conversations",
+            json={
+                "student_id": account_id,
+                "active_conversation_id": "conversation-owned",
+                "sessions": [
+                    {
+                        "id": "conversation-owned",
+                        "title": "自己的会话",
+                        "updated_at": 100,
+                        "messages": [],
+                    },
+                ],
+            },
+        )
+        assert own.status_code == 200
+        assert client.get(f"/api/conversations/{account_id}").status_code == 200
+
+        forbidden_get = client.get(f"/api/conversations/{foreign_id}")
+        assert forbidden_get.status_code == 403
+        assert forbidden_get.json()["detail"]["code"] == "student_scope_forbidden"
+
+        forbidden_put = client.put(
+            "/api/conversations",
+            json={
+                "student_id": foreign_id,
+                "active_conversation_id": "foreign-conversation",
+                "sessions": [
+                    {
+                        "id": "foreign-conversation",
+                        "title": "越权会话",
+                        "updated_at": 200,
+                        "messages": [],
+                    },
+                ],
+            },
+        )
+        assert forbidden_put.status_code == 403
+        assert forbidden_put.json()["detail"]["code"] == "student_scope_forbidden"
+
+    asyncio.run(engine.dispose())
 
 
 @pytest.mark.asyncio

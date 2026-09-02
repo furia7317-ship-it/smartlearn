@@ -46,6 +46,9 @@ class Settings(BaseSettings):
 
     # ── 数据库 ──
     DATABASE_URL: str = "sqlite+aiosqlite:///./smartlearn.db"
+    # SQL 逐句输出会在 Windows/WSL 桌面开发环境制造大量同步终端 I/O。
+    # 与 DEBUG 解耦，按需诊断时再通过环境变量显式开启。
+    SQL_ECHO: bool = False
 
     # ── Chroma 向量库 ──
     CHROMA_PERSIST_DIR: str = "./chroma"
@@ -199,7 +202,7 @@ _ensure_sqlite_parent(settings.DATABASE_URL)
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.DEBUG,
+    echo=settings.SQL_ECHO,
     future=True,
 )
 

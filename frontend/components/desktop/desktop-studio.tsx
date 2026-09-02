@@ -29,7 +29,6 @@ import { AssistantAvatar } from "@/components/agent-bits";
 import { Chat } from "@/components/chat";
 import { PathPanel } from "@/components/path-panel";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
-import { ResourceViewer } from "@/components/resource-viewer";
 import { Button } from "@/components/ui/button";
 import { useStudioPanels, type StudioPanelKey } from "@/hooks/use-studio-panels";
 import type { ResourceItem } from "@/lib/types";
@@ -47,6 +46,11 @@ const ProfilePanel = dynamic(
     ssr: false,
     loading: () => <div className="p-6 text-center text-xs text-muted-foreground">画像加载中…</div>,
   },
+);
+
+const ResourceViewer = dynamic(
+  () => import("@/components/resource-viewer").then((module) => module.ResourceViewer),
+  { ssr: false },
 );
 
 type InspectorTab = "trace" | "profile" | "path" | "browser";
@@ -154,6 +158,7 @@ export default function DesktopStudio() {
     item: ResourceItem;
     taskKey?: string;
   } | null>(null);
+  const [resourceViewerActivated, setResourceViewerActivated] = useState(false);
   const [teacherChooserOpen, setTeacherChooserOpen] = useState(false);
   const [sessionMenuId, setSessionMenuId] = useState("");
   const [renamingConversationId, setRenamingConversationId] = useState("");
@@ -196,6 +201,7 @@ export default function DesktopStudio() {
     const resource = o.resources.find((item) => item.id === resourceId && item.status === "ready");
     if (!resource) return;
     const data = resource.data ?? await getMaterialData(o.mode, resource.id).catch(() => undefined);
+    setResourceViewerActivated(true);
     setOpenResource({ item: data ? { ...resource, data } : resource });
   }, [o.mode, o.resources]);
 
@@ -589,7 +595,10 @@ export default function DesktopStudio() {
                 onRecordEvidence={(key, content) =>
                   o.recordTaskEvidence(key, content, "written_response")
                 }
-                onOpenResource={(item, taskKey) => setOpenResource({ item, taskKey })}
+                onOpenResource={(item, taskKey) => {
+                  setResourceViewerActivated(true);
+                  setOpenResource({ item, taskKey });
+                }}
               />
             )}
             {activeTab === "browser" && <div ref={browserSlotRef} className="h-full" />}
@@ -605,11 +614,13 @@ export default function DesktopStudio() {
         </aside>
       </div>
 
-      <ResourceViewer
-        item={openResource?.item ?? null}
-        taskKey={openResource?.taskKey}
-        onClose={() => setOpenResource(null)}
-      />
+      {resourceViewerActivated ? (
+        <ResourceViewer
+          item={openResource?.item ?? null}
+          taskKey={openResource?.taskKey}
+          onClose={() => setOpenResource(null)}
+        />
+      ) : null}
       <TeacherChooser
         open={teacherChooserOpen}
         onClose={() => setTeacherChooserOpen(false)}

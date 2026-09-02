@@ -73,6 +73,7 @@ frontend/runtime/
 /.superpowers/
 /design-audit/
 /design-qa.md
+/design-qa-*.png
 /项目交接说明.md
 /artifacts/smartlearn-web-*
 /artifacts/smartlearn-frontend-*.tar.gz

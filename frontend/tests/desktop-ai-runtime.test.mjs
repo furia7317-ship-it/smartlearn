@@ -131,11 +131,12 @@ test("learning-path form and resource selection reuse the live teacher pipeline"
   assert.match(viewer, /解释选中内容/);
   assert.match(viewer, /就此询问/);
   assert.match(viewer, /openTutorAnswer\(request, question\?\.trim\(\) \|\| "解释选中内容", selectedContext\)/);
-  assert.match(viewer, /aria-label="资料问答"/);
-  assert.match(viewer, /aria-label="询问智能教师"/);
-  assert.match(viewer, /当前资料/);
-  assert.match(viewer, /tutorMessages\.map/);
-  assert.match(viewer, /startTutorResize/);
+  assert.match(viewer, /useTeacherWindow/);
+  assert.match(viewer, /openTeacher\(\{/);
+  assert.match(viewer, /module: "resource"/);
+  assert.doesNotMatch(viewer, /aria-label="资料问答"/);
+  assert.doesNotMatch(viewer, /tutorMessages\.map/);
+  assert.doesNotMatch(viewer, /startTutorResize/);
   assert.doesNotMatch(viewer, /router\.push\(shellHref\(base, "\/studio"\)\)/);
   assert.match(viewer, /\}, \[taskKey, viewedItemId\]\);/);
   assert.doesNotMatch(viewer, /setTutorOpen\(false\);[\s\S]{0,300}\}, \[goBack, taskKey, viewedItem\]\);/);

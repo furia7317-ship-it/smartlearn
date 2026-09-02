@@ -5,7 +5,7 @@ export function BrandLockup() {
   return (
     <Link href="/app" className="web-brand" aria-label="学枢学习总览">
       <span className="web-brand__mark" aria-hidden>
-        <Image src="/brand/xueshu-app-icon.png" alt="" width={32} height={32} sizes="32px" />
+        <Image src="/brand/xueshu-app-icon-128.webp" alt="" width={32} height={32} sizes="32px" />
       </span>
       <span className="web-brand__copy">
         <strong>学枢</strong>

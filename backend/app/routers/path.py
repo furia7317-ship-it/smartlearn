@@ -15,7 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_db
 from app.core.deps import get_llm
 from app.core.llm import parse_json_response
-from app.models.learning import LearningGoal, LearningPath, MemoryCard, WrongQuestion
+from app.models.learning import (
+    Assessment,
+    ExamPaper,
+    LearningGoal,
+    LearningPath,
+    MemoryCard,
+    WrongQuestion,
+)
 from app.services.goals import recalculate_goal
 
 router = APIRouter()
@@ -23,6 +30,58 @@ router = APIRouter()
 
 class PathNodeUpdate(BaseModel):
     status: str
+
+
+@router.get("/workspace/{student_id}/summary")
+async def get_path_workspace_summary(
+    student_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return durable counts used by the learning-path navigation workspaces."""
+
+    async def count(model, *conditions) -> int:
+        value = await db.scalar(
+            select(func.count()).select_from(model).where(*conditions)
+        )
+        return int(value or 0)
+
+    return {
+        "student_id": student_id,
+        "active_goals": await count(
+            LearningGoal,
+            LearningGoal.student_id == student_id,
+            LearningGoal.status == "active",
+        ),
+        "completed_goals": await count(
+            LearningGoal,
+            LearningGoal.student_id == student_id,
+            LearningGoal.status == "completed",
+        ),
+        "assessments": await count(
+            Assessment,
+            Assessment.student_id == student_id,
+        ),
+        "available_exams": await count(
+            ExamPaper,
+            ExamPaper.student_id == student_id,
+            ExamPaper.archived.is_(False),
+            ExamPaper.status != "graded",
+        ),
+        "graded_exams": await count(
+            ExamPaper,
+            ExamPaper.student_id == student_id,
+            ExamPaper.status == "graded",
+        ),
+        "wrong_questions": await count(
+            WrongQuestion,
+            WrongQuestion.student_id == student_id,
+        ),
+        "due_reviews": await count(
+            MemoryCard,
+            MemoryCard.student_id == student_id,
+            MemoryCard.due_date <= date.today().isoformat(),
+        ),
+    }
 
 
 def _update_node_status(nodes: list[dict], node_id: str, status: str) -> bool:

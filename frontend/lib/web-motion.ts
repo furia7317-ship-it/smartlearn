@@ -74,19 +74,19 @@ export const DESKTOP_PAGE_DURATION = 0.14;
 export const DESKTOP_BOOK_CLOSE_DURATION_MS = 160;
 export const DESKTOP_BOOK_OPEN_DURATION_MS = 180;
 
-/** 路由过场终态：只有 transform，永远不隐藏页面。 */
-export const DESKTOP_PAGE_SETTLED = { x: 0, scale: 1 };
+/** 路由过场终态：只使用合成层上的轻量 transform/opacity。 */
+export const DESKTOP_PAGE_SETTLED = { opacity: 1, y: 0 };
 
-/** 常规桌面路由的入场起始态（横向轻推，呼应左侧栏导航方向）。 */
-export const DESKTOP_PAGE_ENTER = { x: 8, scale: 0.999 };
+/** 常规桌面路由的入场起始态：不隐藏整页，只提供即时的轻微方向感。 */
+export const DESKTOP_PAGE_ENTER = { opacity: 0.94, y: 4 };
 
 /**
- * 位移敏感路由的入场起始态：只留一点点缩放。
+ * 位移敏感路由的入场起始态：只留轻微透明度变化，不施加位移或缩放。
  * - /desktop/studio 的 <webview> 是 position:fixed 挂在根层、不在 <main> 内，位移会让它错位；
  */
-export const DESKTOP_PAGE_ENTER_STILL = { x: 0, scale: 0.9995 };
+export const DESKTOP_PAGE_ENTER_STILL = { opacity: 0.96, y: 0 };
 
-const DESKTOP_STILL_ROUTES = ["/desktop/studio"];
+const DESKTOP_STILL_ROUTES = ["/desktop/studio", "/desktop/path", "/desktop/resources"];
 
 /** trailingSlash:true 会让 pathname 带尾斜杠，作为动画触发键前必须归一化。 */
 export function normalizeRouteKey(pathname: string | null | undefined) {
@@ -104,7 +104,7 @@ export function getDesktopPageEnter(pathname: string | null | undefined) {
 }
 
 /** 侧栏激活指示条的滑动时长，与 .desktop-rail-link 的 150ms 对齐。 */
-export const DESKTOP_RAIL_INDICATOR_DURATION = 0.12;
+export const DESKTOP_RAIL_INDICATOR_DURATION = 0.22;
 
 /** 页内视图切换（tab 条件渲染）的时长。 */
 export const DESKTOP_VIEW_SWAP_DURATION = 0.18;

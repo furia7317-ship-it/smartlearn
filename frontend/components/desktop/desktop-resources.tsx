@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   type CSSProperties,
   type FormEvent,
@@ -11,6 +12,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { TeacherOpenButton } from "@/components/desktop/teacher-window-provider";
 import {
   ArrowLeft,
   BookMarked,
@@ -46,10 +48,7 @@ import {
 } from "lucide-react";
 
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
-import { MarketPublishDialog } from "@/components/market-publish-dialog";
 import { ResourceBookFlip } from "@/components/desktop/resource-book-flip";
-import { ResourcePathAttachmentDialog } from "@/components/resource-path-attachment-dialog";
-import { ResourceViewer } from "@/components/resource-viewer";
 import { API_BASE } from "@/lib/api";
 import { BROWSER_URL_KEY, openInBrowser } from "@/lib/browser-bus";
 import { downloadText, materialsToMarkdown } from "@/lib/export-materials";
@@ -82,6 +81,21 @@ import {
 } from "@/lib/session-insights";
 import type { ResourceData, ResourceItem, ResourceType } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const MarketPublishDialog = dynamic(
+  () => import("@/components/market-publish-dialog").then((module) => module.MarketPublishDialog),
+  { ssr: false },
+);
+
+const ResourcePathAttachmentDialog = dynamic(
+  () => import("@/components/resource-path-attachment-dialog").then((module) => module.ResourcePathAttachmentDialog),
+  { ssr: false },
+);
+
+const ResourceViewer = dynamic(
+  () => import("@/components/resource-viewer").then((module) => module.ResourceViewer),
+  { ssr: false },
+);
 
 const RESOURCE_LABELS: Record<ResourceType, string> = {
   explainer: "讲义",
@@ -266,7 +280,6 @@ function DesktopResourcesInner() {
   const selectedKeyRef = useRef("");
   const stableBookStateRef = useRef<ResourceCenterStableBookState>("open");
   const bookHeightRef = useRef(RESOURCE_BOOK_MIN_HEIGHT);
-  const bookWidthFloorRef = useRef(RESOURCE_BOOK_MIN_HEIGHT);
   const bookTransitionLockRef = useRef(false);
   const bookTransitionSequenceRef = useRef(0);
   const entryExitTimerRef = useRef<number | null>(null);
@@ -289,6 +302,7 @@ function DesktopResourcesInner() {
   const [library, setLibrary] = useState<StoredMaterial[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<CatalogEntry | null>(null);
   const [openItem, setOpenItem] = useState<ResourceItem | null>(null);
+  const [resourceViewerActivated, setResourceViewerActivated] = useState(false);
   const [attachItem, setAttachItem] = useState<ResourceItem | null>(null);
   const [pathCollectionOpen, setPathCollectionOpen] = useState(false);
   const [loadingId, setLoadingId] = useState("");
@@ -302,6 +316,7 @@ function DesktopResourcesInner() {
   const [moreOpen, setMoreOpen] = useState(true);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [bookState, setBookState] = useState<ResourceBookState>("open");
+  const [bookTransitionId, setBookTransitionId] = useState(0);
   const [bookHeight, setBookHeight] = useState(RESOURCE_BOOK_MIN_HEIGHT);
   const [bookFlipReady, setBookFlipReady] = useState(false);
   const [entryExitActive, setEntryExitActive] = useState(false);
@@ -370,15 +385,10 @@ function DesktopResourcesInner() {
     if (!workspace) return;
     const measure = () => {
       const bounds = workspace.getBoundingClientRect();
-      const widthFloor = Math.max(
+      const measured = Math.max(
         RESOURCE_BOOK_MIN_HEIGHT,
         Math.min(RESOURCE_BOOK_MAX_WIDE_HEIGHT, Math.ceil(bounds.width / 2))
       );
-      const renderedHeight = Math.max(RESOURCE_BOOK_MIN_HEIGHT, Math.min(1_600, Math.ceil(bounds.height)));
-      let measured = bookHeightRef.current;
-      if (renderedHeight > widthFloor + 1) measured = renderedHeight;
-      else if (bookHeightRef.current <= bookWidthFloorRef.current + 1) measured = RESOURCE_BOOK_MIN_HEIGHT;
-      bookWidthFloorRef.current = widthFloor;
       if (Math.abs(measured - bookHeightRef.current) <= 1) return;
       bookHeightRef.current = measured;
       setBookHeight(measured);
@@ -655,7 +665,10 @@ function DesktopResourcesInner() {
 
   const openResource = async (resource: ResourceItem) => {
     const hydrated = await ensureData(resource);
-    if (hydrated) setOpenItem(hydrated);
+    if (hydrated) {
+      setResourceViewerActivated(true);
+      setOpenItem(hydrated);
+    }
   };
 
   const exportResource = async (resource: ResourceItem) => {
@@ -695,7 +708,6 @@ function DesktopResourcesInner() {
       /* keep navigation functional when storage is unavailable */
     }
     openInBrowser(url);
-    router.push("/desktop/studio");
   };
 
   const deleteResource = async (resource: ResourceItem) => {
@@ -747,7 +759,9 @@ function DesktopResourcesInner() {
       (direction === "closing" && bookState !== "open")
     ) return;
     bookTransitionLockRef.current = true;
-    bookTransitionSequenceRef.current += 1;
+    const nextTransitionId = bookTransitionSequenceRef.current + 1;
+    bookTransitionSequenceRef.current = nextTransitionId;
+    setBookTransitionId(nextTransitionId);
     setBookFlipReady(false);
     if (direction === "opening" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setEntryExitActive(true);
@@ -893,7 +907,7 @@ function DesktopResourcesInner() {
     { id: "generated-video", label: "生成视频", count: generatedVideoCount, Icon: Film },
     { id: "external-video", label: "外部视频链接", count: externalVideos.length, Icon: Link2 },
   ];
-  const activeBookTransitionId = bookTransitionSequenceRef.current;
+  const activeBookTransitionId = bookTransitionId;
   const resourceToolbar = (withBookToggle = false) => (
     <section className={cn("desktop-resource-toolbar", withBookToggle && "has-book-toggle")} aria-label="资源筛选与批量操作">
       {withBookToggle && (
@@ -948,16 +962,29 @@ function DesktopResourcesInner() {
         </header>
 
         {recentEntries.length > 0 && (
-          <section className="desktop-resource-recent" aria-label="最近继续">
-            <div className="desktop-resource-recent__title"><strong>最近继续</strong><button type="button" onClick={() => navigateFilters({ category: "all" })}>查看全部</button></div>
+          <section className="desktop-resource-recent" aria-label="最近学习">
+            <div className="desktop-resource-recent__title"><strong>最近学习</strong><button type="button" onClick={() => { navigateFilters({ category: "all" }); if (bookState === "closed") runBookTransition("opening"); }}>查看全部</button></div>
             <div>
-              {recentEntries.map((entry) => {
+              {recentEntries.map((entry, index) => {
                 const title = entry.kind === "resource" ? entry.resource.title : entry.video.title;
-                const subtitle = entry.kind === "resource" ? `${RESOURCE_LABELS[entry.resource.type]} · ${createdAt(entry.resource)}` : `外部视频 · ${entry.video.updatedAt}`;
+                const category = entry.kind === "resource" ? RESOURCE_LABELS[entry.resource.type] : "外部视频";
+                const updatedAt = entry.kind === "resource" ? createdAt(entry.resource) : entry.video.updatedAt;
                 return (
-                  <button key={entry.key} type="button" onClick={() => void selectEntry(entry)}>
-                    {entry.kind === "external-video" || entry.resource.type === "video" ? <Film aria-hidden className="size-4" /> : <BookMarked aria-hidden className="size-4" />}
-                    <span><strong>{title}</strong><small>{subtitle}</small></span>
+                  <button
+                    key={entry.key}
+                    type="button"
+                    className={cn("desktop-resource-recent__card", `is-tone-${(index % 3) + 1}`)}
+                    onClick={() => { void selectEntry(entry); if (bookState === "closed") runBookTransition("opening"); }}
+                    aria-label={`继续学习：${title}；${category}；更新于 ${updatedAt}`}
+                    title={title}
+                  >
+                    <span className="desktop-resource-recent__spine" aria-hidden />
+                    {entry.kind === "external-video" ? <Film aria-hidden /> : <BookMarked aria-hidden />}
+                    <span className="desktop-resource-recent__copy">
+                      <strong>{title}</strong>
+                      <small>{category} · {updatedAt}</small>
+                    </span>
+                    <span className="desktop-resource-recent__status" aria-hidden>继续</span>
                   </button>
                 );
               })}
@@ -970,7 +997,7 @@ function DesktopResourcesInner() {
         {!session.hydrated ? (
           <>{resourceToolbar()}<div className="desktop-resource-loading">正在恢复资源会话…</div></>
         ) : combined.length === 0 ? (
-          <>{resourceToolbar()}<div className="desktop-resource-empty"><Library aria-hidden className="size-6" /><div><strong>{filtersActive ? "当前筛选没有匹配资源" : "还没有已过审资源"}</strong><p>{filtersActive ? "清空筛选或更换关键词。" : "先让智能教师生成资料，通过审核后会自动进入这里。"}</p></div><Link href={filtersActive ? "/desktop/resources" : "/desktop/studio"}>{filtersActive ? "清空筛选" : "生成新资料"}</Link></div></>
+          <>{resourceToolbar()}<div className="desktop-resource-empty"><Library aria-hidden className="size-6" /><div><strong>{filtersActive ? "当前筛选没有匹配资源" : "还没有已过审资源"}</strong><p>{filtersActive ? "清空筛选或更换关键词。" : "先让智能教师生成资料，通过审核后会自动进入这里。"}</p></div>{filtersActive ? <Link href="/desktop/resources">清空筛选</Link> : <TeacherOpenButton context={{ module: "resources", title: "资源中心", detail: "当前没有已过审资料，请帮助规划并生成新的学习资料。" }}>生成新资料</TeacherOpenButton>}</div></>
         ) : (
           <div
             ref={bookShellRef}
@@ -981,11 +1008,11 @@ function DesktopResourcesInner() {
               <section className="desktop-resource-closed-workbench" aria-labelledby="resource-workbench-title" aria-hidden={entryExitActive} inert={entryExitActive}>
                 <div className="desktop-resource-closed-workbench__primary">
                   <header>
-                    <span>资源工作台</span>
-                    <h2 id="resource-workbench-title">选择一种方式，开始构建学习资源</h2>
+                    <h2 id="resource-workbench-title">资源工作台</h2>
+                    <p>选择一种方式，开始构建学习资源</p>
                   </header>
                   <div className="desktop-resource-closed-workbench__entrances">
-                    <Link href="/desktop/studio" className="desktop-resource-closed-entry is-ai">
+                    <Link href="/desktop/create" className="desktop-resource-closed-entry is-ai">
                       <img src="/brand/resources/resource-entry-ai-engraving-v1.webp" alt="" />
                       <span className="desktop-resource-closed-entry__copy">
                         <strong>AI 生成资料</strong>
@@ -1179,6 +1206,25 @@ function DesktopResourcesInner() {
             )}
           </div>
         )}
+        <nav className="desktop-resource-bookshelf" aria-label="书架功能入口">
+          <div className="desktop-resource-shelf-books">
+            <Link
+              href="/desktop/practice"
+              className="desktop-resource-shelf-book is-practice"
+              aria-label="进入练习模块"
+              title="进入练习模块"
+            >
+              <img src="/brand/resources/shelf-book-practice-original-v1.webp" alt="" draggable={false} />
+              <strong className="desktop-resource-shelf-book__label" aria-hidden>练习</strong>
+            </Link>
+            <span className="desktop-resource-shelf-book is-reserved is-pine" aria-hidden>
+              <img src="/brand/resources/shelf-book-pine-original-v1.webp" alt="" draggable={false} />
+            </span>
+            <span className="desktop-resource-shelf-book is-reserved is-ochre" aria-hidden>
+              <img src="/brand/resources/shelf-book-ochre-original-v1.webp" alt="" draggable={false} />
+            </span>
+          </div>
+        </nav>
       </div>
       {collectionPickerOpen && (
         <div className="desktop-resource-collection-overlay" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !collectionSaving) setCollectionPickerOpen(false); }}>
@@ -1219,9 +1265,13 @@ function DesktopResourcesInner() {
           </section>
         </div>
       )}
-      <ResourceViewer item={openItem} onClose={() => setOpenItem(null)} />
-      <ResourcePathAttachmentDialog item={attachItem} onClose={() => setAttachItem(null)} onAttached={setFeedback} />
-      <MarketPublishDialog open={marketOpen} resources={combined} initialResourceIds={marketSelectedIds} onClose={() => setMarketOpen(false)} onPublished={(listing) => { setFeedback(`《${listing.title}》已发布到学习市场。`); setMarketSelecting(false); setMarketSelectedIds([]); }} />
+      {resourceViewerActivated ? <ResourceViewer item={openItem} onClose={() => setOpenItem(null)} /> : null}
+      {attachItem ? (
+        <ResourcePathAttachmentDialog item={attachItem} onClose={() => setAttachItem(null)} onAttached={setFeedback} />
+      ) : null}
+      {marketOpen ? (
+        <MarketPublishDialog open resources={combined} initialResourceIds={marketSelectedIds} onClose={() => setMarketOpen(false)} onPublished={(listing) => { setFeedback(`《${listing.title}》已发布到学习市场。`); setMarketSelecting(false); setMarketSelectedIds([]); }} />
+      ) : null}
     </div>
   );
 }

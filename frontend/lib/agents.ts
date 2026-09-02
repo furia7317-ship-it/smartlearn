@@ -19,7 +19,7 @@ export const AGENTS: AgentMeta[] = [
   { id: "solution", name: "题目解析官", duty: "题目、答案与逐题讲解", color: OCHRE },
   { id: "reading", name: "拓展阅读官", duty: "延伸材料精选", color: OCHRE },
   { id: "code", name: "代码教练", duty: "可运行实操案例", color: OCHRE },
-  { id: "video", name: "动画导演", duty: "Manim 教学短片", color: OCHRE },
+  { id: "video", name: "动画导演", duty: "白板教学短片", color: OCHRE },
   { id: "courseware", name: "课件设计师", duty: "结构化 PPT 课件", color: OCHRE },
   { id: "interactive", name: "交互演示官", duty: "可操作的三维/公式/算法演示", color: OCHRE },
   { id: "reviewer", name: "质检审核官", duty: "防幻觉 · 知识库比对", color: VERMILION },

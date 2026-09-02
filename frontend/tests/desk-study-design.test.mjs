@@ -16,26 +16,25 @@ test("the desktop imports the shared 书院案头 visual system", () => {
   assert.match(styles, /market-hero-ink\.png/);
   assert.match(styles, /\.desktop-desk-layout/);
   assert.match(styles, /\.desk-avatar-picker/);
-  assert.doesNotMatch(styles, /linear-gradient|radial-gradient/);
+  assert.match(styles, /\.desktop-rail\s*\{[\s\S]*repeating-linear-gradient/);
+  assert.doesNotMatch(styles, /radial-gradient/);
 });
 
-test("the desktop home follows the selected desk composition", () => {
+test("the desktop home follows the selected single-page dossier composition", () => {
   const page = read("app/desktop/page.tsx");
   const home = read("components/desktop/desktop-home-dossier.tsx");
   const source = `${page}\n${home}`;
 
   assert.match(page, /DesktopHomeDossier/);
-  assert.match(home, /PAGE_ORDER: HomePage\[\] = \["today", "analysis", "growth"\]/);
-  assert.match(home, /pageDirection/);
-  assert.match(home, /custom=\{pageDirection\}/);
-  assert.match(home, /transition=\{pageSwap\.transition\}/);
-  assert.match(home, /window\.history\.pushState/);
-  assert.match(home, /window\.addEventListener\("popstate"/);
-  assert.match(home, /aria-label="首页分页"/);
-  assert.match(home, /title: "今日案头"/);
+  assert.match(home, /id="desktop-home-today"/);
+  assert.match(home, /id="desktop-home-analysis"/);
+  assert.match(home, /id="desktop-home-growth"/);
+  assert.match(home, /aria-label="首页快捷操作"/);
+  assert.match(home, /title="今日案头"/);
+  assert.doesNotMatch(home, /PAGE_ORDER|pageDirection|window\.history\.pushState|aria-label="首页分页"/);
   assert.match(home, />当前学习任务</);
   assert.match(home, />今日安排</);
-  assert.match(home, /下一页：/);
+  assert.doesNotMatch(home, /下一页：/);
   assert.doesNotMatch(source, />智能教师批注</);
   assert.doesNotMatch(source, />已审核资料</);
   assert.doesNotMatch(source, /生成复习计划/);
@@ -56,7 +55,7 @@ test("the desktop home follows the selected desk composition", () => {
   assert.doesNotMatch(source, /学习驾驶舱/);
 });
 
-test("the packaged Electron app opens the exported three-page desktop home", () => {
+test("the packaged Electron app opens the exported desktop home", () => {
   const electronMain = read("electron/main.js");
   const nextConfig = read("next.config.mjs");
 

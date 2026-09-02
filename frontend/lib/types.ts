@@ -395,6 +395,14 @@ export interface TutorAttachment extends ChatAttachmentMeta {
   recognition_notice: string;
 }
 
+/** A bounded, user-visible snapshot of the desktop surface that opened the teacher. */
+export interface TutorPageContext {
+  module?: string;
+  title?: string;
+  detail?: string;
+  entityId?: string;
+}
+
 export type Phase =
   | "idle"
   | "profiling"

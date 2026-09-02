@@ -29,6 +29,15 @@ class ChatAttachment(BaseModel):
     recognition_notice: str = Field(default="", max_length=300)
 
 
+class ChatPageContext(BaseModel):
+    """A bounded, explicitly untrusted snapshot of the UI surface asking for help."""
+
+    module: str = Field(default="", max_length=80)
+    title: str = Field(default="", max_length=180)
+    detail: str = Field(default="", max_length=1200)
+    entity_id: str = Field(default="", max_length=120)
+
+
 class ChatRequest(BaseModel):
     """POST /api/chat 请求。"""
     student_id: str
@@ -37,6 +46,7 @@ class ChatRequest(BaseModel):
     history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=100)
     image_data: str | None = None  # base64 图片
     attachments: list[ChatAttachment] = Field(default_factory=list, max_length=5)
+    page_context: ChatPageContext | None = None
     teacher_persona: Literal["alligator", "raccoon"] = "raccoon"
 
 

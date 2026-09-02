@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
+
+
+ScopePoint = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
+]
+QuestionId = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=64),
+]
+AnswerText = Annotated[str, StringConstraints(max_length=20_000)]
 
 
 class ExamRequest(BaseModel):
@@ -14,6 +25,28 @@ class ExamRequest(BaseModel):
     scope_points: list[str] = Field(default_factory=list)
     paper_type: str = "mixed"  # unit_test / mixed / adaptive
     category: str = "未分类"
+
+
+class CourseExamContext(BaseModel):
+    """One currently visible course selected for a combined assessment."""
+
+    course_id: str = Field(min_length=1, max_length=64)
+    title: str = Field(min_length=1, max_length=256)
+    progress: float = Field(default=0, ge=0, le=100)
+    scope_points: list[ScopePoint] = Field(default_factory=list, max_length=80)
+    current_stage: str = Field(default="", max_length=256)
+
+
+class CourseExamRequest(BaseModel):
+    """POST /api/assess/course-exam request.
+
+    ``topic``, ``category`` and paper tags are intentionally server-derived so
+    the stored paper always reflects the selected course snapshot.
+    """
+
+    student_id: str = Field(min_length=1, max_length=64)
+    courses: list[CourseExamContext] = Field(min_length=1, max_length=8)
+    paper_type: Literal["adaptive"] = "adaptive"
 
 
 class QuestionSchema(BaseModel):
@@ -41,7 +74,8 @@ class ExamResponse(BaseModel):
 class SubmitRequest(BaseModel):
     """POST /api/assess/{exam_id}/submit 请求。"""
     student_id: str
-    answers: dict[str, str]  # {question_id: answer_text}
+    answers: dict[QuestionId, AnswerText] = Field(default_factory=dict, max_length=200)
+    # {question_id: answer_text}
 
 
 class GradedResult(BaseModel):

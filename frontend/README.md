@@ -85,7 +85,7 @@ lib/agents.ts        # 12 个智能体花名册（与后端对应）
 | React | UI 框架 | github.com/facebook/react | MIT |
 | Tailwind CSS v4 | 原子化样式 | github.com/tailwindlabs/tailwindcss | MIT |
 | shadcn/ui | 基础组件体系（源码复制模式） | github.com/shadcn-ui/ui | MIT |
-| Radix UI | 无障碍交互原语（Tabs/Tooltip 等） | github.com/radix-ui/primitives | MIT |
+| Radix UI | 无障碍交互原语（Tabs/Slot） | github.com/radix-ui/primitives | MIT |
 | Vercel AI Elements | AI 对话界面设计范式参考（Conversation/Task/Response） | github.com/vercel/ai-elements | Apache-2.0 |
 | Framer Motion | 动效 | github.com/motiondivision/motion | MIT |
 | Recharts | 雷达图 | github.com/recharts/recharts | MIT |
@@ -95,4 +95,4 @@ lib/agents.ts        # 12 个智能体花名册（与后端对应）
 
 > 说明：shadcn/ui 与 AI Elements 均为「源码分发」模式的组件体系，本项目按其推荐方式将组件源码
 > 内置于 `components/ui/`（因网络环境限制由人工内置等价源码，样式与官方 new-york 风格一致）。
-> 多模态资源由后端智能体（Manim 渲染、讯飞 TTS/OCR 等）产出。
+> 多模态资源由后端智能体（Remotion/FFmpeg 渲染、讯飞 TTS/OCR 等）产出。

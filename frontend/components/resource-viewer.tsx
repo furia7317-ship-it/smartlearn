@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
@@ -11,10 +11,8 @@ import {
   GitBranch,
   Globe,
   Loader2,
-  MessageCircle,
   MessageSquareText,
   PencilLine,
-  Send,
   Sparkles,
   Waypoints,
   X,
@@ -27,8 +25,8 @@ import { CodeExecutionVisualizer } from "@/components/code-execution-visualizer"
 import { HtmlSandbox } from "@/components/html-sandbox";
 import { Markdown } from "@/components/markdown";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
+import { useTeacherWindow } from "@/components/desktop/teacher-window-provider";
 import { ResourcePathAttachmentDialog } from "@/components/resource-path-attachment-dialog";
-import { VoiceCallControl } from "@/components/voice-call-control";
 import { QuizRunner } from "@/components/quiz-runner";
 import { SlideDeck } from "@/components/slide-deck";
 import { VideoPlayer } from "@/components/video-player";
@@ -1002,12 +1000,9 @@ export function ResourceViewer({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { open: teacherOpen, openTeacher } = useTeacherWindow();
   const {
-    activeConversationKind,
-    activeResourceId,
-    activeResourceContext,
     askResourceQuestion,
-    messages,
     mode,
     patchResourceData,
     recordPractice,
@@ -1015,10 +1010,8 @@ export function ResourceViewer({
     resourcePathAttachments,
     resources,
     running,
-    stop,
   } = useOrchestratorContext();
   const contentRef = useRef<HTMLDivElement>(null);
-  const tutorScrollRef = useRef<HTMLDivElement>(null);
   const learningRecordedRef = useRef("");
   const lastTrackedScrollRef = useRef(0);
   const [linkedItem, setLinkedItem] = useState<ResourceItem | null>(null);
@@ -1029,12 +1022,6 @@ export function ResourceViewer({
   const [practiceError, setPracticeError] = useState("");
   const practiceAbortRef = useRef<AbortController | null>(null);
   const [selectedText, setSelectedText] = useState("");
-  const [tutorOpen, setTutorOpen] = useState(false);
-  const [tutorQuestion, setTutorQuestion] = useState("");
-  const [tutorContext, setTutorContext] = useState("");
-  const [tutorSize, setTutorSize] = useState({ width: 390, height: 520 });
-  const [tutorResizing, setTutorResizing] = useState(false);
-  const tutorResizeCleanupRef = useRef<(() => void) | null>(null);
   // 「生成 PPT」弹窗（图片模板墙 + 讯飞智文成品生成），见 PptGenerateModal
   const [pptOpen, setPptOpen] = useState(false);
   const [pathAttachOpen, setPathAttachOpen] = useState(false);
@@ -1051,42 +1038,6 @@ export function ResourceViewer({
     setPathAttachOpen(false);
   }, [item?.id]);
   useEffect(() => () => practiceAbortRef.current?.abort(), []);
-  useEffect(() => () => tutorResizeCleanupRef.current?.(), []);
-
-  const startTutorResize = (
-    event: ReactPointerEvent<HTMLButtonElement>,
-    axis: "width" | "height" | "both",
-  ) => {
-    event.preventDefault();
-    tutorResizeCleanupRef.current?.();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const startSize = tutorSize;
-    setTutorResizing(true);
-    const move = (pointer: PointerEvent) => {
-      const maxWidth = Math.max(320, window.innerWidth - 32);
-      const maxHeight = Math.max(300, window.innerHeight - 96);
-      setTutorSize({
-        width: axis === "height"
-          ? startSize.width
-          : Math.min(maxWidth, Math.max(320, startSize.width + startX - pointer.clientX)),
-        height: axis === "width"
-          ? startSize.height
-          : Math.min(maxHeight, Math.max(300, startSize.height + startY - pointer.clientY)),
-      });
-    };
-    const stop = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
-      window.removeEventListener("pointercancel", stop);
-      tutorResizeCleanupRef.current = null;
-      setTutorResizing(false);
-    };
-    tutorResizeCleanupRef.current = stop;
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
-    window.addEventListener("pointercancel", stop);
-  };
   const recordReadCompletion = useCallback(() => {
     const evidenceKey = viewedItem ? `${viewedItem.id}:${taskKey ?? ""}` : "";
     if (!viewedItem || viewedItem.type === "quiz" || learningRecordedRef.current === evidenceKey) return;
@@ -1117,7 +1068,7 @@ export function ResourceViewer({
   const openTutorAnswer = (
     prompt: string,
     displayQuestion = "讲解这份资料",
-    context = tutorContext,
+    context = "",
   ) => {
     if (!viewedItem || !prompt.trim() || running) return;
     const visibleContext = context.trim() || viewedItem.subtitle || "围绕当前资料内容进行问答";
@@ -1130,33 +1081,23 @@ export function ResourceViewer({
     });
     if (!accepted) return;
     noteLearningActivityInteraction("questions");
-    setTutorOpen(true);
-    setTutorContext(visibleContext);
-    setTutorQuestion("");
+    openTeacher({
+      module: "resource",
+      title: viewedItem.title,
+      detail: visibleContext,
+      entityId: viewedItem.id,
+    });
   };
 
   const openTutorQuestion = (context = "") => {
-    setTutorOpen(true);
-    setTutorContext(context);
-    setTutorQuestion("");
+    if (!viewedItem) return;
+    openTeacher({
+      module: "resource",
+      title: viewedItem.title,
+      detail: context.trim() || viewedItem.subtitle || "围绕当前资料内容进行问答",
+      entityId: viewedItem.id,
+    });
   };
-
-  const sendTutorQuestion = (rawQuestion: string) => {
-    const question = rawQuestion.trim();
-    if (!viewedItem || !question || running) return;
-    const prompt = tutorContext
-      ? `${tutorContext}\n\n我的问题：${question}`
-      : `我正在学习资料「${viewedItem.title}」。请结合这份资料和课程知识库回答下面的问题：\n\n${question}`;
-    openTutorAnswer(prompt, question, tutorContext);
-  };
-
-  const submitTutorQuestion = () => sendTutorQuestion(tutorQuestion);
-
-  const isCurrentResourceConversation =
-    activeConversationKind === "resource_qa" && activeResourceId === viewedItemId;
-  const tutorMessages = isCurrentResourceConversation
-    ? messages.filter((message) => message.kind === "text")
-    : [];
 
   const openRelatedLecture = async (label: string) => {
     if (!item) return;
@@ -1345,26 +1286,13 @@ export function ResourceViewer({
     if (!viewedItemId) return;
     learningRecordedRef.current = "";
     setSelectedText("");
-    setTutorOpen(false);
-    setTutorQuestion("");
-    setTutorContext("");
   }, [taskKey, viewedItemId]);
-
-  useEffect(() => {
-    if (!tutorOpen) return;
-    const frame = window.requestAnimationFrame(() => {
-      const node = tutorScrollRef.current;
-      if (node) node.scrollTop = node.scrollHeight;
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [messages, running, tutorOpen]);
 
   useEffect(() => {
     if (!viewedItemId) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (tutorOpen) setTutorOpen(false);
-      else goBack();
+      if (!teacherOpen) goBack();
     };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -1373,7 +1301,7 @@ export function ResourceViewer({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [goBack, tutorOpen, viewedItemId]);
+  }, [goBack, teacherOpen, viewedItemId]);
 
   useEffect(() => {
     if (!viewedItem || viewedItem.type === "quiz" || viewedItem.type === "courseware") return;
@@ -1595,96 +1523,6 @@ export function ResourceViewer({
               </div>
             )}
 
-            {tutorOpen && (
-              <section
-                role="dialog"
-                aria-label="资料问答"
-                style={{ width: tutorSize.width, height: tutorSize.height }}
-                className={cn(
-                  "absolute bottom-16 right-4 z-30 flex max-h-[calc(100%-6rem)] max-w-[calc(100%-2rem)] flex-col overflow-hidden rounded-lg border border-[#c9aa78] bg-[#fffaf2] shadow-2xl",
-                  tutorResizing && "select-none",
-                )}
-              >
-                <button type="button" tabIndex={-1} aria-label="调整问答窗高度" onPointerDown={(event) => startTutorResize(event, "height")} className="absolute left-3 right-3 top-0 z-40 h-2 cursor-row-resize" />
-                <button type="button" tabIndex={-1} aria-label="调整问答窗宽度" onPointerDown={(event) => startTutorResize(event, "width")} className="absolute bottom-3 left-0 top-3 z-40 w-2 cursor-col-resize" />
-                <button type="button" tabIndex={-1} aria-label="调整问答窗大小" onPointerDown={(event) => startTutorResize(event, "both")} className="absolute left-0 top-0 z-50 size-4 cursor-nwse-resize" />
-                <header className="flex shrink-0 items-center gap-2 border-b border-[#e0d2bd] px-3 py-2.5">
-                  <MessageCircle className="size-4 text-[#8b5620]" />
-                  <strong className="text-sm text-[#3a2a18]">智能教师</strong>
-                  {running && isCurrentResourceConversation && <Loader2 className="ml-auto size-3.5 animate-spin text-[#8b5620]" />}
-                  <button type="button" onClick={() => setTutorOpen(false)} className={cn("grid size-7 place-items-center rounded-md text-[#786650] hover:bg-[#eee4d5]", !(running && isCurrentResourceConversation) && "ml-auto")} aria-label="关闭问答窗"><X className="size-4" /></button>
-                </header>
-                <div ref={tutorScrollRef} className="thin-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3" aria-live="polite">
-                  <div className="rounded-md border border-[#dfcfb7] bg-[#f7efe2] px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase text-[#8b5620]">当前资料</p>
-                    <p className="mt-0.5 text-xs font-medium leading-5 text-[#3a2a18]">{viewedItem.title}</p>
-                    {(tutorContext || (isCurrentResourceConversation ? activeResourceContext : "")) && (
-                      <p className="mt-1 line-clamp-4 text-[11px] leading-5 text-[#6b5943]">
-                        {tutorContext || activeResourceContext}
-                      </p>
-                    )}
-                  </div>
-                  {tutorMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        "text-sm leading-6",
-                        message.role === "user"
-                          ? "ml-8 rounded-md bg-[#68471f] px-3 py-2 text-[#fffaf1]"
-                          : "mr-2 border-l-2 border-[#c69a61] pl-3 text-[#3a2a18]",
-                      )}
-                    >
-                      {message.role === "assistant"
-                        ? message.content.trim()
-                          ? <Prose content={message.content} />
-                          : <p className="flex items-center gap-2 text-xs text-[#786650]"><Loader2 className="size-3.5 animate-spin" />正在回答…</p>
-                        : <p className="whitespace-pre-wrap">{message.content}</p>}
-                    </div>
-                  ))}
-                  {tutorMessages.length === 0 && (
-                    <p className="py-4 text-center text-xs leading-5 text-[#786650]">输入问题后会为这份资料创建独立问答会话，并保留后续上下文。</p>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-end gap-2 border-t border-[#e0d2bd] bg-white/70 p-2.5">
-                  <textarea
-                    autoFocus
-                    value={tutorQuestion}
-                    onChange={(event) => setTutorQuestion(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                        event.preventDefault();
-                        submitTutorQuestion();
-                      }
-                    }}
-                    rows={2}
-                    placeholder="询问这份资料…"
-                    className="min-h-14 flex-1 resize-none rounded-md border border-[#d6c5ab] bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#c59a62]/35"
-                  />
-                  <VoiceCallControl
-                    surfaceMode="inline"
-                    messages={tutorMessages}
-                    running={running && isCurrentResourceConversation}
-                    enabled={mode === "live"}
-                    onSend={sendTutorQuestion}
-                    onStop={stop}
-                    onClose={() => setTutorOpen(false)}
-                  />
-                  <button type="button" disabled={!tutorQuestion.trim() || running} onClick={submitTutorQuestion} title="发送" aria-label="发送问题" className="grid size-9 shrink-0 place-items-center rounded-md bg-[#3a2a18] text-white hover:bg-[#4c3821] disabled:cursor-not-allowed disabled:opacity-40"><Send className="size-4" /></button>
-                </div>
-              </section>
-            )}
-
-            {!tutorOpen && (
-              <button
-                type="button"
-                onClick={() => openTutorQuestion()}
-                title="询问智能教师"
-                aria-label="询问智能教师"
-                className="absolute bottom-4 right-4 z-20 grid size-11 place-items-center rounded-full bg-[#3a2a18] text-[#fffaf1] shadow-lg transition hover:bg-[#4c3821] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c59a62] focus-visible:ring-offset-2"
-              >
-                <MessageCircle className="size-5" />
-              </button>
-            )}
           </motion.div>
         </motion.div>
       )}

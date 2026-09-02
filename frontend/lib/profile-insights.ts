@@ -379,13 +379,15 @@ function buildEvidence(
     rows.push({
       id: `paper-${paper.id}`,
       kind: "practice",
-      label: "练习",
+      label: paper.category === "课程测评" ? "测评" : "练习",
       content: paper.title || "试卷练习",
       knowledge: paper.topic || paper.tags.slice(0, 3).join("、") || "综合练习",
       result: `得分 ${clampPercent(paper.overall_score)}%`,
       time: evidenceTime(paper.created_at, now),
       occurredAt: paper.created_at,
-      href: "/desktop/practice",
+      href: paper.category === "课程测评"
+        ? "/desktop/path/assessment"
+        : "/desktop/practice",
     });
   });
 

@@ -129,7 +129,7 @@ async def fallback_slideshow(
     script: dict[str, Any],
     task_id: str,
 ) -> Path:
-    """兜底：Manim 失败时生成图文幻灯（PIL/matplotlib）。"""
+    """兜底：高阶渲染不可用时使用 Pillow 生成图文幻灯。"""
     from PIL import Image, ImageDraw, ImageFont
 
     output_dir = Path(settings.MEDIA_OUTPUT_DIR) / "video_tasks" / task_id / "fallback"

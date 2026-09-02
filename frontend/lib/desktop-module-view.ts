@@ -28,9 +28,9 @@ const MODULE_ROOTS: Record<DesktopModuleId, string> = {
 
 const MODULE_ROUTES: Record<DesktopModuleId, string[]> = {
   home: ["/desktop", "/desktop/todos", "/desktop/calendar"],
-  studio: ["/desktop/studio", "/desktop/create", "/desktop/agents"],
+  studio: ["/desktop/studio", "/desktop/agents"],
   path: ["/desktop/path"],
-  resources: ["/desktop/resources", "/desktop/kb", "/desktop/video-learning"],
+  resources: ["/desktop/resources", "/desktop/create", "/desktop/kb", "/desktop/video-learning"],
   practice: ["/desktop/practice", "/desktop/code-lab", "/desktop/diagnostic"],
   discover: ["/desktop/discover", "/desktop/theater", "/desktop/market"],
 };

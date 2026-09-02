@@ -48,6 +48,25 @@ test("knowledge path canvas supports pointer-anchored wheel zoom and flowing pip
   assert.match(styles, /\.canvasViewportPanning/);
 });
 
+test("learning path top navigation opens real persisted workspaces", () => {
+  const source = read("components/desktop/desktop-path.tsx");
+  const styles = read("components/desktop/desktop-path.module.css");
+  const api = read("lib/learning-path-api.ts");
+
+  assert.match(source, /type PathWorkspaceTab = "overview" \| "courses" \| "plan"/);
+  assert.match(source, /useDesktopModuleStringState<PathWorkspaceTab>/);
+  assert.match(source, /"workspace\.tab"/);
+  assert.match(source, /<CourseManagementWorkspace/);
+  assert.match(source, /<LearningPlanWorkspace/);
+  assert.doesNotMatch(source, /path-today-tasks.*scrollIntoView/);
+  assert.match(source, /getLearningPathWorkspaceSummary\(\)/);
+  assert.match(source, /replanSubjectPath/);
+  assert.match(source, /recordTaskEvidence\(key, content, "written_response"\)/);
+  assert.match(styles, /\.courseWorkspace/);
+  assert.match(styles, /\.planWorkspace/);
+  assert.match(api, /\/api\/path\/workspace\/\$\{encodeURIComponent\(studentId\)\}\/summary/);
+});
+
 test("desktop task steps switch the detail copy and exact linked material", () => {
   const page = read("app/desktop/page.tsx");
   const dossier = read("components/desktop/desktop-home-dossier.tsx");

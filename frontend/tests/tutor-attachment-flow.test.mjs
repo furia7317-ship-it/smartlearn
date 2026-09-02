@@ -18,7 +18,7 @@ test("smart tutor accepts click and drag-drop attachments", () => {
   assert.match(chat, /讯飞已识别/);
   assert.match(chat, /正在识别/);
   assert.match(orchestrator, /attachments,/);
-  assert.match(orchestrator, /void runTutorLive\(question, question, undefined, attachments\)/);
+  assert.match(orchestrator, /void runTutorLive\(question, question, undefined, attachments, pageContext\)/);
 });
 
 test("chat history persists only public attachment metadata", () => {

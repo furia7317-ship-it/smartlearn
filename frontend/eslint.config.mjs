@@ -8,10 +8,12 @@ const eslintConfig = defineConfig([
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
-    ".next/**",
+    "**/.next/**",
     "out/**",
     "build/**",
     "dist-electron/**",
+    ".electron-app/**",
+    ".electron-app-*.tmp/**",
     "runtime/**",
     "coverage/**",
     // Third-party prebuilt SDK bundles are immutable runtime assets, not app source.

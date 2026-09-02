@@ -489,10 +489,10 @@ class TestPaperLibrary:
             update_paper,
         )
 
-        detail = await get_paper_detail("paper-1", db_session)
+        detail = await get_paper_detail("paper-1", "paper-student", db_session)
         assert detail["questions"][0]["id"] == "q1"
         assert detail["mastery"]["排序"]["score"] == 1
-        assert (await get_paper_detail("exam-1", db_session))["id"] == "paper-1"
+        assert (await get_paper_detail("exam-1", "paper-student", db_session))["id"] == "paper-1"
 
         updated = await update_paper(
             "paper-1", PaperUpdate(title="新标题", category="冲刺", starred=False), db_session,
@@ -514,7 +514,7 @@ class TestPaperLibrary:
         from app.routers.assess import ExamFromBankRequest, create_exam_from_bank
         from app.routers.papers import redo_paper
 
-        redo = await redo_paper("paper-1", db_session)
+        redo = await redo_paper("paper-1", "paper-student", db_session)
         assert redo["exam_id"] != "exam-1"
         assert redo["questions"] == papers[0].questions
 

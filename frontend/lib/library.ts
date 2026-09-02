@@ -9,6 +9,7 @@
 
 import { API_BASE } from "./api";
 import { requireOk } from "./api-error";
+import { createScopedRequestCache } from "./request-cache";
 import { getStudentId } from "./student-identity";
 import type { QuizQuestion, ResourceData, ResourceItem, ResourceType } from "./types";
 
@@ -17,6 +18,35 @@ type Mode = "checking" | "live" | "offline";
 const LS_MATERIALS = "sl_materials_v1";
 const LS_PAPERS = "sl_papers_v1";
 const LS_ASSESSMENTS = "sl_assessments_v1";
+
+export type LibraryListCacheKey = "materials" | "papers" | "assessments" | "goals";
+
+export interface LibraryListOptions {
+  force?: boolean;
+}
+
+const libraryListCache = createScopedRequestCache();
+
+function cachedLibraryList<T>(
+  mode: Mode,
+  key: LibraryListCacheKey,
+  load: () => Promise<T>,
+  options: LibraryListOptions = {},
+): Promise<T> {
+  return libraryListCache.getOrLoad(
+    { studentId: getStudentId(), mode, key },
+    load,
+    options,
+  );
+}
+
+/** Invalidate current-account reads after a successful mutation. */
+export function invalidateLibraryListCache(...keys: LibraryListCacheKey[]): void {
+  libraryListCache.invalidate({
+    studentId: getStudentId(),
+    keys: keys.length > 0 ? keys : undefined,
+  });
+}
 
 /* ── localStorage 小工具 ── */
 
@@ -110,22 +140,27 @@ function summaryToItem(s: Record<string, unknown>): StoredMaterial {
   };
 }
 
-export async function listMaterials(mode: Mode): Promise<StoredMaterial[]> {
-  if (mode === "live") {
-    const res = await requireOk(
-      await fetch(`${API_BASE}/api/materials/${getStudentId()}`, {
-        cache: "no-store",
-        credentials: "include",
-      })
+export async function listMaterials(
+  mode: Mode,
+  options: LibraryListOptions = {},
+): Promise<StoredMaterial[]> {
+  return cachedLibraryList(mode, "materials", async () => {
+    if (mode === "live") {
+      const res = await requireOk(
+        await fetch(`${API_BASE}/api/materials/${getStudentId()}`, {
+          cache: "no-store",
+          credentials: "include",
+        })
+      );
+      const json = (await res.json()) as Record<string, unknown>[];
+      return json
+        .filter((item) => item.review_approved === true)
+        .map(summaryToItem);
+    }
+    return lsRead<StoredMaterial>(LS_MATERIALS).filter(
+      (item) => item.review_approved === true,
     );
-    const json = (await res.json()) as Record<string, unknown>[];
-    return json
-      .filter((item) => item.review_approved === true)
-      .map(summaryToItem);
-  }
-  return lsRead<StoredMaterial>(LS_MATERIALS).filter(
-    (item) => item.review_approved === true,
-  );
+  }, options);
 }
 
 /** 取材料完整内容（live 摘要列表不含 data，点开时按需拉取）。 */
@@ -185,7 +220,9 @@ export async function linkMaterialVideo(
       }),
     }),
   );
-  return (await response.json()) as MaterialMediaLinkResult;
+  const result = (await response.json()) as MaterialMediaLinkResult;
+  invalidateLibraryListCache("materials");
+  return result;
 }
 
 export async function saveMaterial(mode: Mode, input: MaterialInput): Promise<void> {
@@ -212,6 +249,8 @@ export async function saveMaterial(mode: Mode, input: MaterialInput): Promise<vo
         }),
       })
     );
+    // A quiz material can create a linked paper in the same backend mutation.
+    invalidateLibraryListCache("materials", "papers");
     return;
   }
 
@@ -242,7 +281,9 @@ export async function saveReflection(
       }),
     }),
   );
-  return summaryToItem((await response.json()) as Record<string, unknown>);
+  const material = summaryToItem((await response.json()) as Record<string, unknown>);
+  invalidateLibraryListCache("materials");
+  return material;
 }
 
 export async function saveNote(mode: Mode, input: NoteInput): Promise<StoredMaterial> {
@@ -265,7 +306,9 @@ export async function saveNote(mode: Mode, input: NoteInput): Promise<StoredMate
       }),
     }),
   );
-  return summaryToItem((await response.json()) as Record<string, unknown>);
+  const material = summaryToItem((await response.json()) as Record<string, unknown>);
+  invalidateLibraryListCache("materials");
+  return material;
 }
 
 export async function deleteMaterial(mode: Mode, id: string): Promise<void> {
@@ -276,9 +319,11 @@ export async function deleteMaterial(mode: Mode, id: string): Promise<void> {
         { method: "DELETE", credentials: "include" },
       )
     );
+    invalidateLibraryListCache("materials", "papers");
     return;
   }
   lsWrite(LS_MATERIALS, lsRead<StoredMaterial>(LS_MATERIALS).filter((m) => m.id !== id));
+  invalidateLibraryListCache("materials", "papers");
 }
 
 export async function clearMaterials(mode: Mode): Promise<void> {
@@ -289,9 +334,11 @@ export async function clearMaterials(mode: Mode): Promise<void> {
         credentials: "include",
       })
     );
+    invalidateLibraryListCache("materials", "papers");
     return;
   }
   lsWrite<StoredMaterial>(LS_MATERIALS, []);
+  invalidateLibraryListCache("materials", "papers");
 }
 
 /* ── 试题库 ── */
@@ -312,6 +359,28 @@ export interface PaperSummary {
 export interface PaperDetail extends PaperSummary {
   questions: QuizQuestion[];
   answers?: Record<string, string>;
+  paper_type?: string;
+  results?: PaperQuestionResult[];
+  mastery?: Record<string, PaperMasteryItem | number>;
+}
+
+export interface PaperQuestionResult {
+  question_id: string;
+  type?: string;
+  score: number;
+  max_score: number;
+  correct: boolean;
+  student_answer?: string;
+  answer?: string;
+  knowledge_point?: string;
+  feedback?: string;
+  error_type?: string;
+}
+
+export interface PaperMasteryItem {
+  score: number;
+  level?: string;
+  question_count?: number;
 }
 
 interface StoredPaper extends PaperSummary {
@@ -326,34 +395,42 @@ export interface PaperInput {
   questions: QuizQuestion[];
 }
 
-export async function listPapers(mode: Mode): Promise<PaperSummary[]> {
-  if (mode === "live") {
-    try {
-      const res = await fetch(`${API_BASE}/api/papers/${getStudentId()}`, { cache: "no-store" });
-      if (!res.ok) return [];
-      return (await res.json()) as PaperSummary[];
-    } catch {
-      return [];
-    }
+export async function listPapers(
+  mode: Mode,
+  options: LibraryListOptions = {},
+): Promise<PaperSummary[]> {
+  try {
+    return await cachedLibraryList(mode, "papers", async () => {
+      if (mode === "live") {
+        const res = await fetch(`${API_BASE}/api/papers/${getStudentId()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`读取试卷失败 HTTP ${res.status}`);
+        return (await res.json()) as PaperSummary[];
+      }
+      return lsRead<StoredPaper>(LS_PAPERS).map((paper) => ({
+        id: paper.id,
+        exam_id: paper.exam_id,
+        title: paper.title,
+        topic: paper.topic,
+        category: paper.category,
+        tags: paper.tags,
+        status: paper.status,
+        overall_score: paper.overall_score,
+        question_count: paper.question_count,
+        created_at: paper.created_at,
+      }));
+    }, options);
+  } catch {
+    return [];
   }
-  return lsRead<StoredPaper>(LS_PAPERS).map((paper) => ({
-    id: paper.id,
-    exam_id: paper.exam_id,
-    title: paper.title,
-    topic: paper.topic,
-    category: paper.category,
-    tags: paper.tags,
-    status: paper.status,
-    overall_score: paper.overall_score,
-    question_count: paper.question_count,
-    created_at: paper.created_at,
-  }));
 }
 
 export async function getPaperDetail(mode: Mode, id: string): Promise<PaperDetail | undefined> {
   if (mode === "live") {
     try {
-      const res = await fetch(`${API_BASE}/api/papers/detail/${id}`, { cache: "no-store" });
+      const res = await fetch(
+        `${API_BASE}/api/papers/detail/${id}?student_id=${encodeURIComponent(getStudentId())}`,
+        { cache: "no-store" },
+      );
       if (!res.ok) return undefined;
       return (await res.json()) as PaperDetail;
     } catch {
@@ -382,6 +459,7 @@ export async function savePaper(mode: Mode, input: PaperInput): Promise<void> {
     questions: input.questions,
   };
   lsWrite(LS_PAPERS, [paper, ...lsRead<StoredPaper>(LS_PAPERS)]);
+  invalidateLibraryListCache("papers");
 }
 
 export async function deletePaper(mode: Mode, id: string): Promise<void> {
@@ -389,9 +467,11 @@ export async function deletePaper(mode: Mode, id: string): Promise<void> {
     await requireOk(
       await fetch(`${API_BASE}/api/papers/${id}`, { method: "DELETE" })
     );
+    invalidateLibraryListCache("papers");
     return;
   }
   lsWrite(LS_PAPERS, lsRead<StoredPaper>(LS_PAPERS).filter((p) => p.id !== id));
+  invalidateLibraryListCache("papers");
 }
 
 /* ── 摸底记录 ── */
@@ -414,22 +494,28 @@ export interface AssessmentRecord {
   created_at: string;
 }
 
-export async function listAssessments(mode: Mode): Promise<AssessmentRecord[]> {
-  if (mode === "live") {
-    try {
-      const res = await fetch(`${API_BASE}/api/diagnostic/${getStudentId()}`, { cache: "no-store" });
-      if (!res.ok) return [];
-      return (await res.json()) as AssessmentRecord[];
-    } catch {
-      return [];
-    }
+export async function listAssessments(
+  mode: Mode,
+  options: LibraryListOptions = {},
+): Promise<AssessmentRecord[]> {
+  try {
+    return await cachedLibraryList(mode, "assessments", async () => {
+      if (mode === "live") {
+        const res = await fetch(`${API_BASE}/api/diagnostic/${getStudentId()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`读取摸底记录失败 HTTP ${res.status}`);
+        return (await res.json()) as AssessmentRecord[];
+      }
+      return lsRead<AssessmentRecord>(LS_ASSESSMENTS);
+    }, options);
+  } catch {
+    return [];
   }
-  return lsRead<AssessmentRecord>(LS_ASSESSMENTS);
 }
 
 /** offline 下保存摸底记录（live 由后端 /api/diagnostic 持久化）。 */
 export function saveAssessmentLocal(rec: AssessmentRecord): void {
   lsWrite(LS_ASSESSMENTS, [rec, ...lsRead<AssessmentRecord>(LS_ASSESSMENTS)]);
+  invalidateLibraryListCache("assessments");
 }
 
 /* ── 学习目标 ── */
@@ -456,17 +542,22 @@ export interface GoalInput {
   horizon?: "long" | "mid" | "short";
 }
 
-export async function listGoals(mode: Mode): Promise<GoalRecord[]> {
-  if (mode === "live") {
-    try {
-      const res = await fetch(`${API_BASE}/api/goals/${getStudentId()}`, { cache: "no-store" });
-      if (!res.ok) return [];
-      return (await res.json()) as GoalRecord[];
-    } catch {
-      return [];
-    }
+export async function listGoals(
+  mode: Mode,
+  options: LibraryListOptions = {},
+): Promise<GoalRecord[]> {
+  try {
+    return await cachedLibraryList(mode, "goals", async () => {
+      if (mode === "live") {
+        const res = await fetch(`${API_BASE}/api/goals/${getStudentId()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`读取学习目标失败 HTTP ${res.status}`);
+        return (await res.json()) as GoalRecord[];
+      }
+      return lsRead<GoalRecord>(LS_GOALS);
+    }, options);
+  } catch {
+    return [];
   }
-  return lsRead<GoalRecord>(LS_GOALS);
 }
 
 export async function saveGoal(mode: Mode, input: GoalInput): Promise<void> {
@@ -488,6 +579,7 @@ export async function saveGoal(mode: Mode, input: GoalInput): Promise<void> {
         }),
       })
     );
+    invalidateLibraryListCache("goals");
     return;
   }
   const goal: GoalRecord = {
@@ -502,6 +594,7 @@ export async function saveGoal(mode: Mode, input: GoalInput): Promise<void> {
     horizon: input.horizon ?? "short",
   };
   lsWrite(LS_GOALS, [goal, ...lsRead<GoalRecord>(LS_GOALS)]);
+  invalidateLibraryListCache("goals");
 }
 
 export async function deleteGoal(mode: Mode, id: string | number): Promise<void> {
@@ -509,9 +602,11 @@ export async function deleteGoal(mode: Mode, id: string | number): Promise<void>
     await requireOk(
       await fetch(`${API_BASE}/api/goals/${id}`, { method: "DELETE" })
     );
+    invalidateLibraryListCache("goals");
     return;
   }
   lsWrite(LS_GOALS, lsRead<GoalRecord>(LS_GOALS).filter((g) => g.id !== id));
+  invalidateLibraryListCache("goals");
 }
 
 /** 把一条摸底分析压成可注入生成器的简短上下文。 */

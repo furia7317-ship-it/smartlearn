@@ -6,6 +6,7 @@ const routes = [
   "/desktop/studio/",
   "/desktop/create/",
   "/desktop/path/",
+  "/desktop/path/assessment/",
   "/desktop/path/study/",
   "/desktop/resources/",
   "/desktop/theater/",

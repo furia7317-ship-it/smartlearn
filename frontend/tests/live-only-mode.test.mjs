@@ -14,7 +14,7 @@ test("orchestrator uses live services and routes first messages by intent", asyn
   assert.doesNotMatch(source, /if\s*\(!hasRunMain\)\s*void\s+createPlanForRequest\(trimmed\);/);
   assert.match(source, /const\s+question\s*=\s*trimmed\s*\|\|/);
   assert.match(source, /const\s+generate\s*=\s*wantsResource\(question\);/);
-  assert.match(source, /if\s*\(generate\)\s*void\s+createPlanForRequest\(question\);\s*else\s*void\s+runTutorLive\(question\);/);
+  assert.match(source, /else if\s*\(generate\)\s*void\s+createPlanForRequest\(question\);\s*else\s*void\s+runTutorLive\(question, question, undefined, \[\], pageContext\);/);
 });
 
 test("backend-unavailable helpers do not synthesize placeholder content", async () => {

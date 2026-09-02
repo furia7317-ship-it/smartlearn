@@ -36,7 +36,7 @@ test("desktop shell has a transform-only route transition that respects reduced 
   assert.match(shell, /DesktopPageTransition/);
   assert.match(
     shell,
-    /<main[\s\S]{0,200}?<DesktopPageTransition suppressMotion=\{bookPhase !== "idle"\}>\s*\{children\}\s*<\/DesktopPageTransition>/,
+    /<main[\s\S]{0,200}?<DesktopPageTransition>\s*\{children\}\s*<\/DesktopPageTransition>/,
     "the desktop <main> must mount the route transition around its children",
   );
 });
@@ -56,9 +56,9 @@ test("desktop route motion normalizes trailing slashes and stays still on transf
   assert.equal(normalizeRouteKey("/"), "/");
   assert.equal(normalizeRouteKey(null), "/");
 
-  assert.equal(getDesktopPageEnter("/desktop/studio/").x, 0, "studio hosts a fixed webview overlay");
-  assert.ok(getDesktopPageEnter("/desktop/market").x > 0, "market now uses the shared desktop shell");
-  assert.ok(getDesktopPageEnter("/desktop/path").x > 0);
+  assert.equal(getDesktopPageEnter("/desktop/studio/").y, 0, "studio hosts a fixed webview overlay");
+  assert.ok(getDesktopPageEnter("/desktop/market").y > 0, "market keeps a small compositor-only offset");
+  assert.equal(getDesktopPageEnter("/desktop/path").y, 0, "the graph canvas must not inherit a route transform");
 });
 
 test("desktop view swaps degrade to a no-op when the user asks for reduced motion", async () => {
@@ -113,60 +113,23 @@ test("desktop rail marks the active route with a shared sliding indicator", asyn
   assert.match(globals, /\.desktop-rail-link\s*\{[^}]*position:\s*relative/s);
 });
 
-test("desktop rail navigation closes and reopens a transform-only book", async () => {
-  const [shell, book, globals, motion] = await Promise.all([
+test("desktop rail navigation provides immediate feedback without a blocking book overlay", async () => {
+  const [shell, globals, motion] = await Promise.all([
     source("../components/layout/desktop-shell.tsx"),
-    source("../components/layout/desktop-book-transition.tsx"),
     source("../app/globals.css"),
     import("../lib/web-motion.ts"),
   ]);
 
   assert.match(shell, /navigateFromRail/);
-  assert.match(shell, /router\.prefetch\(href\)/, "primary desktop modules should be warmed before navigation");
-  assert.match(shell, /DesktopBookTransition/);
-  assert.match(shell, /bookPhase/);
-  assert.match(
-    shell,
-    /className="relative flex min-w-0 flex-1 flex-col"[\s\S]*?<DesktopBookTransition/,
-    "the book transition must be contained by the right-hand content area",
-  );
-  assert.match(book, /data-phase=\{phase\}/);
-  assert.match(book, /desktop-book-transition__turning-cover/);
-  assert.match(globals, /@keyframes desktop-book-close/);
-  assert.match(globals, /@keyframes desktop-book-open/);
+  assert.match(shell, /prefetch=\{false\}/);
+  assert.match(shell, /setPendingHref\(href\)[\s\S]{0,180}?router\.push\(href\)/);
+  assert.match(shell, /data-navigation-pending=\{pending \? "true" : undefined\}/);
+  assert.match(shell, /requestIdleCallback\(prefetch, \{ timeout: 2_000 \}\)/);
+  assert.doesNotMatch(shell, /DesktopBookTransition|bookPhase/);
+  assert.ok(motion.DESKTOP_PAGE_DURATION <= 0.16);
   assert.match(
     globals,
-    /\.desktop-book-transition\s*\{[^}]*position:\s*absolute/s,
-    "the book transition must not cover the persistent navigation rail",
-  );
-  assert.doesNotMatch(
-    globals,
-    /\.desktop-book-transition\s*\{[^}]*position:\s*fixed/s,
-  );
-  assert.match(
-    globals,
-    /\.desktop-book-transition__turning-cover\s*\{[^}]*will-change:\s*transform/s,
-  );
-  assert.doesNotMatch(
-    globals.match(/@keyframes desktop-book-(?:close|open)[\s\S]*?(?=@keyframes desktop-book-overlay-in)/)?.[0] ?? "",
-    /(width|height|top|left|filter|box-shadow)\s*:/,
-    "book keyframes must stay on the compositor",
-  );
-  assert.ok(motion.DESKTOP_BOOK_CLOSE_DURATION_MS <= 400);
-  assert.ok(motion.DESKTOP_BOOK_OPEN_DURATION_MS <= 450);
-  assert.ok(motion.DESKTOP_BOOK_CLOSE_DURATION_MS <= 240);
-  assert.ok(motion.DESKTOP_BOOK_OPEN_DURATION_MS <= 280);
-  assert.ok(motion.DESKTOP_BOOK_CLOSE_DURATION_MS <= 180);
-  assert.ok(motion.DESKTOP_BOOK_OPEN_DURATION_MS <= 200);
-  assert.match(
-    shell,
-    /router\.push\(href\);[\s\S]{0,240}?bookCloseTimerRef\.current\s*=\s*window\.setTimeout/,
-    "route loading must start before the closing animation completes",
-  );
-  assert.match(
-    shell,
-    /<DesktopPageTransition suppressMotion=\{bookPhase !== "idle"\}>/,
-    "the full-page transform must not compete with the book overlay",
+    /\.desktop-page-transition\[data-transition="running"\]\s*\{[^}]*will-change:\s*transform, opacity/s,
   );
 });
 
@@ -181,7 +144,7 @@ test("heavy desktop pages animate only their outermost view container", async ()
     assert.match(page, /getDesktopViewSwap/);
     assert.match(page, /useReducedMotion/);
   }
-  assert.match(path, /<motion\.div key=\{view\}/);
+  assert.match(path, /<motion\.div key=\{`\$\{activeWorkspaceTab\}:\$\{view\}`\}/);
   assert.match(studio, /<motion\.div key=\{conversationGroup\}/);
   assert.match(studio, /<motion\.div key=\{activeTab\}[^>]*min-h-0/, "the studio flex chain needs min-h-0 restored");
 

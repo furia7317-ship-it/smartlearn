@@ -1,10 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 
 import { DesktopHomeDossier } from "@/components/desktop/desktop-home-dossier";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
-import { ResourceViewer } from "@/components/resource-viewer";
 import { useUserSettings } from "@/hooks/use-user-settings";
 import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import { fetchBehaviorDashboard } from "@/lib/api";
@@ -12,11 +12,9 @@ import { buildPathDashboardPlan } from "@/lib/daily-task-plan";
 import {
   getMaterialData,
   listAssessments,
-  listMaterials,
   listPapers,
   type AssessmentRecord,
   type PaperSummary,
-  type StoredMaterial,
 } from "@/lib/library";
 import {
   LEARNING_ACTIVITY_UPDATED_EVENT,
@@ -33,37 +31,27 @@ import { resolveResourceForTaskTarget } from "@/lib/path-resource-links";
 import { getStudentId } from "@/lib/student-identity";
 import type { ResourceItem } from "@/lib/types";
 
+const ResourceViewer = dynamic(
+  () => import("@/components/resource-viewer").then((module) => module.ResourceViewer),
+  { ssr: false },
+);
+
 export default function DesktopHome() {
   const session = useOrchestratorContext();
   const { name, major, grade } = useUserSettings();
-  const [library, setLibrary] = useState<StoredMaterial[]>([]);
   const [assessments, setAssessments] = useState<AssessmentRecord[]>([]);
   const [papers, setPapers] = useState<PaperSummary[]>([]);
   const [activities, setActivities] = useState<LearningActivityEvent[]>([]);
   const [serverActivities, setServerActivities] = useState<LearningActivityEvent[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [openItem, setOpenItem] = useState<ResourceItem | null>(null);
+  const [resourceViewerActivated, setResourceViewerActivated] = useState(false);
   const [selectedTaskKey, setSelectedTaskKey] = useDesktopModuleStringState<string>(
     "home",
     "dossier.task",
     ""
   );
   const displayName = name.trim() || "同学";
-
-  useEffect(() => {
-    if (session.mode === "checking") return;
-    let cancelled = false;
-    listMaterials(session.mode)
-      .then((items) => {
-        if (!cancelled) setLibrary(items);
-      })
-      .catch(() => {
-        if (!cancelled) setLibrary([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session.mode]);
 
   useEffect(() => {
     if (!session.hydrated || session.mode === "checking") return;
@@ -126,13 +114,13 @@ export default function DesktopHome() {
   const resources = useMemo(() => {
     const seen = new Set<string>();
     const merged: ResourceItem[] = [];
-    for (const resource of [...library, ...session.resources]) {
+    for (const resource of session.resources) {
       if (resource.status !== "ready" || seen.has(resource.id)) continue;
       seen.add(resource.id);
       merged.push(resource);
     }
     return merged;
-  }, [library, session.resources]);
+  }, [session.resources]);
 
   const dashboard = useMemo(
     () => buildPathDashboardPlan(session.masterPath, session.completedMaterials, {
@@ -219,6 +207,7 @@ export default function DesktopHome() {
   ]);
 
   const openResource = async (resource: ResourceItem) => {
+    setResourceViewerActivated(true);
     setOpenItem(resource);
     if (resource.data || session.mode !== "live") return;
     const data = await getMaterialData(session.mode, resource.id);
@@ -250,7 +239,9 @@ export default function DesktopHome() {
         onSelectTask={setSelectedTaskKey}
         onOpenResource={openResource}
       />
-      <ResourceViewer item={openItem} onClose={() => setOpenItem(null)} />
+      {resourceViewerActivated ? (
+        <ResourceViewer item={openItem} onClose={() => setOpenItem(null)} />
+      ) : null}
     </>
   );
 }

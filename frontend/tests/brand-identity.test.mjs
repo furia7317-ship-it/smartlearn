@@ -13,7 +13,7 @@ test("web and desktop surfaces expose the 学枢 brand", () => {
   const splash = read("electron/splash.html");
 
   assert.match(metadata, /title: "学枢 — AI 个性化学习平台"/);
-  assert.match(desktopShell, />学枢</);
+  assert.match(desktopShell, /<span className="desktop-brand__title">学枢<\/span>/);
   assert.match(desktopShell, />XUESHU</);
   assert.match(webBrand, />学枢</);
   assert.match(marketing, /© 2026 学枢 Xueshu/);

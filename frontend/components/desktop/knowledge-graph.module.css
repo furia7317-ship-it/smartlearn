@@ -38,9 +38,13 @@
   align-items: center;
   gap: 5px;
   margin-bottom: 7px;
+  padding: 0;
+  border: 0;
   color: #8c7d68;
+  background: transparent;
   font-size: 11px;
   transition: color 160ms ease;
+  cursor: pointer;
 }
 
 .back:hover {

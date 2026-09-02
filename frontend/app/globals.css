@@ -164,7 +164,7 @@
   border: 1px solid #4a3821;
   border-radius: 0 18px 18px 0;
   background-color: #201810;
-  background-image: url("/brand/desktop/book-spine-texture-v2.png");
+  background-image: url("/brand/desktop/book-spine-texture-v2.webp");
   background-size: 430px 430px;
   box-shadow: inset -10px 0 28px rgb(0 0 0 / 0.38), 8px 0 24px rgb(20 13 7 / 0.28);
   transition: width 180ms ease, flex-basis 180ms ease, padding 180ms ease;
@@ -355,7 +355,7 @@
 }
 /* will-change 鍙湪鎾斁鏈熼棿鎵撳紑锛屽父椹讳細缁欓〉鍐?position:fixed 寮圭獥鍒堕€犲寘鍚潡 */
 .desktop-page-transition[data-transition="running"] {
-  will-change: transform;
+  will-change: transform, opacity;
 }
 
 /*
@@ -1474,14 +1474,17 @@
 .desktop-resource-empty > div { min-width: 0; flex: 1; }
 .desktop-resource-empty strong { color: var(--foreground); font-size: 13px; }
 .desktop-resource-empty p { margin-top: 4px; font-size: 10px; line-height: 1.55; }
-.desktop-resource-empty a {
+.desktop-resource-empty a,
+.desktop-resource-empty button {
   flex-shrink: 0;
   padding: 8px 12px;
+  border: 0;
   border-radius: 7px;
   color: var(--primary-foreground);
   background: var(--primary);
   font-size: 10px;
   font-weight: 700;
+  cursor: pointer;
 }
 
 .desktop-resource-workspace {

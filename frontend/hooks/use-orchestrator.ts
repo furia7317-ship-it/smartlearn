@@ -137,6 +137,7 @@ import type {
   ResourceItem,
   ResourceType,
   TutorAttachment,
+  TutorPageContext,
 } from "@/lib/types";
 import {
   buildWatchedVideoStep,
@@ -2524,6 +2525,7 @@ export function useOrchestrator() {
       displayQuestion = question,
       historyOverride?: ChatMessage[],
       attachments: TutorAttachment[] = [],
+      pageContext?: TutorPageContext,
     ) => {
       const ownerConversationId = activeConversationIdRef.current;
       const ownerTeacher = activeTeacher;
@@ -2650,6 +2652,12 @@ export function useOrchestrator() {
             message: question,
             history,
             attachments,
+            page_context: pageContext ? {
+              module: pageContext.module?.trim().slice(0, 80) || "",
+              title: pageContext.title?.trim().slice(0, 180) || "",
+              detail: pageContext.detail?.trim().slice(0, 1200) || "",
+              entity_id: pageContext.entityId?.trim().slice(0, 120) || "",
+            } : undefined,
             teacher_persona: ownerTeacher,
           },
           ({ event, data }) => {
@@ -2966,7 +2974,7 @@ export function useOrchestrator() {
   }, []);
 
   const send = useCallback(
-    (text: string, attachments: TutorAttachment[] = []) => {
+    (text: string, attachments: TutorAttachment[] = [], pageContext?: TutorPageContext) => {
       const trimmed = text.trim();
       if ((!trimmed && attachments.length === 0) || conversationRunning || mode === "checking") return;
       const question = trimmed || "请阅读这些附件并解答其中的问题，给出关键步骤、结论和必要的逐题解析。";
@@ -2979,7 +2987,7 @@ export function useOrchestrator() {
           addMessage("assistant", "text", "后端未连接，暂时无法解析附件。请启动本地后端后重新发送。" );
           return;
         }
-        void runTutorLive(question, question, undefined, attachments);
+        void runTutorLive(question, question, undefined, attachments, pageContext);
         return;
       }
       // “打开/查看/播放资料”是软件动作，优先级高于资料生成和普通答疑。
@@ -3006,7 +3014,7 @@ export function useOrchestrator() {
       if (generate && needsLearningBaseline(question)) {
         requestLearningPath(question);
       } else if (generate) void createPlanForRequest(question);
-      else void runTutorLive(question);
+      else void runTutorLive(question, question, undefined, [], pageContext);
     },
     [addMessage, conversationRunning, createPlanForRequest, mode, patchMessage, requestLearningPath, runResourceOpenAction, runTutorLive, runVideoSearch]
   );

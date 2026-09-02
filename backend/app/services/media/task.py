@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import logging
 import re
 import shutil
 import uuid
@@ -15,6 +16,7 @@ from typing import Any
 from app.core.config import settings
 
 VIDEO_WORKFLOW_VERSION = "remotion-whiteboard-mimo-v5"
+logger = logging.getLogger(__name__)
 
 
 class MediaTaskManager:
@@ -472,6 +474,10 @@ class MediaTaskManager:
                     # A valid video is more useful than surfacing a renderer
                     # installation detail to the learner. The progress UI only
                     # reports that a compatible rendering mode is being used.
+                    logger.exception(
+                        "Remotion render failed for media task %s; falling back to storyboard",
+                        task_id,
+                    )
                     mp4_path = None
 
             if mp4_path is None:

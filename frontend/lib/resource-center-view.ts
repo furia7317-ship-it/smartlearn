@@ -2,6 +2,9 @@ export const RESOURCE_CENTER_VIEW_KEY = "sl_resource_center_view_v2";
 
 export type ResourceCenterStableBookState = "open" | "closed";
 
+const RESOURCE_CENTER_BOOK_MIN_HEIGHT = 648;
+const RESOURCE_CENTER_BOOK_MAX_HEIGHT = 720;
+
 export interface ResourceCenterViewState {
   href: string;
   bookState: ResourceCenterStableBookState;
@@ -13,7 +16,7 @@ export interface ResourceCenterViewState {
 const DEFAULT_RESOURCE_CENTER_VIEW: ResourceCenterViewState = {
   href: "/desktop/resources",
   bookState: "open",
-  bookHeight: 648,
+  bookHeight: RESOURCE_CENTER_BOOK_MIN_HEIGHT,
   selectedKey: "",
   scrollTop: 0,
 };
@@ -65,7 +68,7 @@ export function readResourceCenterView(): ResourceCenterViewState {
       bookState: parsed.bookState === "closed" ? "closed" : "open",
       bookHeight:
         typeof parsed.bookHeight === "number" && Number.isFinite(parsed.bookHeight)
-          ? Math.max(648, Math.min(1_600, parsed.bookHeight))
+          ? Math.max(RESOURCE_CENTER_BOOK_MIN_HEIGHT, Math.min(RESOURCE_CENTER_BOOK_MAX_HEIGHT, parsed.bookHeight))
           : DEFAULT_RESOURCE_CENTER_VIEW.bookHeight,
       selectedKey:
         typeof parsed.selectedKey === "string"
@@ -93,7 +96,7 @@ export function saveResourceCenterView(
     bookState: next.bookState === "closed" ? "closed" : "open",
     bookHeight:
       typeof next.bookHeight === "number" && Number.isFinite(next.bookHeight)
-        ? Math.max(648, Math.min(1_600, next.bookHeight))
+        ? Math.max(RESOURCE_CENTER_BOOK_MIN_HEIGHT, Math.min(RESOURCE_CENTER_BOOK_MAX_HEIGHT, next.bookHeight))
         : DEFAULT_RESOURCE_CENTER_VIEW.bookHeight,
     selectedKey: typeof next.selectedKey === "string" ? next.selectedKey.slice(0, 512) : "",
     scrollTop:

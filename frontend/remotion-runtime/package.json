@@ -2,11 +2,9 @@
   "name": "xueshu-remotion-runtime",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "render": "remotion render src/index.ts LessonVideo"
-  },
   "dependencies": {
-    "@remotion/cli": "4.0.242",
+    "@remotion/bundler": "4.0.242",
+    "@remotion/renderer": "4.0.242",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "remotion": "4.0.242"

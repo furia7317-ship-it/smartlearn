@@ -36,7 +36,7 @@
 │                                          └──► Reviewer 审核 ──(驳回)──► 重做      │
 │                                                                                 │
 │   云端 LLM (DeepSeek)         本地 RAG (bge-small-zh + ChromaDB)                 │
-│   讯飞 TTS/IAT/OCR · Manim 视频 · 防幻觉服务 · 画像/路径/题库/错题/记忆          │
+│   讯飞 TTS/IAT/OCR · Remotion/FFmpeg 视频 · 防幻觉 · 画像/路径/题库/错题/记忆       │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,7 +62,7 @@
 | 题库命题官 `quiz` | 生成 | 按薄弱点定向命题（选择 / 填空 + 解析） |
 | 拓展阅读官 `reading` | 生成 | 延伸材料 + 关键术语 + 思考题 |
 | 代码教练 `code` | 生成 | 可运行代码示例 + 逐行解释 + 变体 |
-| 动画导演 `video` | 生成 | Manim 分镜脚本 + 旁白（前端可直接播） |
+| 动画导演 `video` | 生成 | Remotion 分镜脚本 + 旁白（前端可直接播） |
 | 课件设计师 `courseware` | 生成 | PPT 大纲（标题页 → 内容 → 总结） |
 | 质检审核官 `reviewer` | 审核 | 防幻觉：逐项与知识库嵌入相似度溯源，不达标驳回 |
 | 路径规划师 `planner` | 规划 | 综合画像 × 资源 × 考期编排个性化路径 |
@@ -111,7 +111,7 @@
 **后端** `backend/`
 - FastAPI、LangGraph（多智能体编排）、Pydantic、Uvicorn
 - ChromaDB + sentence-transformers（bge 中文嵌入）、async SQLAlchemy + SQLite
-- DeepSeek（云端 LLM）、讯飞 IAT/OCR/TTS、Manim + ffmpeg（视频）、httpx + BeautifulSoup（联网抓取）
+- DeepSeek（云端 LLM）、讯飞 IAT/OCR/TTS、Remotion + FFmpeg（视频）、httpx + BeautifulSoup（联网抓取）
 
 **桌面端** `frontend/electron/`
 - Electron 42 + electron-builder（NSIS），自包含 Python 运行时（base CPython 核心 + venv site-packages 覆盖）+ 离线中文嵌入模型 + ChromaDB 种子

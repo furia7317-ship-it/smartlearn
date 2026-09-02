@@ -34,7 +34,8 @@ function scrollNodeKey(node: HTMLElement, index: number): string {
 
 /**
  * 桌面壳路由过场：与 WebPageTransition 同范式。
- * 只动 transform，绝不整页隐藏；起始态先 set 再 rAF 启动，避免首帧闪跳。
+ * 只动 transform/opacity，绝不整页隐藏；起始态先 set 再 rAF 启动，避免首帧闪跳。
+ * 不对整页使用 filter/scale：大图、SVG 和阴影在 Electron 中会触发昂贵的重栅格化。
  */
 export function DesktopPageTransition({
   children,

@@ -27,7 +27,7 @@ def grader(state: GradeState) -> dict[str, Any]:
 
 def merge(state: GradeState) -> dict[str, Any]:
     """合并选择题和主观题评分结果，计算总分和掌握度。"""
-    from app.services.scoring import calculate_overall, calculate_mastery
+    from app.services.scoring import calculate_mastery, calculate_overall
 
     results = state["results"]
     overall = calculate_overall(results)
@@ -51,16 +51,21 @@ def analyst(state: GradeState) -> dict[str, Any]:
         questions=state["questions"],
     )
 
-    writer({"event": "graded", "results": {"overall": state["overall"], "mastery": state["mastery"]}})
+    writer({
+        "event": "graded",
+        "results": {
+            "overall": state["overall"],
+            "mastery": state["mastery"],
+            "results": state["results"],
+        },
+    })
     writer({"event": "report", "assessment": assessment})
     return {"assessment": assessment}
 
 
-def profiler_update(state: GradeState) -> dict[str, Any]:
-    """回写画像：根据测评结果更新学生六维画像。"""
-    from app.agents.profiler import update_from_exam
+def profiler_update(_state: GradeState) -> dict[str, Any]:
+    """画像由路由层在评分副作用的同一异步事务中持久化。"""
 
-    update_from_exam(state["student_id"], state["mastery"], state["results"])
     return {}
 
 

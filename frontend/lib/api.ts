@@ -18,8 +18,25 @@ const browserApiBase =
 const desktopApiBase =
   typeof window !== "undefined" ? window.desktop?.apiBase?.trim() : undefined;
 
+function normalizeBrowserApiBase(value: string | undefined): string | undefined {
+  if (typeof window === "undefined" || !value) return value;
+  try {
+    const configured = new URL(value);
+    const pageHost = window.location.hostname;
+    const isConfiguredLoopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(configured.hostname);
+    const isPageLoopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(pageHost);
+    if (isConfiguredLoopback && isPageLoopback && configured.hostname !== pageHost) {
+      configured.hostname = pageHost;
+      return configured.toString().replace(/\/$/, "");
+    }
+  } catch {
+    return value;
+  }
+  return value;
+}
+
 export const API_BASE =
-  desktopApiBase || process.env.NEXT_PUBLIC_API_BASE || browserApiBase;
+  normalizeBrowserApiBase(desktopApiBase || process.env.NEXT_PUBLIC_API_BASE) || browserApiBase;
 
 const BACKEND_STATUS_CACHE_MS = 5_000;
 let backendStatusCache: { online: boolean; checkedAt: number } | null = null;

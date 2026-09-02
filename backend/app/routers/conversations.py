@@ -13,9 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_db
 from app.models.learning import ConversationSessionRecord
+from app.routers.auth import require_account_student_scope
 from app.services.agent_memory import consolidate_conversation
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_account_student_scope)])
 
 TERMINAL_SUMMARY_PREFIXES = ("全部 ", "学习路径已交付 ")
 

@@ -368,18 +368,18 @@ test("path panel focuses one selectable day instead of noisy summary copy", asyn
   assert.match(pathPanel, /aria-label=\{`查看 \$\{step\.day\} 学习内容`\}/);
 });
 
-test("desktop studio renders real dependency health and recovery instead of fake online state", async () => {
+test("desktop studio consumes real dependency health without duplicating it in the rail account", async () => {
   const desktopStudio = await read("../components/desktop/desktop-studio.tsx");
   const desktopShell = await read("../components/layout/desktop-shell.tsx");
   const studioPage = await read("../app/studio/page.tsx");
 
   assert.match(desktopStudio, /getMaterialData\(o\.mode/);
   assert.doesNotMatch(desktopStudio, /真实后端已连接/);
-  assert.match(desktopShell, /checkBackend\(\)/);
-  assert.match(desktopShell, /SERVICE_POLL_INTERVAL_MS/);
-  assert.match(desktopShell, /"online"/);
-  assert.match(desktopShell, /"focus"/);
-  assert.match(desktopShell, /"服务异常"/);
+  assert.match(desktopShell, /desktop-rail-account/);
+  assert.doesNotMatch(desktopShell, /desktop-topbar/);
+  assert.doesNotMatch(desktopShell, /checkBackend\(\)/);
+  assert.doesNotMatch(desktopShell, /SERVICE_POLL_INTERVAL_MS/);
+  assert.doesNotMatch(desktopShell, /desktop-service-state/);
   assert.doesNotMatch(desktopStudio, /在线 14/);
   assert.doesNotMatch(studioPage, /后端已连接/);
   assert.doesNotMatch(studioPage, /后端未连接/);
@@ -418,7 +418,10 @@ test("learning path resource actions use the shared exact resolver on both surfa
   assert.match(pathPanel, /onOpenResource/);
   assert.match(desktopStudio, /ResourceViewer/);
   assert.match(desktopStudio, /resources=\{o\.resources\}/);
-  assert.match(desktopStudio, /onOpenResource=\{\(item, taskKey\) => setOpenResource\(\{ item, taskKey \}\)\}/);
+  assert.match(
+    desktopStudio,
+    /onOpenResource=\{\(item, taskKey\) => \{[\s\S]{0,120}?setResourceViewerActivated\(true\);[\s\S]{0,120}?setOpenResource\(\{ item, taskKey \}\)/,
+  );
   assert.match(desktopStudio, /taskKey=\{openResource\?\.taskKey\}/);
   assert.match(desktopPath, /ResourceViewer/);
 });
@@ -579,7 +582,8 @@ test("resource generation survives route changes and exposes streamed trace and 
   assert.match(controller, /event === "trace"/);
   assert.match(controller, /event === "content_delta"/);
   assert.match(controller, /normalizeAgentRunEvent/);
-  assert.match(shell, /materialGenerator\.running/);
+  assert.match(controller, /const \[running, setRunning\] = useState\(false\)/);
+  assert.doesNotMatch(shell, /materialGenerator\.running/);
   assert.match(desktopCreate, /AgentRunInspector/);
   assert.match(desktopCreate, /已过审内容流/);
 });

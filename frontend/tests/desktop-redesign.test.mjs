@@ -11,6 +11,7 @@ const DESKTOP_ROUTES = [
   "../app/desktop/create/page.tsx",
   "../app/desktop/agents/page.tsx",
   "../app/desktop/path/page.tsx",
+  "../app/desktop/path/assessment/page.tsx",
   "../app/desktop/path/study/page.tsx",
   "../app/desktop/todos/page.tsx",
   "../app/desktop/calendar/page.tsx",
@@ -36,20 +37,21 @@ test("every required desktop route has a renderable page module", async () => {
 });
 
 test("consolidated desktop destinations are reachable from their owning surfaces", async () => {
-  const [shell, home, discover, resources, practice, path] = await Promise.all([
+  const [shell, home, discover, resources, practice, path, assessment] = await Promise.all([
     read("../components/layout/desktop-shell.tsx"),
     read("../app/desktop/page.tsx"),
     read("../components/desktop/desktop-discover.tsx"),
     read("../components/desktop/desktop-resources.tsx"),
     read("../components/desktop/desktop-practice.tsx"),
     read("../components/desktop/desktop-path.tsx"),
+    read("../components/desktop/desktop-course-assessment.tsx"),
   ]);
   const homeDossier = await read("../components/desktop/desktop-home-dossier.tsx");
-  const visibleControls = [shell, home, homeDossier, discover, resources, practice, path].join("\n");
+  const visibleControls = [shell, home, homeDossier, discover, resources, practice, path, assessment].join("\n");
   const requiredHrefs = [
     "/desktop",
-    "/desktop/studio",
     "/desktop/path",
+    "/desktop/path/assessment",
     "/desktop/path/study",
     "/desktop/calendar",
     "/desktop/resources",
@@ -75,13 +77,13 @@ test("consolidated desktop destinations are reachable from their owning surfaces
   }
 });
 
-test("desktop-only video actions target the desktop route without relying on removed web pages", async () => {
+test("desktop-only video actions target the desktop route without duplicating a global topbar shortcut", async () => {
   const [shell, path] = await Promise.all([
     read("../components/layout/desktop-shell.tsx"),
     read("../components/desktop/desktop-path.tsx"),
   ]);
 
-  assert.match(shell, /href="\/desktop\/video-learning"/);
+  assert.doesNotMatch(shell, /href="\/desktop\/video-learning"/);
   assert.match(path, /<NextLink[\s\S]{0,120}href="\/desktop\/video-learning"/);
   assert.doesNotMatch(path, /href="\/video-learning"/);
 });
@@ -96,36 +98,48 @@ test("desktop shell matches the selected 书院案头 direction and exposes real
   ]);
 
   const navBlock = shell.match(/const NAV[\s\S]*?\n\];/)?.[0] || "";
-  for (const label of ["首页", "智能教师", "学习路径", "资源中心", "练习", "发现"]) {
+  for (const label of ["首页", "学习路径", "资源中心", "练习", "发现"]) {
     assert.match(navBlock, new RegExp(`label: "${label}"`));
   }
-  assert.equal((navBlock.match(/href: "/g) || []).length, 6);
+  assert.doesNotMatch(navBlock, /label: "智能教师"/);
+  assert.equal((navBlock.match(/href: "/g) || []).length, 5);
   for (const secondaryLabel of ["互动教学", "学习市场", "代码挑战", "学情摸底", "知识库", "视频学习", "设置"]) {
     assert.doesNotMatch(navBlock, new RegExp(`label: "${secondaryLabel}"`));
   }
   assert.match(shell, /href="\/desktop\/settings"/);
   assert.match(shell, /目标与设置/);
   assert.doesNotMatch(shell, /href:\s*"\/desktop\/create",\s*label:\s*"资源生成"/);
-  assert.match(shell, /MessageCircle/);
-  assert.match(deskStudy, /\.desktop-rail\s*\{[\s\S]*width:\s*178px/);
-  assert.match(shell, /xueshu-plaque-v3\.png/);
+  assert.match(shell, /DesktopTeacherLauncher/);
+  assert.match(deskStudy, /\.desktop-rail\s*\{[\s\S]*width:\s*204px/);
+  assert.match(shell, /className="desktop-brand__frame"/);
+  assert.match(shell, /<span className="desktop-brand__title">学枢<\/span>/);
+  assert.match(shell, /<span className="sr-only">XUESHU<\/span>/);
+  assert.doesNotMatch(shell, /xueshu-plaque-v3\.webp|desktop-rail-spine-ribs|desktop-rail-inscription/);
+  assert.match(deskStudy, /\.desktop-brand__frame\s*\{[\s\S]*sidebar-blank-plaque-v1\.webp/);
+  assert.match(deskStudy, /\.desktop-brand__title\s*\{[\s\S]*font-family:\s*"STZhongsong"[\s\S]*font-size:\s*32px/);
+  assert.match(deskStudy, /\.desktop-rail\s*\{[\s\S]*sidebar-bookcloth-v1\.webp/);
+  assert.ok(desktopBrandAssets.includes("sidebar-blank-plaque-v1.webp"));
+  assert.ok(desktopBrandAssets.includes("sidebar-bookcloth-v1.webp"));
+  assert.match(deskStudy, /\.desktop-rail-indicator\s*\{[\s\S]*display:\s*block/);
   assert.doesNotMatch(shell, /desktop-book-rings|book-ring/);
   assert.doesNotMatch(deskStudy, /\.desktop-book-rings/);
   assert.equal(desktopBrandAssets.some((name) => name.startsWith("book-ring")), false);
   assert.match(deskStudy, /\[data-desktop-page-shell\]/);
-  assert.match(deskStudy, /\.desktop-topbar\s*\{[\s\S]*height:\s*58px/);
-  assert.match(deskStudy, /\.desktop-topbar-tools \.desktop-user-link\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*height:\s*34px;[\s\S]*align-items:\s*center;[\s\S]*white-space:\s*nowrap;/);
+  assert.match(deskStudy, /\.desktop-rail-account\s*\{[\s\S]*margin:\s*12px 6px 0/);
+  assert.match(deskStudy, /\.desktop-rail-account__menu\s*\{[\s\S]*bottom:\s*calc\(100% \+ 8px\)/);
   assert.match(deskStudy, /--background:\s*#f6f0e5/);
   assert.match(deskStudy, /market-hero-ink\.png/);
-  assert.match(shell, /currentCourse/);
+  assert.match(shell, /desktop-rail-account/);
+  assert.match(shell, /desktop-rail-profile/);
+  assert.doesNotMatch(shell, /desktop-topbar|topbar-academy-scroll/);
   assert.doesNotMatch(shell, /notificationCount|通知 \{/);
-  assert.match(shell, /const live = await checkBackend\(\)/);
-  assert.match(shell, /serviceState === "live"/);
+  assert.doesNotMatch(shell, /checkBackend|serviceState|currentCourse/);
+  assert.doesNotMatch(shell, /desktop-global-search|desktop-resource-shortcuts|desktop-service-state/);
   assert.match(shell, /\/desktop\/profile/);
-  assert.match(shell, /submitSearch/);
+  assert.match(shell, /desktop-rail-account[\s\S]{0,420}<UserAvatar[\s\S]{0,180}\{displayName\}/);
 
   assert.match(home, /buildPathDashboardPlan/);
-  assert.match(homeDossier, /title: "今日案头"/);
+  assert.match(homeDossier, /title="今日案头"/);
   assert.match(homeDossier, />今日安排</);
   assert.doesNotMatch(homeDossier, />智能教师批注</);
   assert.doesNotMatch(homeDossier, />已审核资料</);
@@ -134,7 +148,7 @@ test("desktop shell matches the selected 书院案头 direction and exposes real
   assert.match(homeDossier, /"成长记录"/);
   assert.match(homeDossier, /downloadCsv/);
   assert.match(deskStudy, /\.desktop-desk-layout/);
-  assert.match(home, /listMaterials/);
+  assert.match(home, /session\.resources/);
   assert.match(home, /ResourceViewer/);
   assert.doesNotMatch(home, /role="columnheader">审核状态/);
   assert.doesNotMatch(home, /desktop-reviewed-status/);
@@ -216,7 +230,7 @@ test("desktop layout contracts cover 1024 and 1440 widths with visible keyboard 
     read("../components/desktop/desktop-video-learning.tsx"),
   ]);
 
-  assert.match(shell, /min-w-\[1024px\]/);
+  assert.match(shell, /desktop-scope flex h-dvh min-w-0 flex-col[^"]*md:flex-row/);
   assert.match(globals, /max-width:\s*1420px/);
   assert.match(globals, /@media \(max-width:\s*1120px\)/);
   assert.match(globals, /focus-visible/);

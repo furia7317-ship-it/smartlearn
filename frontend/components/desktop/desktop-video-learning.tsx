@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
+import { ResourceCenterBackButton } from "@/components/desktop/resource-center-back-button";
 import { PageHeader } from "@/components/layout/page-header";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { Button } from "@/components/ui/button";
@@ -139,6 +140,7 @@ export default function VideoLearningPage() {
         <PageHeader
           title="视频学习"
         >
+          <ResourceCenterBackButton />
           <Link
             href="/resources?type=quiz"
             className="flex items-center gap-1 rounded-lg border bg-background px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"

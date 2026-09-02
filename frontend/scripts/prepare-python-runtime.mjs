@@ -6,10 +6,24 @@ import { fileURLToPath } from "node:url";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(scriptDir, "..");
 const runtimePython = path.join(frontendRoot, "runtime", "python", "python.exe");
+const pythonEnv = {
+  ...process.env,
+  PYTHONDONTWRITEBYTECODE: "1",
+};
 const required = [
   ["pypdf", "pypdf>=5.0"],
   ["docx", "python-docx>=1.1"],
   ["openpyxl", "openpyxl>=3.1"],
+];
+const desktopExcludedDistributions = [
+  "smartlearn-backend",
+  "matplotlib",
+  "manim",
+  "pytest",
+  "pytest-asyncio",
+  "pytest-cov",
+  "coverage",
+  "ruff",
 ];
 
 if (!fs.existsSync(runtimePython)) {
@@ -20,9 +34,31 @@ function moduleAvailable(moduleName) {
   const probe = spawnSync(
     runtimePython,
     ["-c", `import ${moduleName}`],
-    { stdio: "ignore", windowsHide: true },
+    { stdio: "ignore", windowsHide: true, env: pythonEnv },
   );
   return probe.status === 0;
+}
+
+function distributionInstalled(distributionName) {
+  const probe = spawnSync(
+    runtimePython,
+    ["-m", "pip", "show", distributionName],
+    { stdio: "ignore", windowsHide: true, env: pythonEnv },
+  );
+  return probe.status === 0;
+}
+
+const installedExcluded = desktopExcludedDistributions.filter(distributionInstalled);
+if (installedExcluded.length > 0) {
+  console.log(`Removing non-production Python packages: ${installedExcluded.join(", ")}`);
+  const uninstall = spawnSync(
+    runtimePython,
+    ["-m", "pip", "uninstall", "-y", ...installedExcluded],
+    { stdio: "inherit", windowsHide: true, env: pythonEnv },
+  );
+  if (uninstall.status !== 0) {
+    throw new Error("Failed to remove non-production Python packages");
+  }
 }
 
 const missing = required.filter(([moduleName]) => !moduleAvailable(moduleName));
@@ -38,7 +74,7 @@ if (missing.length > 0) {
       "--disable-pip-version-check",
       "--no-cache-dir",
     ],
-    { stdio: "inherit", windowsHide: true },
+    { stdio: "inherit", windowsHide: true, env: pythonEnv },
   );
   if (install.status !== 0) {
     throw new Error("Failed to install desktop document readers");
@@ -50,4 +86,13 @@ if (unavailable.length > 0) {
   throw new Error(`Desktop Python runtime is incomplete: ${unavailable.map(([name]) => name).join(", ")}`);
 }
 
-console.log("Desktop Python document readers are ready.");
+const dependencyCheck = spawnSync(
+  runtimePython,
+  ["-m", "pip", "check"],
+  { stdio: "inherit", windowsHide: true, env: pythonEnv },
+);
+if (dependencyCheck.status !== 0) {
+  throw new Error("Desktop Python runtime contains incompatible dependencies");
+}
+
+console.log("Desktop Python runtime dependencies are ready.");

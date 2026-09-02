@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from app.core.llm import build_llm, parse_json_response
@@ -58,17 +59,30 @@ def grade_subjective(
     try:
         parsed = parse_json_response(resp.content)
         scores = parsed.get("scores", parsed) if isinstance(parsed, dict) else {}
+        if not isinstance(scores, dict):
+            raise ValueError("grader response does not contain a scores object")
 
         results = []
         for q in subjective_qs:
             qid = q["id"]
-            score_info = scores.get(qid, {})
+            score_info = scores.get(qid)
+            if not isinstance(score_info, dict):
+                raise ValueError(f"grader response is missing question {qid}")
+            try:
+                awarded = float(score_info.get("score"))
+                maximum = float(q.get("score", 0))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"grader returned an invalid score for {qid}") from exc
+            if not math.isfinite(awarded) or not math.isfinite(maximum) or maximum <= 0:
+                raise ValueError(f"grader returned a non-finite score for {qid}")
+            if awarded < 0 or awarded > maximum:
+                raise ValueError(f"grader score is out of range for {qid}")
             results.append({
                 "question_id": qid,
                 "type": q["type"],
-                "score": score_info.get("score", 0),
-                "max_score": q.get("score", 0),
-                "correct": score_info.get("score", 0) >= q.get("score", 0) * 0.6,
+                "score": awarded,
+                "max_score": maximum,
+                "correct": awarded >= maximum * 0.6,
                 "student_answer": answers.get(qid, ""),
                 "answer": q.get("answer", ""),
                 "knowledge_point": q.get("knowledge_point", ""),
@@ -77,20 +91,6 @@ def grade_subjective(
             })
         return results
 
-    except Exception:
-        # 评分失败给 0 分
-        return [
-            {
-                "question_id": q["id"],
-                "type": q["type"],
-                "score": 0,
-                "max_score": q.get("score", 0),
-                "correct": False,
-                "student_answer": answers.get(q["id"], ""),
-                "answer": q.get("answer", ""),
-                "knowledge_point": q.get("knowledge_point", ""),
-                "feedback": "评分系统异常，请人工复核",
-                "error_type": "unknown",
-            }
-            for q in subjective_qs
-        ]
+    except Exception as exc:
+        # 基础设施或协议异常不能伪装成学生答错，否则会污染错题、记忆与画像。
+        raise RuntimeError("主观题评分暂时失败，请稍后重试") from exc

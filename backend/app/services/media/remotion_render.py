@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import hashlib
+import json
 import os
+import re
 import shutil
+import threading
+import uuid
 import zipfile
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable
 
@@ -16,6 +20,10 @@ from app.services.media.ffmpeg import _run_process
 
 
 ProgressCallback = Callable[[float, str], None]
+_RUNTIME_CACHE_PATTERN = re.compile(r"remotion-runtime-[0-9a-f]{12}")
+_RUNTIME_MARKER = ".xueshu-remotion-runtime.json"
+_RUNTIME_PREPARE_LOCK = threading.Lock()
+_PREPARED_RUNTIME_CACHE: dict[tuple[str, int, int, str], Path] = {}
 
 
 def _repository_runtime() -> Path:
@@ -28,7 +36,62 @@ def resolve_runtime_dir() -> Path:
 
 
 def _has_dependencies(runtime: Path) -> bool:
-    return (runtime / "node_modules" / "@remotion" / "renderer").is_dir()
+    return all(
+        (runtime / "node_modules" / "@remotion" / package).is_dir()
+        for package in ("bundler", "renderer")
+    )
+
+
+def _runtime_is_ready(runtime: Path, digest: str | None = None) -> bool:
+    if not (
+        _has_dependencies(runtime)
+        and (runtime / "render.mjs").is_file()
+        and (runtime / "src" / "index.ts").is_file()
+    ):
+        return False
+    if digest is None:
+        return True
+    try:
+        marker = json.loads((runtime / _RUNTIME_MARKER).read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return False
+    return isinstance(marker, dict) and marker.get("archive_sha256") == digest
+
+
+def _calculate_archive_digest(archive: Path) -> str:
+    hasher = hashlib.sha256()
+    with archive.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+@lru_cache(maxsize=8)
+def _cached_archive_digest(path: str, size: int, modified_ns: int) -> str:
+    del size, modified_ns
+    return _calculate_archive_digest(Path(path))
+
+
+def _cleanup_stale_runtime_dirs(cache_root: Path, current: Path) -> None:
+    """Remove only old hash-addressed Remotion caches inside cache_root."""
+
+    try:
+        candidates = list(cache_root.iterdir())
+    except OSError:
+        return
+    for candidate in candidates:
+        if candidate == current or not _RUNTIME_CACHE_PATTERN.fullmatch(candidate.name):
+            continue
+        try:
+            # Do not follow a symlink or junction out of the application cache.
+            if candidate.is_symlink() or candidate.resolve().parent != cache_root:
+                continue
+            if candidate.is_dir():
+                shutil.rmtree(candidate)
+        except OSError:
+            # A previous renderer may still have the directory open. It can be
+            # retried on the next preparation without blocking this render.
+            continue
 
 
 def prepare_runtime_dir() -> Path:
@@ -46,29 +109,63 @@ def prepare_runtime_dir() -> Path:
     if not archive.is_file():
         return source
 
-    digest = hashlib.sha256(archive.read_bytes()).hexdigest()[:12]
     cache_root = Path(settings.MEDIA_OUTPUT_DIR).resolve().parent
-    target = cache_root / f"remotion-runtime-{digest}"
-    if _has_dependencies(target) and (target / "render.mjs").is_file():
-        return target
+    cache_root.mkdir(parents=True, exist_ok=True)
+    archive = archive.resolve()
+    archive_stat = archive.stat()
+    cache_key = (
+        str(archive),
+        archive_stat.st_size,
+        archive_stat.st_mtime_ns,
+        str(cache_root),
+    )
 
-    temporary = cache_root / f".remotion-runtime-{digest}-{os.getpid()}"
-    if temporary.exists():
-        shutil.rmtree(temporary)
-    temporary.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(archive) as bundle:
-        for member in bundle.infolist():
-            destination = (temporary / member.filename).resolve()
-            if temporary != destination and temporary not in destination.parents:
-                raise RuntimeError("Remotion 运行时压缩包包含非法路径")
-        bundle.extractall(temporary)
-    if not _has_dependencies(temporary) or not (temporary / "render.mjs").is_file():
-        raise RuntimeError("Remotion 运行时压缩包不完整")
-    if target.exists():
-        shutil.rmtree(temporary)
-    else:
-        temporary.replace(target)
-    return target
+    with _RUNTIME_PREPARE_LOCK:
+        cached = _PREPARED_RUNTIME_CACHE.get(cache_key)
+        if cached is not None and _runtime_is_ready(cached):
+            return cached
+
+        digest = _cached_archive_digest(
+            str(archive), archive_stat.st_size, archive_stat.st_mtime_ns
+        )
+        target = cache_root / f"remotion-runtime-{digest[:12]}"
+        if _runtime_is_ready(target, digest):
+            _PREPARED_RUNTIME_CACHE.clear()
+            _PREPARED_RUNTIME_CACHE[cache_key] = target
+            _cleanup_stale_runtime_dirs(cache_root, target)
+            return target
+
+        temporary = cache_root / (
+            f".remotion-runtime-{digest[:12]}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+        )
+        temporary.mkdir(parents=True, exist_ok=False)
+        try:
+            with zipfile.ZipFile(archive) as bundle:
+                for member in bundle.infolist():
+                    destination = (temporary / member.filename).resolve()
+                    if temporary != destination and temporary not in destination.parents:
+                        raise RuntimeError("Remotion 运行时压缩包包含非法路径")
+                bundle.extractall(temporary)
+            if not _runtime_is_ready(temporary):
+                raise RuntimeError("Remotion 运行时压缩包不完整")
+            (temporary / _RUNTIME_MARKER).write_text(
+                json.dumps({"archive_sha256": digest}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            if target.exists():
+                if target.is_symlink() or target.resolve().parent != cache_root:
+                    raise RuntimeError("Remotion 运行时缓存目录不安全")
+                shutil.rmtree(target)
+            temporary.replace(target)
+        finally:
+            if temporary.exists():
+                shutil.rmtree(temporary, ignore_errors=True)
+
+        _PREPARED_RUNTIME_CACHE.clear()
+        _PREPARED_RUNTIME_CACHE[cache_key] = target
+        _cleanup_stale_runtime_dirs(cache_root, target)
+        return target
 
 
 def resolve_node_binary(runtime_dir: Path | None = None) -> str | None:
@@ -103,12 +200,7 @@ def resolve_browser_executable() -> str | None:
 def is_available() -> bool:
     try:
         runtime = prepare_runtime_dir()
-        return bool(
-            resolve_node_binary(runtime)
-            and (runtime / "render.mjs").is_file()
-            and (runtime / "src" / "index.ts").is_file()
-            and _has_dependencies(runtime)
-        )
+        return bool(resolve_node_binary(runtime) and _runtime_is_ready(runtime))
     except (OSError, RuntimeError, zipfile.BadZipFile):
         return False
 
@@ -144,7 +236,7 @@ async def render_remotion_video(
 ) -> Path:
     runtime = await asyncio.to_thread(prepare_runtime_dir)
     node = resolve_node_binary(runtime)
-    if not node or not is_available():
+    if not node or not _runtime_is_ready(runtime):
         raise RuntimeError("Remotion 桌面渲染运行时不可用")
 
     task_dir = Path(settings.MEDIA_OUTPUT_DIR) / "video_tasks" / task_id / "remotion"

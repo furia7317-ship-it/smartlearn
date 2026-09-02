@@ -13,6 +13,7 @@ import type {
   LearningPathGoal,
   LearningPathMaterialType,
 } from "@/lib/learning-path-confirmation";
+import { invalidateLibraryListCache } from "@/lib/library";
 import { getStudentId } from "@/lib/student-identity";
 import { cn } from "@/lib/utils";
 
@@ -363,6 +364,7 @@ export function LearningBaselineGate({
         },
       );
       if (!examId || generated.length === 0) throw new Error("AI 未返回可用的摸底题，请重试");
+      invalidateLibraryListCache("papers");
       setDiagnosticExamId(examId);
       setDiagnosticQuestions(generated);
       setDiagnosticStage("questions");
@@ -391,6 +393,7 @@ export function LearningBaselineGate({
             : {};
         },
       );
+      invalidateLibraryListCache("papers", "assessments", "goals");
       setDiagnosticResult(diagnosticBaseline(overall, mastery, diagnosticQuestions.length));
       setDiagnosticStage("done");
       setSummary(true);

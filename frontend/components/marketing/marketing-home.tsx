@@ -45,7 +45,7 @@ const SECTION_LABELS = ["认识学枢", "智能体协作", "学习材料", "学�
 const FREE_TRIAL_HREF = "/login?next=/app";
 const DESKTOP_DOWNLOAD_HREF =
   process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL ||
-  "/downloads/学枢-一体安装版-0.1.13.exe";
+  "/downloads/学枢-一体安装版-0.1.14.exe";
 
 const AGENTS = [
   { label: "学习画像", detail: "汇总测验与代码评分", icon: UserRoundSearch, position: "agentTopLeft" },
@@ -77,7 +77,7 @@ function Brand() {
   return (
     <button className={styles.brand} type="button" aria-label="回到首页第一屏">
       <span className={styles.brandMark}>
-        <Image src="/brand/xueshu-app-icon.png" alt="" width={36} height={36} priority />
+        <Image src="/brand/xueshu-app-icon-128.webp" alt="" width={36} height={36} priority />
       </span>
       <span><strong>学枢</strong><small>XUESHU</small></span>
     </button>

@@ -48,7 +48,7 @@ export async function getConversationState(): Promise<StoredConversationState> {
   const studentId = getStudentId();
   const response = await requireOk(await fetch(
     `${API_BASE}/api/conversations/${encodeURIComponent(studentId)}`,
-    { cache: "no-store" },
+    { cache: "no-store", credentials: "include" },
   ));
   const payload = await response.json() as ConversationStateResponse;
   const sessions = Array.isArray(payload.sessions)
@@ -66,6 +66,7 @@ export async function saveConversationState(state: StoredConversationState): Pro
   await requireOk(await fetch(`${API_BASE}/api/conversations`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({
       student_id: getStudentId(),
       active_conversation_id: state.activeConversationId,

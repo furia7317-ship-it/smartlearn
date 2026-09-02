@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.agents.common import format_untrusted_knowledge_context
 from app.core.llm import build_llm, parse_json_response
 from app.services.scoring import trim_composition
 
@@ -48,9 +49,17 @@ def classify_exam_scope(
         else "普通练习卷，总题数控制在 3-8 题。"
     )
     weak_text = "、".join(weak_points or []) or "（暂无）"
+    knowledge_text = format_untrusted_knowledge_context(
+        kb_context,
+        max_sources=20,
+        max_content_chars=700,
+        max_total_chars=10_000,
+    )
     prompt = (
         f"主题：{topic}\n试卷用途：{paper_type}\n\n知识点范围：\n{points_text}\n\n"
-        f"已有薄弱点：{weak_text}\n\n题量规则：{count_rule}\n请确定各类题目的数量。"
+        f"已有薄弱点：{weak_text}\n\n题量规则：{count_rule}\n\n"
+        f"课程知识依据：\n{knowledge_text}\n\n"
+        "请只依据给定主题、范围和课程知识依据确定各类题目的数量。"
     )
 
     resp = llm.invoke([
