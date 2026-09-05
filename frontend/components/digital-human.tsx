@@ -24,7 +24,9 @@ type AvatarState = "idle" | "connecting" | "ready" | "error";
  * studio 接线不变：仍只接收 `answer`。
  */
 export function DigitalHuman({ answer }: { answer: string }) {
-  const { mode } = useOrchestratorContext();
+  const { mode } = useOrchestratorContext((state) => ({
+    mode: state.mode,
+  }));
   const [speaking, setSpeaking] = useState(false);
   const [ttsSupported, setTtsSupported] = useState(true);
   const [cfg, setCfg] = useState<AvatarConfig | null>(null);

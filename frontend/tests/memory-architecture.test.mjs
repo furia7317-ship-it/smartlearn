@@ -22,6 +22,9 @@ test("tutor sends enough working memory for server-side budgeting and compressio
   const orchestrator = await read("../hooks/use-orchestrator.ts");
   assert.match(orchestrator, /\.slice\(-100\)/);
   assert.match(orchestrator, /conversation_id: ownerConversationId/);
+  assert.match(orchestrator, /const messagesRef = useRef\(messages\)/);
+  assert.match(orchestrator, /session\.id === ownerConversationId/);
+  assert.match(orchestrator, /const history = scopedMessages/);
   assert.match(orchestrator, /event === "context_budget"/);
   assert.match(orchestrator, /已压缩 \$\{compressed\} 条旧消息/);
 });

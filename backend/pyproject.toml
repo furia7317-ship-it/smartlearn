@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "smartlearn-backend"
 version = "0.1.0"
 description = "学枢后端 — FastAPI + LangGraph 多智能体编排"
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
@@ -19,6 +19,7 @@ dependencies = [
     "chromadb>=0.5",
     "pysqlite3-binary>=0.5.4; platform_system == 'Linux'",
     "sentence-transformers>=3.0",
+    "numpy>=2.2,<3",
     "python-pptx>=0.6",
     "pydantic>=2.7",
     "pydantic-settings>=2.2",

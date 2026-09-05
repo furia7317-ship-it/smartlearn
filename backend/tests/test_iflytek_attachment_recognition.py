@@ -96,15 +96,17 @@ async def test_image_understanding_stream_is_collected(monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
-async def test_tutor_image_is_recognized_before_returning_to_browser(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_recognize(_data: bytes) -> str:
-        return "识别结果：二叉树层序遍历题"
+async def test_tutor_image_bypasses_iflytek_and_keeps_native_bytes(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def forbidden_recognize(_data: bytes) -> str:
+        raise AssertionError("tutor image upload must not call the legacy image-understanding service")
 
-    monkeypatch.setattr(recognition, "recognize_image", fake_recognize)
+    monkeypatch.setattr(recognition, "recognize_image", forbidden_recognize)
     payload = await extract_tutor_attachment("question.png", "image/png", _sample_png())
-    assert payload["recognition_status"] == "recognized"
-    assert payload["recognition_provider"] == "iflytek-image-understanding"
-    assert "二叉树" in payload["extracted_text"]
+    assert payload["recognition_status"] == "native"
+    assert payload["recognition_provider"] == "mimo-v2.5-native"
+    assert payload["media_type"] == "image/png"
+    assert payload["extracted_text"] == ""
+    assert base64.b64decode(payload["image_data"]).startswith(b"\x89PNG")
 
 
 @pytest.mark.asyncio

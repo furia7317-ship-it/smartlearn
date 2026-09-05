@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   AudioLines,
   LoaderCircle,
@@ -23,10 +24,11 @@ const PHASE_LABEL: Record<VoicePhase, string> = {
   listening: "正在聆听",
   user_speaking: "正在识别",
   finalizing: "判断是否说完…",
-  thinking: "教师思考中",
+  thinking: "正在快速回复",
   teacher_speaking: "教师正在回答",
   error: "语音不可用",
 };
+const VOICE_ACTION_CLASS = "transform-gpu transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-150 ease-out active:scale-90 motion-reduce:transition-none";
 
 type VoiceSurface = "closed" | "full" | "mini" | "inline";
 
@@ -57,6 +59,7 @@ export function VoiceCallControl({
   surfaceMode?: "fullscreen" | "inline";
   className?: string;
 }) {
+  const reducedMotion = useReducedMotion();
   const [mounted, setMounted] = useState(false);
   const [surface, setSurface] = useState<VoiceSurface>("closed");
   const voice = useRealtimeVoice({
@@ -106,7 +109,12 @@ export function VoiceCallControl({
   };
 
   const voiceSurface = surface === "inline" ? (
-    <section
+    <motion.section
+      key="inline-voice-call"
+      initial={reducedMotion ? false : { opacity: 0, scale: 0.985 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.985 }}
+      transition={{ duration: reducedMotion ? 0.01 : 0.18, ease: "easeOut" }}
       className="absolute inset-0 z-[60] flex flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_38%,rgba(102,75,43,0.96),rgba(29,24,19,0.99)_68%)] text-[#fffaf1]"
       role="dialog"
       aria-label="窗口内语音通话"
@@ -118,7 +126,7 @@ export function VoiceCallControl({
         </div>
         <button
           type="button"
-          className="ml-auto grid size-8 place-items-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white"
+          className={cn("ml-auto grid size-8 place-items-center rounded-full text-white/60 hover:bg-white/10 hover:text-white", VOICE_ACTION_CLASS)}
           onClick={() => void endCall()}
           aria-label="关闭语音通话"
         >
@@ -182,7 +190,7 @@ export function VoiceCallControl({
 
         <button
           type="button"
-          className="mt-7 grid size-12 place-items-center rounded-full bg-[#b9483d] text-white shadow-[0_10px_28px_rgba(185,72,61,0.32)] transition hover:bg-[#ca5548]"
+          className={cn("mt-7 grid size-12 place-items-center rounded-full bg-[#b9483d] text-white shadow-[0_10px_28px_rgba(185,72,61,0.32)] hover:bg-[#ca5548]", VOICE_ACTION_CLASS)}
           onClick={() => void endCall()}
           aria-label="结束语音通话"
           title="结束通话"
@@ -190,9 +198,14 @@ export function VoiceCallControl({
           <PhoneOff className="size-5" aria-hidden />
         </button>
       </div>
-    </section>
+    </motion.section>
   ) : surface === "full" ? (
-    <section
+    <motion.section
+      key="full-voice-call"
+      initial={reducedMotion ? false : { opacity: 0, scale: 1.015 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 1.01 }}
+      transition={{ duration: reducedMotion ? 0.01 : 0.2, ease: "easeOut" }}
       className="fixed inset-0 z-[100] grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_50%_42%,rgba(99,76,48,0.46),rgba(18,16,14,0.97)_58%)] px-5 py-8 text-[#fffaf1]"
       role="dialog"
       aria-modal="true"
@@ -200,7 +213,7 @@ export function VoiceCallControl({
     >
       <button
         type="button"
-        className="absolute right-5 top-5 grid size-10 place-items-center rounded-full border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10 hover:text-white"
+        className={cn("absolute right-5 top-5 grid size-10 place-items-center rounded-full border border-white/15 bg-white/5 text-white/75 hover:bg-white/10 hover:text-white", VOICE_ACTION_CLASS)}
         onClick={() => void endCall()}
         aria-label="关闭语音通话"
       >
@@ -265,7 +278,7 @@ export function VoiceCallControl({
         <div className="mt-12 flex items-center gap-4">
           <button
             type="button"
-            className="grid size-12 place-items-center rounded-full border border-white/15 bg-white/8 text-white/80 transition hover:bg-white/14 hover:text-white"
+            className={cn("grid size-12 place-items-center rounded-full border border-white/15 bg-white/8 text-white/80 hover:bg-white/14 hover:text-white", VOICE_ACTION_CLASS)}
             onClick={() => setSurface("mini")}
             aria-label="将语音通话缩小为悬浮窗"
             title="缩小通话窗口"
@@ -274,7 +287,7 @@ export function VoiceCallControl({
           </button>
           <button
             type="button"
-            className="grid size-14 place-items-center rounded-full bg-[#b9483d] text-white shadow-[0_12px_34px_rgba(185,72,61,0.34)] transition hover:bg-[#ca5548]"
+            className={cn("grid size-14 place-items-center rounded-full bg-[#b9483d] text-white shadow-[0_12px_34px_rgba(185,72,61,0.34)] hover:bg-[#ca5548]", VOICE_ACTION_CLASS)}
             onClick={() => void endCall()}
             aria-label="结束语音通话"
             title="结束通话"
@@ -284,9 +297,14 @@ export function VoiceCallControl({
         </div>
         <p className="mt-7 text-[11px] text-white/38">按 Esc 可缩小通话窗口</p>
       </div>
-    </section>
+    </motion.section>
   ) : surface === "mini" ? (
-    <section
+    <motion.section
+      key="mini-voice-call"
+      initial={reducedMotion ? false : { opacity: 0, y: 14, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.97 }}
+      transition={{ duration: reducedMotion ? 0.01 : 0.18, ease: "easeOut" }}
       className="fixed bottom-5 right-5 z-[100] flex w-[min(330px,calc(100vw-32px))] items-center gap-3 rounded-2xl border border-[#5c4630] bg-[#211b16] p-3 text-[#fffaf1] shadow-[0_20px_52px_rgba(22,16,11,0.42)]"
       role="dialog"
       aria-label="语音通话悬浮窗"
@@ -297,7 +315,7 @@ export function VoiceCallControl({
       </span>
       <button
         type="button"
-        className="min-w-0 flex-1 text-left"
+        className={cn("min-w-0 flex-1 text-left", VOICE_ACTION_CLASS)}
         onClick={() => setSurface("full")}
         aria-label="恢复语音通话全屏"
       >
@@ -311,7 +329,7 @@ export function VoiceCallControl({
       </button>
       <button
         type="button"
-        className="grid size-9 shrink-0 place-items-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+        className={cn("grid size-9 shrink-0 place-items-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white", VOICE_ACTION_CLASS)}
         onClick={() => setSurface("full")}
         aria-label="恢复语音通话全屏"
         title="展开"
@@ -320,14 +338,14 @@ export function VoiceCallControl({
       </button>
       <button
         type="button"
-        className="grid size-9 shrink-0 place-items-center rounded-full bg-[#a9473a] text-white hover:bg-[#bc5144]"
+        className={cn("grid size-9 shrink-0 place-items-center rounded-full bg-[#a9473a] text-white hover:bg-[#bc5144]", VOICE_ACTION_CLASS)}
         onClick={() => void endCall()}
         aria-label="结束语音通话"
         title="结束通话"
       >
         <PhoneOff className="size-4" aria-hidden />
       </button>
-    </section>
+    </motion.section>
   ) : null;
 
   return (
@@ -355,7 +373,7 @@ export function VoiceCallControl({
               : "开始与智能教师的语音通话"}
           title={voice.active ? `${detail} · 点击打开通话界面` : inactiveTitle}
           className={cn(
-            "relative grid size-8 shrink-0 place-items-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+            "relative grid size-8 shrink-0 transform-gpu place-items-center rounded-full border transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 motion-reduce:transition-none disabled:active:scale-100",
             voice.active
               ? "border-[#b75b4b] bg-[#a9473a] text-white shadow-[0_0_0_3px_rgba(169,71,58,0.12)]"
               : voice.phase === "error"
@@ -368,10 +386,10 @@ export function VoiceCallControl({
           {voice.phase === "user_speaking" && <span className="absolute inset-0 animate-ping rounded-full border border-[#c97665]" />}
         </button>
       </div>
-      {mounted && voiceSurface
+      {mounted
         ? surfaceMode === "inline"
-          ? voiceSurface
-          : createPortal(voiceSurface, document.body)
+          ? <AnimatePresence initial={false}>{voiceSurface}</AnimatePresence>
+          : createPortal(<AnimatePresence initial={false}>{voiceSurface}</AnimatePresence>, document.body)
         : null}
     </>
   );

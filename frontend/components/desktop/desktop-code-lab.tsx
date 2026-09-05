@@ -58,7 +58,16 @@ function displayValue(value: unknown): string {
 }
 
 export function DesktopCodeLab() {
-  const session = useOrchestratorContext();
+  const session = useOrchestratorContext((state) => ({
+    masterPath: state.masterPath,
+    path: state.path,
+    masterPathScheduleAnchor: state.masterPathScheduleAnchor,
+    pathScheduleAnchor: state.pathScheduleAnchor,
+    completedMaterials: state.completedMaterials,
+    hydrated: state.hydrated,
+    recordCodePractice: state.recordCodePractice,
+    recordTaskEvidence: state.recordTaskEvidence,
+  }));
   const learningDate = localDateKey();
   const [code, setCode] = useState(STARTER_CODE);
   const [exercise, setExercise] = useState<CodeExercise | null>(null);

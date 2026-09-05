@@ -1705,7 +1705,32 @@ export default function DesktopPath() {
     cancelLearningPath,
     recordLearningPathClarification,
     recordTaskEvidence,
-  } = useOrchestratorContext();
+  } = useOrchestratorContext((state) => ({
+    hydrated: state.hydrated,
+    mode: state.mode,
+    subjectPaths: state.subjectPaths,
+    masterPath: state.masterPath,
+    masterPathScheduleAnchor: state.masterPathScheduleAnchor,
+    activateSubjectPath: state.activateSubjectPath,
+    pauseSubjectPath: state.pauseSubjectPath,
+    resumeSubjectPath: state.resumeSubjectPath,
+    replanSubjectPath: state.replanSubjectPath,
+    deleteSubjectPath: state.deleteSubjectPath,
+    resources: state.resources,
+    completedMaterials: state.completedMaterials,
+    watchedVideos: state.watchedVideos,
+    running: state.running,
+    requestLearningPath: state.requestLearningPath,
+    requestSubjectPathSupplement: state.requestSubjectPathSupplement,
+    pendingLearningPath: state.pendingLearningPath,
+    continueLearningPath: state.continueLearningPath,
+    retryLearningPath: state.retryLearningPath,
+    editLearningPath: state.editLearningPath,
+    openLearningPathKnowledgeBase: state.openLearningPathKnowledgeBase,
+    cancelLearningPath: state.cancelLearningPath,
+    recordLearningPathClarification: state.recordLearningPathClarification,
+    recordTaskEvidence: state.recordTaskEvidence,
+  }));
   const viewSwap = getDesktopViewSwap(Boolean(useReducedMotion()));
   const [openResource, setOpenResource] = useState<{
     item: ResourceItem;

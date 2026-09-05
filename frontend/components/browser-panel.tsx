@@ -73,7 +73,10 @@ export function BrowserPanel({
   targetNonce?: number;
 }) {
   const desktop = isDesktop();
-  const { mode, appendResources } = useOrchestratorContext();
+  const { mode, appendResources } = useOrchestratorContext((state) => ({
+    mode: state.mode,
+    appendResources: state.appendResources,
+  }));
   const [url, setUrl] = useState("");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);

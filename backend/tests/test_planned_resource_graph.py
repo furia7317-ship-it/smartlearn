@@ -1342,18 +1342,17 @@ async def test_sse_bridge_can_finish_after_a_terminal_snapshot_even_if_worker_st
                 worker_finished.set()
 
     try:
-        chunks = [
-            chunk
-            async for chunk in astream_via_thread(
-                StuckAfterTerminalGraph(),
-                {},
-                ["custom", "values"],
-                stop_when=lambda chunk: chunk == terminal,
-                stop_grace_seconds=0.02,
-            )
-        ]
-        assert chunks == [terminal]
-        assert worker_waiting.is_set()
+        stream = astream_via_thread(
+            StuckAfterTerminalGraph(), {}, ["custom", "values"],
+            stop_when=lambda chunk: chunk == terminal,
+            stop_grace_seconds=0.02,
+        )
+        assert await anext(stream) == terminal
+        # Handshake before resuming the consumer: the producer really is stuck
+        # after its terminal yield, independently of OS thread scheduling.
+        assert await asyncio.to_thread(worker_waiting.wait, 1)
+        assert [chunk async for chunk in stream] == []
+        assert not worker_finished.is_set()
     finally:
         release_worker.set()
         assert await asyncio.to_thread(worker_finished.wait, 1)

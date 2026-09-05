@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11.15-slim
 
 WORKDIR /app
 
@@ -8,9 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 依赖
-COPY pyproject.toml .
-COPY app ./app
-RUN pip install --no-cache-dir .
+COPY requirements-linux.lock .
+RUN pip install --no-cache-dir --require-hashes -r requirements-linux.lock
 
 # 应用代码
 COPY . .

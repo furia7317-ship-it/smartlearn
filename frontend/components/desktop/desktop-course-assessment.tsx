@@ -167,7 +167,12 @@ function CourseAssessmentTopbar({
 
 export default function DesktopCourseAssessment() {
   const router = useRouter();
-  const { mode, hydrated, subjectPaths, completedMaterials } = useOrchestratorContext();
+  const { mode, hydrated, subjectPaths, completedMaterials } = useOrchestratorContext((state) => ({
+    mode: state.mode,
+    hydrated: state.hydrated,
+    subjectPaths: state.subjectPaths,
+    completedMaterials: state.completedMaterials,
+  }));
   const [studentId, setStudentId] = useState("");
   const scopes = useMemo(
     () => buildCourseAssessmentScopes(subjectPaths, completedMaterials)

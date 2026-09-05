@@ -343,7 +343,19 @@ function GoalsSection({ mode }: { mode: OrchestratorMode }) {
 
 export default function PathPage() {
   const { hydrated, mode, masterPath, subjectPaths, resources, tags, planReason, adjustments, completedMaterials, watchedVideos, toggleMaterial } =
-    useOrchestratorContext();
+    useOrchestratorContext((state) => ({
+      hydrated: state.hydrated,
+      mode: state.mode,
+      masterPath: state.masterPath,
+      subjectPaths: state.subjectPaths,
+      resources: state.resources,
+      tags: state.tags,
+      planReason: state.planReason,
+      adjustments: state.adjustments,
+      completedMaterials: state.completedMaterials,
+      watchedVideos: state.watchedVideos,
+      toggleMaterial: state.toggleMaterial,
+    }));
   const path = masterPath;
   const progress = getPathProgress(path);
   const readyResources = resources.filter((resource) => resource.status === "ready").length;

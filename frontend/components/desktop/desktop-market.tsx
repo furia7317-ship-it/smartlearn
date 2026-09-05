@@ -107,7 +107,12 @@ function importActionLabel(kind: MarketListing["kind"]) {
 }
 
 export default function DesktopMarket() {
-  const session = useOrchestratorContext();
+  const session = useOrchestratorContext((state) => ({
+    resources: state.resources,
+    mode: state.mode,
+    importMarketPath: state.importMarketPath,
+    appendResources: state.appendResources,
+  }));
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [library, setLibrary] = useState<StoredMaterial[]>([]);
   const [selectedId, setSelectedId] = useDesktopModuleStringState<string>(

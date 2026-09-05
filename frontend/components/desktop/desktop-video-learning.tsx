@@ -40,7 +40,12 @@ function displayDuration(seconds: number): string {
 }
 
 export default function VideoLearningPage() {
-  const { mode, hydrated, appendResources, recordWatchedVideo } = useOrchestratorContext();
+  const { mode, hydrated, appendResources, recordWatchedVideo } = useOrchestratorContext((state) => ({
+    mode: state.mode,
+    hydrated: state.hydrated,
+    appendResources: state.appendResources,
+    recordWatchedVideo: state.recordWatchedVideo,
+  }));
   const [query, setQuery] = useDesktopModuleStringState<string>(
     "resources",
     "video.query",

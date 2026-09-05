@@ -15,7 +15,6 @@ import {
   House,
   Loader2,
   LogOut,
-  PencilRuler,
   PanelLeftClose,
   PanelLeftOpen,
   Route,
@@ -60,12 +59,6 @@ const NAV: DesktopNavItem[] = [
     label: "资源中心",
     icon: BookMarked,
     activePrefixes: ["/desktop/create", "/desktop/kb", "/desktop/video-learning"],
-  },
-  {
-    href: "/desktop/practice",
-    label: "练习",
-    icon: PencilRuler,
-    activePrefixes: ["/desktop/code-lab", "/desktop/diagnostic"],
   },
   {
     href: "/desktop/discover",

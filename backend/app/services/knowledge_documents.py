@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-CHUNKER_VERSION = "smart-markdown-v3"
+CHUNKER_VERSION = "smart-markdown-v4-contextual"
 
 
 def smart_chunk_markdown(content: str, source: str) -> list[dict[str, Any]]:
@@ -20,27 +20,40 @@ def smart_chunk_markdown(content: str, source: str) -> list[dict[str, Any]]:
     """
 
     chunks: list[dict[str, Any]] = []
+    document_title = Path(source).stem
+    search_cursor = 0
     sections = re.split(r"\n(?=#{1,2} )", content)
 
-    for section in sections:
-        section = section.strip()
+    for raw_section in sections:
+        section = raw_section.strip()
         if not section:
             continue
+        section_start = content.find(section, search_cursor)
+        if section_start < 0:
+            section_start = search_cursor
+        search_cursor = section_start + len(section)
         title_match = re.match(r"^#+\s+(.+)", section)
-        title = title_match.group(1).strip() if title_match else Path(source).stem
+        title = title_match.group(1).strip() if title_match else document_title
 
         split_long_section = len(section) > 1500
         candidates = [section]
         if split_long_section:
             candidates = re.split(r"\n(?=#{3} )|\n\n", section)
 
+        candidate_cursor = section_start
         for raw_candidate in candidates:
             candidate = raw_candidate.strip()
             if not candidate or (split_long_section and len(candidate) < 20):
                 continue
+            candidate_start = content.find(candidate, candidate_cursor)
+            if candidate_start < 0:
+                candidate_start = candidate_cursor
+            candidate_end = candidate_start + len(candidate)
+            candidate_cursor = candidate_end
             if split_long_section and len(candidate) < 100 and chunks:
                 chunks[-1]["content"] += "\n\n" + candidate
                 chunks[-1]["metadata"]["char_count"] = len(chunks[-1]["content"])
+                chunks[-1]["metadata"]["end_offset"] = candidate_end
                 chunks[-1]["id"] = _chunk_id(source, chunks[-1]["content"])
                 continue
             chunks.append(
@@ -50,6 +63,11 @@ def smart_chunk_markdown(content: str, source: str) -> list[dict[str, Any]]:
                     "metadata": {
                         "source": source,
                         "title": title,
+                        "document_title": document_title,
+                        "section_title": title,
+                        "sequence_index": len(chunks),
+                        "start_offset": candidate_start,
+                        "end_offset": candidate_end,
                         "char_count": len(candidate),
                         "chunker_version": CHUNKER_VERSION,
                     },

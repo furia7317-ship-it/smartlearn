@@ -21,5 +21,16 @@ test("voice calls keep startup failures retryable and adapt to their host surfac
   assert.match(source, /aria-label="恢复语音通话全屏"/);
   assert.match(source, /await voice\.stop\(\)/);
   assert.match(launcher, /surfaceMode="inline"/);
+  assert.match(launcher, /sendQuestion\(text, \[\], "voice"\)/);
+  assert.match(launcher, /responseMode !== "voice"/);
   assert.doesNotMatch(chat, /surfaceMode="inline"/);
+});
+
+test("voice questions select the dedicated backend response mode", async () => {
+  const orchestrator = await read("../hooks/use-orchestrator.ts");
+
+  assert.match(orchestrator, /responseMode: "text" \| "voice" = "text"/);
+  assert.match(orchestrator, /response_mode: responseMode/);
+  assert.match(orchestrator, /responseMode === "voice"/);
+  assert.match(orchestrator, /runTutorLive\(question, question, undefined, attachments, pageContext, "voice"\)/);
 });

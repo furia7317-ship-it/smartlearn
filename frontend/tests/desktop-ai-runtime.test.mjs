@@ -66,7 +66,7 @@ test("orchestrator isolates runtime state and performs real stop and resource de
 
   assert.match(orchestrator, /setAgentRunStore\(createAgentRunStore\(\)\)/);
   assert.match(orchestrator, /messageRunBindingsRef\.current\.clear\(\)/);
-  assert.match(orchestrator, /trace: undefined/);
+  assert.match(await read("../lib/conversation-state.ts"), /trace: undefined/);
   assert.doesNotMatch(orchestrator, /runId: undefined/);
   assert.match(orchestrator, /fetchAgentRunEvents\(runId/);
   assert.match(orchestrator, /const focusMessageRun = useCallback/);
@@ -93,7 +93,7 @@ test("orchestrator isolates runtime state and performs real stop and resource de
   assert.match(orchestrator, /const askResourceQuestion = useCallback/);
   assert.match(orchestrator, /activeConversationKind === "resource_qa"/);
   assert.match(orchestrator, /splitLegacyResourceConversation\(restoredMessages\)/);
-  assert.match(orchestrator, /getConversationState\(\)/);
+  assert.match(orchestrator, /getConversationState\(mode === "live"\)/);
   assert.match(orchestrator, /saveConversationState\(localState\)/);
   assert.match(orchestrator, /conversationSyncReady/);
   assert.match(orchestrator, /history\.filter\(\(session\) => session\.id !== conversationId\)/);

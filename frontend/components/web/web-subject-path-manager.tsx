@@ -258,7 +258,26 @@ function SupplementDialog({
 }
 
 export function WebSubjectPathManager() {
-  const session = useOrchestratorContext();
+  const session = useOrchestratorContext((state) => ({
+    deleteSubjectPath: state.deleteSubjectPath,
+    subjectPaths: state.subjectPaths,
+    pauseSubjectPath: state.pauseSubjectPath,
+    resumeSubjectPath: state.resumeSubjectPath,
+    masterLearningPath: state.masterLearningPath,
+    running: state.running,
+    mode: state.mode,
+    requestLearningPath: state.requestLearningPath,
+    activateSubjectPath: state.activateSubjectPath,
+    replanSubjectPath: state.replanSubjectPath,
+    requestSubjectPathSupplement: state.requestSubjectPathSupplement,
+    pendingLearningPath: state.pendingLearningPath,
+    continueLearningPath: state.continueLearningPath,
+    cancelLearningPath: state.cancelLearningPath,
+    retryLearningPath: state.retryLearningPath,
+    editLearningPath: state.editLearningPath,
+    openLearningPathKnowledgeBase: state.openLearningPathKnowledgeBase,
+    recordLearningPathClarification: state.recordLearningPathClarification,
+  }));
   const [newPathOpen, setNewPathOpen] = useState(false);
   const [activation, setActivation] = useState<SubjectLearningPath | null>(null);
   const [replan, setReplan] = useState<SubjectLearningPath | null>(null);

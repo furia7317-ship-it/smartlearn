@@ -9,7 +9,7 @@ from starlette.testclient import TestClient
 
 from app.core.config import get_db
 from app.models.base import Base
-from app.models.learning import ConversationSessionRecord
+from app.models.learning import ConversationSessionRecord, ConversationSyncState
 from app.routers.auth import router as auth_router
 from app.routers.conversations import (
     ConversationSessionPayload,
@@ -101,6 +101,7 @@ async def test_conversation_state_persists_separate_general_and_resource_session
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as connection:
         await connection.run_sync(ConversationSessionRecord.__table__.create)
+        await connection.run_sync(ConversationSyncState.__table__.create)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     async with session_factory() as db:
@@ -142,6 +143,8 @@ async def test_conversation_state_persists_separate_general_and_resource_session
             ConversationStatePayload(
                 student_id="student-conversation-test",
                 active_conversation_id="general-2",
+                revision=restored.revision,
+                deleted_session_ids=["general-1", "resource-1"],
                 sessions=[
                     ConversationSessionPayload(
                         id="general-2",
@@ -164,6 +167,7 @@ async def test_get_archives_a_terminal_generation_conversation_and_opens_fresh_a
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as connection:
         await connection.run_sync(ConversationSessionRecord.__table__.create)
+        await connection.run_sync(ConversationSyncState.__table__.create)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     async with session_factory() as db:
@@ -203,6 +207,7 @@ async def test_get_archives_a_terminal_generation_conversation_and_opens_fresh_a
         stale_write = await save_conversation_state(
             ConversationStatePayload(
                 student_id="student-terminal-migration",
+                revision=restored.revision,
                 active_conversation_id="failed-plan-chat",
                 sessions=[
                     ConversationSessionPayload(

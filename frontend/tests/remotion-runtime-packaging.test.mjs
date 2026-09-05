@@ -12,8 +12,9 @@ test("Remotion runtime declares the libraries imported by render.mjs directly", 
     readJson("../remotion-runtime/package-lock.json"),
   ]);
 
-  assert.equal(manifest.dependencies["@remotion/bundler"], "4.0.242");
-  assert.equal(manifest.dependencies["@remotion/renderer"], "4.0.242");
+  assert.match(manifest.dependencies.remotion, /^4\.\d+\.\d+$/);
+  assert.equal(manifest.dependencies["@remotion/bundler"], manifest.dependencies.remotion);
+  assert.equal(manifest.dependencies["@remotion/renderer"], manifest.dependencies.remotion);
   assert.equal(manifest.dependencies["@remotion/cli"], undefined);
   assert.deepEqual(lock.packages[""].dependencies, manifest.dependencies);
   assert.equal(lock.packages["node_modules/@remotion/cli"], undefined);

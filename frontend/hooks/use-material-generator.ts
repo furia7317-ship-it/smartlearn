@@ -77,7 +77,7 @@ function placeholder(type: ResourceType): ResourceItem {
  * 由 web `/create` 与桌面 `/desktop/create` 两套布局共用，二者只是视图不同。
  */
 function useMaterialGeneratorController() {
-  const { mode } = useOrchestratorContext();
+  const { mode } = useOrchestratorContext((state) => ({ mode: state.mode }));
 
   const [topic, setTopic] = useState("");
   const [knowledge, setKnowledge] = useState("");

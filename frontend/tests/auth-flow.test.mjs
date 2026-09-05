@@ -91,7 +91,7 @@ test("web shell exposes a real logout action that clears auth and returns to mar
 
   assert.match(shell, /function LogoutButton/);
   assert.match(shell, /await logout\(\)/);
-  assert.match(shell, /window\.location\.assign\("\/"\)/);
+  assert.match(shell, /router\.replace\("\/"\)/);
   assert.match(shell, /退出 Web 登录/);
   assert.match(provider, /await logoutAccount\(/);
   assert.match(provider, /clearAuthenticatedStudentId\(\)/);

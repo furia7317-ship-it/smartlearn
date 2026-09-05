@@ -277,7 +277,7 @@ def bind_plan_task_sources(
     about Huffman trees, sorting, or dynamic programming.  The previous
     implementation assigned the same first three broad snippets to every task,
     which made valid task output fail semantic review and made retries repeat
-    the same mistake.  This execution-time pass keeps the gate as a fallback
+    the same mistake.  This execution-time pass keeps the gate context as a safety net
     while giving each generator and reviewer a focused, identical source set.
     """
 
@@ -314,15 +314,15 @@ def bind_plan_task_sources(
                     retrieved.extend(retriever(query, student_id, source_limit) or [])
             else:
                 # Query the canonical chapter directly.  Sending the whole
-                # title ("思维导图", "最小生成树") to the lexical fallback
+                # title ("思维导图", "最小生成树") to lexical candidate ranking
                 # accidentally matched the one-character chapter names 图/树
                 # and reintroduced unrelated evidence.
                 focused_query = canonical_hints[0] if canonical_hints else query
                 retrieved = retriever(focused_query, student_id, source_limit) or []
-        except Exception:  # the already-passed broad gate remains the safe fallback
+        except Exception:  # the already-passed broad gate remains the safe evidence source
             retrieved = []
         lexical_scores = [
-            float(item.get("fallback_score") or 0)
+            float(item.get("lexical_score") or 0)
             for item in retrieved
             if isinstance(item, dict) and item.get("retrieval_source") in {"markdown", "hybrid"}
         ]
@@ -336,7 +336,7 @@ def bind_plan_task_sources(
                 for item in retrieved
                 if isinstance(item, dict)
                 and item.get("retrieval_source") in {"markdown", "hybrid"}
-                and float(item.get("fallback_score") or 0) >= 100
+                and float(item.get("lexical_score") or 0) >= 100
             ]
         scoped_by_id: dict[str, dict[str, Any]] = {}
         for item in retrieved:

@@ -27,11 +27,11 @@ def matched_knowledge_gate(monkeypatch):
 
 
 @pytest.fixture
-async def db_session():
+async def db_session(tmp_path):
     from app.models import learning  # noqa: F401
     from app.models.base import Base
 
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'plans.sqlite'}")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -409,12 +409,17 @@ async def test_inflight_cancel_stops_followup_calls_and_keeps_cancelled_terminal
 
     stream_task = asyncio.create_task(consume())
     assert await asyncio.to_thread(generator_started.wait, 3)
-    cancelled = await resource_plans.cancel_plan(
-        seeded_plan.plan_id,
-        PlanActionRequest(student_id=seeded_plan.student_id, version=1),
-        db_session,
-    )
-    allow_generator_return.set()
+    # Real HTTP requests get separate sessions. Sharing the streaming session
+    # here races its commit and can leave SQLAlchemy in PREPARED state.
+    try:
+        async with async_sessionmaker(db_session.bind, expire_on_commit=False)() as cancel_db:
+            cancelled = await resource_plans.cancel_plan(
+                seeded_plan.plan_id,
+                PlanActionRequest(student_id=seeded_plan.student_id, version=1),
+                cancel_db,
+            )
+    finally:
+        allow_generator_return.set()
     events = await asyncio.wait_for(stream_task, timeout=5)
 
     await db_session.refresh(row)

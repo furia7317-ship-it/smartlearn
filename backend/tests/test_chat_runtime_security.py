@@ -8,6 +8,46 @@ from types import SimpleNamespace
 import pytest
 
 
+@pytest.mark.asyncio
+async def test_mimo_compatible_chat_disables_private_thinking_replay():
+    from app.agent.harness import AgentHarness
+
+    captured: dict = {}
+
+    class EmptyStream:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            raise StopAsyncIteration
+
+    class Completions:
+        async def create(self, **kwargs):
+            captured.update(kwargs)
+            return EmptyStream()
+
+    async def emit(*_args, **_kwargs):
+        return None
+
+    async def dispatch(*_args, **_kwargs):
+        raise AssertionError("no tool call expected")
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=Completions()))
+    harness = AgentHarness(
+        client,
+        "mimo-v2.5",
+        [],
+        set(),
+        emit=emit,
+        dispatch=dispatch,
+        student_id="student",
+        provider_id="mimo",
+    )
+    await harness._stream_turn([{"role": "user", "content": "看图回答"}])
+
+    assert captured["extra_body"] == {"thinking": {"type": "disabled"}}
+
+
 def test_retrieved_prompt_injection_is_not_placed_in_system_prompt():
     from app.agent.runner import _build_knowledge_context, _build_system_prompt
 

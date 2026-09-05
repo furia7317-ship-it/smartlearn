@@ -19,7 +19,12 @@ function monthCells(month: Date): Date[] {
 }
 
 export default function DesktopCalendar() {
-  const { path, pathScheduleAnchor, completedMaterials, hydrated } = useOrchestratorContext();
+  const { path, pathScheduleAnchor, completedMaterials, hydrated } = useOrchestratorContext((state) => ({
+    path: state.path,
+    pathScheduleAnchor: state.pathScheduleAnchor,
+    completedMaterials: state.completedMaterials,
+    hydrated: state.hydrated,
+  }));
   const [anchor] = useState(() => new Date());
   const [monthKey, setMonthKey] = useDesktopModuleStringState<string>(
     "home",

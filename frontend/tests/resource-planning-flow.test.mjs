@@ -115,7 +115,7 @@ test("confirmed learning paths leave the questionnaire and use explicit bounded 
   assert.match(source, /if \(pendingLearningPath\.planId\)/);
   assert.match(source, /const record = await getResourcePlan\(planId\)/);
   assert.match(source, /!pendingPlanIds\.has\(record\.plan\.plan_id\)/);
-  assert.match(source, /Boolean\(message\.runId \|\| message\.planId\)/);
+  assert.match(await read("../lib/conversation-state.ts"), /Boolean\(message\.runId \|\| message\.planId\)/);
   assert.doesNotMatch(source, /appendTraceStep/);
   for (const surface of [desktop, web]) {
     assert.match(surface, /pendingLearningPath\?\.stage === "planning"/);
@@ -385,7 +385,7 @@ test("desktop studio consumes real dependency health without duplicating it in t
   assert.doesNotMatch(studioPage, /后端未连接/);
 });
 
-test("resource center can clear persisted and current-session resources", async () => {
+test("resource center keeps whole-library deletion out of its simplified header", async () => {
   const library = await read("../lib/library.ts");
   const orchestrator = await read("../hooks/use-orchestrator.ts");
   const desktopResources = await read("../components/desktop/desktop-resources.tsx");
@@ -394,9 +394,9 @@ test("resource center can clear persisted and current-session resources", async 
   assert.match(library, /method:\s*"DELETE"/);
   assert.match(orchestrator, /const clearResources = useCallback/);
   assert.match(orchestrator, /setResources\(\[\]\)/);
-  assert.match(desktopResources, /clearMaterials\(session\.mode\)/);
-  assert.match(desktopResources, /session\.clearResources\(\)/);
-  assert.match(desktopResources, /data-testid="clear-resource-center"/);
+  assert.doesNotMatch(desktopResources, /clearMaterials\(session\.mode\)/);
+  assert.doesNotMatch(desktopResources, /session\.clearResources\(\)/);
+  assert.doesNotMatch(desktopResources, /data-testid="clear-resource-center"|更多操作|desktop-resource-more/);
 });
 
 test("learning path resource actions use the shared exact resolver on both surfaces", async () => {

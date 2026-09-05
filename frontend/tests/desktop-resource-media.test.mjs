@@ -143,6 +143,8 @@ test("resource folio uses the same hard-cover page-flip mechanism as 智学云�
     resources.indexOf("</header>")
   );
   assert.doesNotMatch(header, /生成新资料/);
+  assert.doesNotMatch(header, /更多操作|desktop-resource-center__header-actions|desktop-resource-more/);
+  assert.match(styles, /\.desktop-resource-center__header\s*\{[\s\S]{0,420}resource-center-hero-v3\.webp[\s\S]{0,180}background-position:\s*center bottom[\s\S]{0,120}background-size:\s*100% 100%/);
   assert.match(resources, /type ResourceBookState = "open" \| "closing" \| "closed" \| "opening"/);
   assert.match(resources, /aria-label="收起书页"/);
   assert.match(resources, /aria-label="展开资源典藏"/);

@@ -40,7 +40,7 @@ def test_gate_distinguishes_match_miss_and_unavailable(monkeypatch: pytest.Monke
     assert "internal detail" not in str(outage.error_payload())
 
 
-def test_gate_falls_back_when_vector_returns_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gate_does_not_fall_back_when_vector_returns_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.services import rag
 
     class Collection:
@@ -58,10 +58,13 @@ def test_gate_falls_back_when_vector_returns_empty(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(rag, "get_or_create_collection", lambda *args: Collection())
     monkeypatch.setattr(rag, "_get_embedder", lambda: Embedder())
-    monkeypatch.setattr(rag, "_markdown_chunks", lambda: [{"id": "kb-real", "content": "数据结构课程内容", "metadata": {"title": "数据结构"}}])
-    result = rag.retrieve_for_gate("帮我生成一份数据结构的学习路径")
-    assert result[0]["id"] == "kb-real"
-    assert result[0]["retrieval_source"] == "markdown"
+    monkeypatch.setattr(
+        rag,
+        "_markdown_chunks",
+        lambda: (_ for _ in ()).throw(AssertionError("keyword fallback must not run")),
+    )
+    with pytest.raises(rag.RetrievalUnavailable):
+        rag.retrieve_for_gate("帮我生成一份数据结构的学习路径")
 
 
 def test_gate_prioritizes_exact_local_evidence_over_stale_vector_hits(

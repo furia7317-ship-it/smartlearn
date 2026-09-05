@@ -98,11 +98,12 @@ test("desktop shell matches the selected 书院案头 direction and exposes real
   ]);
 
   const navBlock = shell.match(/const NAV[\s\S]*?\n\];/)?.[0] || "";
-  for (const label of ["首页", "学习路径", "资源中心", "练习", "发现"]) {
+  for (const label of ["首页", "学习路径", "资源中心", "发现"]) {
     assert.match(navBlock, new RegExp(`label: "${label}"`));
   }
+  assert.doesNotMatch(navBlock, /label: "练习"/);
   assert.doesNotMatch(navBlock, /label: "智能教师"/);
-  assert.equal((navBlock.match(/href: "/g) || []).length, 5);
+  assert.equal((navBlock.match(/href: "/g) || []).length, 4);
   for (const secondaryLabel of ["互动教学", "学习市场", "代码挑战", "学情摸底", "知识库", "视频学习", "设置"]) {
     assert.doesNotMatch(navBlock, new RegExp(`label: "${secondaryLabel}"`));
   }

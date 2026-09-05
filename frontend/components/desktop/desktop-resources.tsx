@@ -53,7 +53,6 @@ import { API_BASE } from "@/lib/api";
 import { BROWSER_URL_KEY, openInBrowser } from "@/lib/browser-bus";
 import { downloadText, materialsToMarkdown } from "@/lib/export-materials";
 import {
-  clearMaterials,
   getMaterialData,
   listMaterials,
   type ExternalVideoSummary,
@@ -297,7 +296,15 @@ function DesktopResourcesInner() {
   const selectedCategory = isCatalogCategory(rawCategory) ? rawCategory : "all";
   const selectedOrigin = isOriginFilter(rawOrigin) ? rawOrigin : "all";
   const selectedSort: SortFilter = rawSort === "title" ? "title" : "recent";
-  const session = useOrchestratorContext();
+  const session = useOrchestratorContext((state) => ({
+    mode: state.mode,
+    resources: state.resources,
+    subjectPaths: state.subjectPaths,
+    completedMaterials: state.completedMaterials,
+    removeResource: state.removeResource,
+    hydrated: state.hydrated,
+    resourcePathAttachments: state.resourcePathAttachments,
+  }));
   const [searchDraft, setSearchDraft] = useState(query);
   const [library, setLibrary] = useState<StoredMaterial[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<CatalogEntry | null>(null);
@@ -307,13 +314,11 @@ function DesktopResourcesInner() {
   const [pathCollectionOpen, setPathCollectionOpen] = useState(false);
   const [loadingId, setLoadingId] = useState("");
   const [deletingId, setDeletingId] = useState("");
-  const [clearing, setClearing] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [marketSelecting, setMarketSelecting] = useState(false);
   const [marketSelectedIds, setMarketSelectedIds] = useState<string[]>([]);
   const [marketOpen, setMarketOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(true);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [bookState, setBookState] = useState<ResourceBookState>("open");
   const [bookTransitionId, setBookTransitionId] = useState(0);
@@ -342,6 +347,7 @@ function DesktopResourcesInner() {
     setBookHeight(restored.bookHeight);
     viewRestoredRef.current = true;
     setViewRestored(true);
+    const scrollElement = resourceScrollRef.current;
 
     return () => {
       if (!viewRestoredRef.current) return;
@@ -350,7 +356,7 @@ function DesktopResourcesInner() {
         bookState: stableBookStateRef.current,
         bookHeight: bookHeightRef.current,
         selectedKey: selectedKeyRef.current,
-        scrollTop: resourceScrollRef.current?.scrollTop ?? restoredScrollTopRef.current,
+        scrollTop: scrollElement?.scrollTop ?? restoredScrollTopRef.current,
       });
     };
   }, []);
@@ -729,27 +735,6 @@ function DesktopResourcesInner() {
     }
   };
 
-  const clearAllResources = async () => {
-    if (combined.length === 0 || clearing) return;
-    if (!window.confirm(`确定清空 ${combined.length} 项已过审资源吗？清空后不能撤销。`)) return;
-    setClearing(true);
-    setError("");
-    setFeedback("");
-    try {
-      await clearMaterials(session.mode);
-      setLibrary([]);
-      session.clearResources();
-      setSelectedEntry(null);
-      setOpenItem(null);
-      setAttachItem(null);
-      setFeedback("资源中心已清空");
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "清空资源失败");
-    } finally {
-      setClearing(false);
-    }
-  };
-
   const runBookTransition = (direction: "closing" | "opening") => {
     if (
       bookTransitionLockRef.current ||
@@ -949,15 +934,6 @@ function DesktopResourcesInner() {
             <h1>资源中心</h1>
             <span>典籍所藏，学识致用</span>
             <p>共 {learningCount + generatedVideoCount + externalVideos.length} 项馆藏 · 涉及 {topicCount} 个知识主题 · 最近更新 8/16</p>
-          </div>
-          <div className="desktop-resource-center__header-actions">
-            <details className="desktop-resource-more" open={moreOpen} onToggle={(event) => setMoreOpen(event.currentTarget.open)}>
-              <summary><MoreHorizontal aria-hidden className="size-4" /> 更多操作</summary>
-              <div>
-                <button type="button" onClick={() => setMarketOpen(true)}><GitBranch aria-hidden className="size-4" /> 发布学习路径</button>
-                <button type="button" data-testid="clear-resource-center" onClick={clearAllResources} disabled={clearing || combined.length === 0}><Trash2 aria-hidden className="size-4" /> {clearing ? "清空中" : "清空资源中心"}</button>
-              </div>
-            </details>
           </div>
         </header>
 

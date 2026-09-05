@@ -9,7 +9,16 @@ import { cn } from "@/lib/utils";
 type ConversationGroup = "general" | "resource_qa";
 
 export function WebConversationSidebar() {
-  const session = useOrchestratorContext();
+  const session = useOrchestratorContext((state) => ({
+    activeConversationKind: state.activeConversationKind,
+    conversations: state.conversations,
+    newConversation: state.newConversation,
+    activeTeacher: state.activeTeacher,
+    conversationSwitchLocked: state.conversationSwitchLocked,
+    openConversation: state.openConversation,
+    deleteConversation: state.deleteConversation,
+    running: state.running,
+  }));
   const [group, setGroup] = useState<ConversationGroup>(session.activeConversationKind);
 
   useEffect(() => setGroup(session.activeConversationKind), [session.activeConversationKind]);

@@ -930,13 +930,13 @@ export function Chat({
               {attachments.map((attachment) => (
                 <span key={attachment.id} title={attachment.recognition_notice} className="inline-flex max-w-[260px] items-center gap-2 rounded-lg border border-[#d8c7ae] bg-[#fffaf1] px-2.5 py-1.5 text-[11px] text-[#5f4a32] shadow-sm">
                   {attachment.kind === "image" ? <ImageIcon className="size-3.5 shrink-0 text-[#986324]" /> : <FileText className="size-3.5 shrink-0 text-[#5f7e9e]" />}
-                  <span className="min-w-0"><b className="block truncate font-medium">{attachment.name}</b><small className="block text-[9px] text-[#8a7861]">{formatAttachmentSize(attachment.size)} · {attachment.recognition_status === "recognized" ? "讯飞已识别" : attachment.recognition_status === "fallback" ? "已读取文字层" : "已解析"}</small></span>
+                  <span className="min-w-0"><b className="block truncate font-medium">{attachment.name}</b><small className="block text-[9px] text-[#8a7861]">{formatAttachmentSize(attachment.size)} · {attachment.recognition_status === "native" ? "MiMo 原生理解" : attachment.recognition_status === "recognized" ? "云端已识别" : attachment.recognition_status === "fallback" ? "已读取文字层" : "已解析"}</small></span>
                   <button type="button" onClick={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))} className="grid size-5 shrink-0 place-items-center rounded text-[#8a7861] hover:bg-[#eee4d5]" aria-label={`移除附件 ${attachment.name}`}><X className="size-3" /></button>
                 </span>
               ))}
               {uploadingFiles.map((name, index) => (
                 <span key={`${name}-${index}`} className="inline-flex max-w-[260px] items-center gap-2 rounded-lg border border-[#d8c7ae] bg-[#f7f1e7] px-2.5 py-1.5 text-[11px] text-[#6f5d48]">
-                  <Loader2 className="size-3.5 shrink-0 animate-spin" /><span className="truncate">正在识别 {name}</span>
+                  <Loader2 className="size-3.5 shrink-0 animate-spin" /><span className="truncate">正在处理 {name}</span>
                 </span>
               ))}
             </div>

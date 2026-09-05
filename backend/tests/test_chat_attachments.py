@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import base64
 import io
 
 import pytest
+from PIL import Image
 
 from app.services.chat_attachments import AttachmentExtractionError, extract_attachment
+
+
+def _sample_png_base64() -> str:
+    output = io.BytesIO()
+    Image.new("RGB", (8, 6), "navy").save(output, format="PNG")
+    return base64.b64encode(output.getvalue()).decode("ascii")
 
 
 def test_text_and_csv_attachments_are_extracted() -> None:
@@ -43,6 +51,47 @@ def test_attachment_rejects_unsupported_or_empty_files() -> None:
         extract_attachment("legacy.doc", "application/msword", b"binary")
     with pytest.raises(AttachmentExtractionError, match="文件为空"):
         extract_attachment("empty.txt", "text/plain", b"")
+
+
+def test_native_image_is_attached_to_the_current_user_message() -> None:
+    from app.agent.runner import _attach_native_images, _native_image_parts
+    from app.schemas.chat import ChatRequest
+
+    request = ChatRequest(
+        student_id="student-1",
+        message="请解释图里的二叉树",
+        attachments=[{
+            "id": "attachment-1",
+            "name": "tree.png",
+            "kind": "image",
+            "media_type": "image/png",
+            "size": 100,
+            "image_data": _sample_png_base64(),
+            "recognition_status": "native",
+        }],
+    )
+    image_parts = _native_image_parts(request)
+    messages = _attach_native_images(
+        [
+            {"role": "system", "content": "system"},
+            {"role": "user", "content": "请解释图里的二叉树"},
+        ],
+        image_parts,
+    )
+
+    assert image_parts[0]["type"] == "image_url"
+    assert image_parts[0]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert messages[-1]["content"][0] == {"type": "text", "text": "请解释图里的二叉树"}
+    assert messages[-1]["content"][1] == image_parts[0]
+
+
+def test_native_image_rejects_invalid_or_mismatched_bytes() -> None:
+    from app.agent.runner import _native_image_data_url
+
+    with pytest.raises(ValueError, match="base64"):
+        _native_image_data_url("not-base64!", "image/png")
+    with pytest.raises(ValueError, match="声明格式"):
+        _native_image_data_url(_sample_png_base64(), "image/jpeg")
 
 
 def test_solution_plan_uses_quiz_generator_but_keeps_new_resource_type() -> None:

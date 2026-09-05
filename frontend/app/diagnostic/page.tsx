@@ -65,7 +65,10 @@ function Chips({ title, items, tone }: { title: string; items?: string[]; tone: 
 }
 
 export default function DiagnosticPage() {
-  const { mode, applyAssessment } = useOrchestratorContext();
+  const { mode, applyAssessment } = useOrchestratorContext((state) => ({
+    mode: state.mode,
+    applyAssessment: state.applyAssessment,
+  }));
 
   const [subject, setSubject] = useState("");
   const [level, setLevel] = useState<MasteryLevel>("基础");

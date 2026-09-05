@@ -2378,17 +2378,6 @@
   line-height: 1.7;
 }
 
-.desktop-resource-center__header-actions img {
-  display: none;
-}
-
-.desktop-resource-center__header-actions > a {
-  min-height: 42px;
-  border-radius: 6px;
-  color: #fffaf0;
-  background: var(--desk-cinnabar);
-}
-
 .desktop-toolbar-primary {
   display: inline-flex;
   min-height: 32px;
@@ -3474,8 +3463,9 @@
   padding: 18px 28px;
   border-radius: 3px;
   background-image: url("/brand/resources/resource-center-hero-v3.webp");
-  background-position: calc(50% - 140px) bottom;
-  background-size: cover;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
   box-shadow: 0 10px 22px rgb(73 55 29 / 0.045);
 }
 
@@ -3506,96 +3496,6 @@
   color: #4f4437;
   font-family: var(--font-display);
   font-size: 11px;
-}
-
-.desktop-resource-center__header-actions {
-  position: absolute;
-  z-index: 2;
-  top: 8px;
-  right: 0;
-  width: 122px;
-  height: 40px;
-}
-
-.desktop-resource-center__header-actions .desktop-toolbar-primary {
-  position: absolute;
-  top: 49px;
-  right: 122px;
-  min-width: 146px;
-  min-height: 48px;
-  padding-inline: 18px;
-  border-radius: 5px;
-  background: var(--desk-cinnabar);
-  font-family: var(--font-display);
-  font-size: 14px;
-}
-
-.desktop-resource-more {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-.desktop-resource-more summary {
-  display: inline-flex;
-  min-height: 34px;
-  cursor: pointer;
-  list-style: none;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid var(--desk-rule);
-  border-radius: 6px;
-  color: var(--foreground);
-  background: color-mix(in srgb, var(--desk-paper) 92%, white);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.desktop-resource-more summary::-webkit-details-marker {
-  display: none;
-}
-
-.desktop-resource-more > div {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 7px);
-  z-index: 30;
-  display: grid;
-  width: 118px;
-  gap: 2px;
-  padding: 6px;
-  border: 1px solid var(--desk-rule);
-  border-radius: 7px;
-  background: #fffaf1;
-  box-shadow: 0 12px 28px rgb(65 45 20 / 0.16);
-}
-
-.desktop-resource-more > div button,
-.desktop-resource-more > div a {
-  display: flex;
-  min-height: 34px;
-  align-items: center;
-  gap: 7px;
-  padding: 0 9px;
-  border-radius: 5px;
-  color: var(--foreground);
-  font-size: 10px;
-  text-align: left;
-}
-
-.desktop-resource-more > div button:hover,
-.desktop-resource-more > div a:hover {
-  background: var(--muted);
-}
-
-.desktop-resource-more > div button:last-child {
-  color: var(--desk-cinnabar);
-}
-
-.desktop-resource-more > div button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
 }
 
 .desktop-resource-recent {

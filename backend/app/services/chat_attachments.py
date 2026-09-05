@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import csv
 import io
 import re
@@ -13,6 +14,7 @@ from typing import Any
 MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_BYTES = 6 * 1024 * 1024
 MAX_EXTRACTED_CHARS = 18_000
+MAX_IMAGE_PIXELS = 40_000_000
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff"}
 TEXT_EXTENSIONS = {".txt", ".md", ".markdown", ".csv", ".json", ".py", ".java", ".c", ".cpp", ".html", ".xml"}
@@ -30,6 +32,49 @@ SUPPORTED_EXTENSIONS = (
 
 class AttachmentExtractionError(ValueError):
     """A public, actionable attachment validation/extraction error."""
+
+
+def _prepare_native_image(data: bytes) -> tuple[bytes, str]:
+    """Validate image bytes locally and normalize formats MiMo can consume."""
+
+    try:
+        from PIL import Image, UnidentifiedImageError
+
+        with Image.open(io.BytesIO(data)) as image:
+            width, height = image.size
+            image_format = str(image.format or "").upper()
+            if width <= 0 or height <= 0 or width * height > MAX_IMAGE_PIXELS:
+                raise AttachmentExtractionError("图片尺寸无效或像素过大，请压缩后重试。")
+            image.verify()
+    except AttachmentExtractionError:
+        raise
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise AttachmentExtractionError("图片文件已损坏或格式无法识别。") from exc
+
+    preserved = {
+        "JPEG": "image/jpeg",
+        "PNG": "image/png",
+        "WEBP": "image/webp",
+        "GIF": "image/gif",
+    }
+    if image_format in preserved:
+        return data, preserved[image_format]
+
+    # BMP/TIFF are accepted by the desktop picker but are less portable in
+    # OpenAI-compatible multimodal payloads. Convert those locally to PNG.
+    try:
+        from PIL import Image
+
+        with Image.open(io.BytesIO(data)) as image:
+            converted = image.convert("RGBA" if "A" in image.getbands() else "RGB")
+            buffer = io.BytesIO()
+            converted.save(buffer, format="PNG", optimize=True)
+            normalized = buffer.getvalue()
+    except (OSError, ValueError) as exc:
+        raise AttachmentExtractionError("图片格式转换失败，请改用 PNG、JPEG 或 WebP。") from exc
+    if len(normalized) > MAX_IMAGE_BYTES:
+        raise AttachmentExtractionError("图片转换后超过 6MB，请压缩后重试。")
+    return normalized, "image/png"
 
 
 def attachment_kind(filename: str, content_type: str = "") -> str:
@@ -184,12 +229,10 @@ def extract_attachment(filename: str, content_type: str, data: bytes) -> dict[st
 
 
 async def extract_tutor_attachment(filename: str, content_type: str, data: bytes) -> dict[str, Any]:
-    """Recognize image/PDF uploads before they enter the tutor request.
+    """Prepare image/PDF uploads before they enter the tutor request.
 
-    Images require the visual model because local text extraction cannot
-    represent diagrams, formulas, or spatial relationships. PDFs use cloud OCR
-    first and fall back to pypdf only when the cloud service is unavailable and
-    the document already contains a usable text layer.
+    Images remain transient and go directly to MiMo V2.5's native multimodal
+    input. PDFs keep cloud OCR because they are currently represented as text.
     """
 
     safe_name = Path(filename or "未命名文件").name[:180]
@@ -202,21 +245,14 @@ async def extract_tutor_attachment(filename: str, content_type: str, data: bytes
         raise AttachmentExtractionError(f"文件过大，{kind == 'image' and '图片' or '单个文件'}不能超过 {label}。")
     if kind == "image":
         payload = await asyncio.to_thread(extract_attachment, safe_name, content_type, data)
-        try:
-            from app.services.iflytek.recognition import recognize_image
-
-            recognized = await recognize_image(data)
-        except Exception as exc:  # noqa: BLE001
-            from app.services.iflytek.recognition import AttachmentRecognitionError
-
-            if isinstance(exc, AttachmentRecognitionError):
-                raise AttachmentExtractionError(str(exc)) from exc
-            raise AttachmentExtractionError(f"图片识别失败（{type(exc).__name__}），请稍后重试。") from exc
+        normalized, native_media_type = await asyncio.to_thread(_prepare_native_image, data)
         payload.update(
-            extracted_text=_clean_text(recognized),
-            recognition_status="recognized",
-            recognition_provider="iflytek-image-understanding",
-            recognition_notice="图片已由讯飞图片理解完成识别，再交给智能教师解答。",
+            media_type=native_media_type,
+            image_data=base64.b64encode(normalized).decode("ascii"),
+            extracted_text="",
+            recognition_status="native",
+            recognition_provider="mimo-v2.5-native",
+            recognition_notice="图片将在本轮问答中由 MiMo V2.5 原生多模态直接理解。",
         )
         return payload
 

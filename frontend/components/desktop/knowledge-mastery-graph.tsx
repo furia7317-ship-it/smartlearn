@@ -283,7 +283,13 @@ function scoreLabel(score: MasteryScore): string {
 }
 
 export function KnowledgeMasteryGraph() {
-  const orchestrator = useOrchestratorContext();
+  const orchestrator = useOrchestratorContext((state) => ({
+    hydrated: state.hydrated,
+    mode: state.mode,
+    profile: state.profile,
+    profileUpdatedAt: state.profileUpdatedAt,
+    profileSources: state.profileSources,
+  }));
   const [assessments, setAssessments] = useState<AssessmentRecord[]>([]);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");

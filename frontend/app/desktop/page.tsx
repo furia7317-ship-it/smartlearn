@@ -37,7 +37,17 @@ const ResourceViewer = dynamic(
 );
 
 export default function DesktopHome() {
-  const session = useOrchestratorContext();
+  const session = useOrchestratorContext((state) => ({
+    hydrated: state.hydrated,
+    mode: state.mode,
+    resources: state.resources,
+    masterPath: state.masterPath,
+    completedMaterials: state.completedMaterials,
+    masterPathScheduleAnchor: state.masterPathScheduleAnchor,
+    subjectPaths: state.subjectPaths,
+    practiceAttempts: state.practiceAttempts,
+    taskEvidence: state.taskEvidence,
+  }));
   const { name, major, grade } = useUserSettings();
   const [assessments, setAssessments] = useState<AssessmentRecord[]>([]);
   const [papers, setPapers] = useState<PaperSummary[]>([]);

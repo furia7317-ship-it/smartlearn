@@ -24,7 +24,7 @@ async def ensure_kb_imported():
         )
     else:
         print(
-            "[bootstrap] 知识索引降级为关键词检索："
+            "[bootstrap] 知识索引不可用："
             f"{result.get('model_error') or '索引尚未完成'}"
         )
     return result

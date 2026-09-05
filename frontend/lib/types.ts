@@ -390,7 +390,7 @@ export interface ChatAttachmentMeta {
 export interface TutorAttachment extends ChatAttachmentMeta {
   extracted_text: string;
   image_data: string;
-  recognition_status: "recognized" | "parsed" | "fallback";
+  recognition_status: "native" | "recognized" | "parsed" | "fallback";
   recognition_provider: string;
   recognition_notice: string;
 }

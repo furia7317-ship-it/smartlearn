@@ -27,7 +27,10 @@ export function MarketPublishDialog({
   onClose: () => void;
   onPublished?: (listing: MarketListing) => void;
 }) {
-  const session = useOrchestratorContext();
+  const session = useOrchestratorContext((state) => ({
+    subjectPaths: state.subjectPaths,
+    mode: state.mode,
+  }));
   const [target, setTarget] = useState<PublishTarget>("resources");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedPathId, setSelectedPathId] = useState("");

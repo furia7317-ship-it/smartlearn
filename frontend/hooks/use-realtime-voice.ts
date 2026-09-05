@@ -38,6 +38,7 @@ interface VoiceOptions {
 
 interface VoiceStatusResponse {
   asr_ready: boolean;
+  asr_provider?: string | null;
   tts_ready: boolean;
   tts_provider: string | null;
 }
@@ -146,9 +147,16 @@ export function useRealtimeVoice({
   const pendingFramesRef = useRef<ArrayBuffer[]>([]);
   const ringFramesRef = useRef<ArrayBuffer[]>([]);
   const transcriptRef = useRef("");
+  const commitInFlightRef = useRef(false);
+  const pendingCommitRef = useRef(false);
+  const deferredSpeechRef = useRef(false);
+  const deferredAudioRef = useRef<ArrayBuffer | null>(null);
   const commitTimerRef = useRef<number | undefined>(undefined);
   const heartbeatTimerRef = useRef<number | undefined>(undefined);
   const reconnectTimerRef = useRef<number | undefined>(undefined);
+  const vadHealthTimerRef = useRef<number | undefined>(undefined);
+  const vadRearmingRef = useRef(false);
+  const lastVadFrameAtRef = useRef(0);
   const connectSocketRef = useRef<(() => Promise<WebSocket>) | null>(null);
   const speechSecondsRef = useRef(0);
   const speechGenerationRef = useRef(0);
@@ -178,6 +186,42 @@ export function useRealtimeVoice({
     }
     window.speechSynthesis?.cancel();
     speechDrainingRef.current = false;
+  }, []);
+
+  const rearmVad = useCallback(async () => {
+    const vad = vadRef.current;
+    if (
+      !vad
+      || !activeRef.current
+      || vadRearmingRef.current
+      || utteranceRef.current
+      || commitInFlightRef.current
+      || pendingCommitRef.current
+      || deferredSpeechRef.current
+      || speechDrainingRef.current
+    ) return;
+
+    vadRearmingRef.current = true;
+    try {
+      // MicVAD can remain logically started while its AudioWorklet stops
+      // delivering frames after output-device playback. Reacquiring the input
+      // stream after every completed turn makes the displayed listening state
+      // match the real microphone state.
+      await vad.pause();
+      if (!activeRef.current || vadRef.current !== vad) return;
+      await withTimeout(
+        vad.start(),
+        8_000,
+        "麦克风恢复超时，请检查音频输入设备后重试",
+      );
+      lastVadFrameAtRef.current = Date.now();
+    } catch (caught) {
+      if (!activeRef.current) return;
+      setError(caught instanceof Error ? caught.message : "麦克风恢复失败，请重新开始语音通话");
+      setPhase("error");
+    } finally {
+      vadRearmingRef.current = false;
+    }
   }, []);
 
   const playBrowserSpeech = useCallback((text: string, generation: number) => new Promise<void>((resolve) => {
@@ -247,9 +291,12 @@ export function useRealtimeVoice({
       }
     } finally {
       speechDrainingRef.current = false;
-      if (activeRef.current && !utteranceRef.current) setPhase(runningRef.current ? "thinking" : "listening");
+      if (activeRef.current && !utteranceRef.current) {
+        setPhase(runningRef.current ? "thinking" : "listening");
+        void rearmVad();
+      }
     }
-  }, [playBrowserSpeech]);
+  }, [playBrowserSpeech, rearmVad]);
 
   const queueSpeech = useCallback((text: string) => {
     const generation = speechGenerationRef.current;
@@ -340,15 +387,15 @@ export function useRealtimeVoice({
     transcriptRef.current = "";
     setPartialTranscript(text);
     if (!text) {
-      setPhase("listening");
+      if (!deferredSpeechRef.current) setPhase("listening");
       return;
     }
     if (await executeCommand(text)) {
-      setPhase("listening");
+      if (!utteranceRef.current && !deferredSpeechRef.current) setPhase("listening");
       return;
     }
     if (await executeAgentAction(text)) {
-      if (!speechDrainingRef.current) setPhase("listening");
+      if (!speechDrainingRef.current && !utteranceRef.current && !deferredSpeechRef.current) setPhase("listening");
       return;
     }
     if (runningRef.current) {
@@ -356,8 +403,21 @@ export function useRealtimeVoice({
       await waitFor(() => !runningRef.current, 2_500);
     }
     callbacksRef.current.onSend(text);
-    setPhase("thinking");
+    if (!utteranceRef.current && !deferredSpeechRef.current) setPhase("thinking");
   }, [executeAgentAction, executeCommand]);
+
+  const submitCompleteUtterance = useCallback((audio: ArrayBuffer) => {
+    const socket = socketRef.current;
+    if (!activeRef.current || !socket || socket.readyState !== WebSocket.OPEN) return;
+    utteranceRef.current = true;
+    sessionReadyRef.current = false;
+    pendingFramesRef.current = [audio];
+    pendingCommitRef.current = true;
+    transcriptRef.current = "";
+    setPartialTranscript("");
+    setPhase("finalizing");
+    socket.send(JSON.stringify({ type: "start", language: "zh_cn" }));
+  }, []);
 
   const connectSocket = useCallback(async (): Promise<WebSocket> => {
     const socket = new WebSocket(voiceSocketUrl());
@@ -384,13 +444,27 @@ export function useRealtimeVoice({
       if (data.type === "ready") {
         sessionReadyRef.current = true;
         for (const frame of pendingFramesRef.current.splice(0)) socket.send(frame);
+        if (pendingCommitRef.current) {
+          pendingCommitRef.current = false;
+          commitInFlightRef.current = true;
+          socket.send(JSON.stringify({ type: "commit" }));
+        }
       } else if (data.type === "transcript") {
         const text = String(data.text ?? "");
         transcriptRef.current = text;
         setPartialTranscript(text);
       } else if (data.type === "final") {
-        void handleFinalTranscript(String(data.text ?? transcriptRef.current));
+        commitInFlightRef.current = false;
+        const deferredAudio = deferredAudioRef.current;
+        deferredAudioRef.current = null;
+        void handleFinalTranscript(String(data.text ?? transcriptRef.current)).then(() => {
+          if (deferredAudio && activeRef.current) submitCompleteUtterance(deferredAudio);
+        });
       } else if (data.type === "error") {
+        commitInFlightRef.current = false;
+        pendingCommitRef.current = false;
+        deferredSpeechRef.current = false;
+        deferredAudioRef.current = null;
         setError(String(data.message ?? "语音识别失败"));
         setPhase("error");
       }
@@ -420,7 +494,7 @@ export function useRealtimeVoice({
       if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "ping" }));
     }, 10_000);
     return socket;
-  }, [handleFinalTranscript]);
+  }, [handleFinalTranscript, submitCompleteUtterance]);
 
   useEffect(() => {
     connectSocketRef.current = connectSocket;
@@ -430,6 +504,12 @@ export function useRealtimeVoice({
     window.clearTimeout(commitTimerRef.current);
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    if (commitInFlightRef.current) {
+      deferredSpeechRef.current = true;
+      setPartialTranscript("");
+      setPhase("user_speaking");
+      return;
+    }
     if (utteranceRef.current) {
       setPhase("user_speaking");
       return;
@@ -448,6 +528,11 @@ export function useRealtimeVoice({
 
   const handleFrame = useCallback((_probabilities: unknown, frame: Float32Array) => {
     if (!activeRef.current) return;
+    lastVadFrameAtRef.current = Date.now();
+    // MiMo finalizes one buffered turn at a time. A complete copy of speech
+    // that starts during finalization is taken from onSpeechEnd below, so do
+    // not leak its live frames into the recognizer that owns the prior turn.
+    if (deferredSpeechRef.current) return;
     const pcm = pcm16Buffer(frame);
     if (!utteranceRef.current) {
       ringFramesRef.current.push(pcm);
@@ -466,7 +551,18 @@ export function useRealtimeVoice({
     setPhase("user_speaking");
   }, [interruptTeacher]);
 
-  const handleSpeechEnd = useCallback(() => {
+  const handleSpeechEnd = useCallback((audio: Float32Array) => {
+    if (deferredSpeechRef.current) {
+      deferredSpeechRef.current = false;
+      const bufferedAudio = pcm16Buffer(audio);
+      if (commitInFlightRef.current) {
+        deferredAudioRef.current = bufferedAudio;
+        setPhase("finalizing");
+      } else {
+        submitCompleteUtterance(bufferedAudio);
+      }
+      return;
+    }
     if (!utteranceRef.current) return;
     setPhase("finalizing");
     const delay = adaptiveEndpointDelayMs(transcriptRef.current, speechSecondsRef.current);
@@ -474,9 +570,12 @@ export function useRealtimeVoice({
     commitTimerRef.current = window.setTimeout(() => {
       if (!utteranceRef.current) return;
       const socket = socketRef.current;
-      if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "commit" }));
+      if (socket?.readyState === WebSocket.OPEN) {
+        commitInFlightRef.current = true;
+        socket.send(JSON.stringify({ type: "commit" }));
+      }
     }, delay);
-  }, []);
+  }, [submitCompleteUtterance]);
 
   const cancelMisfire = useCallback(() => {
     window.clearTimeout(commitTimerRef.current);
@@ -487,6 +586,9 @@ export function useRealtimeVoice({
     utteranceRef.current = false;
     sessionReadyRef.current = false;
     pendingFramesRef.current = [];
+    pendingCommitRef.current = false;
+    deferredSpeechRef.current = false;
+    deferredAudioRef.current = null;
     if (activeRef.current) setPhase("listening");
   }, []);
 
@@ -495,10 +597,17 @@ export function useRealtimeVoice({
     utteranceRef.current = false;
     sessionReadyRef.current = false;
     pendingFramesRef.current = [];
+    commitInFlightRef.current = false;
+    pendingCommitRef.current = false;
+    deferredSpeechRef.current = false;
+    deferredAudioRef.current = null;
     setActive(false);
     window.clearTimeout(commitTimerRef.current);
     window.clearTimeout(reconnectTimerRef.current);
     window.clearInterval(heartbeatTimerRef.current);
+    window.clearInterval(vadHealthTimerRef.current);
+    vadRearmingRef.current = false;
+    lastVadFrameAtRef.current = 0;
     interruptTeacher();
     const socket = socketRef.current;
     if (socket) {
@@ -526,7 +635,7 @@ export function useRealtimeVoice({
       const statusResponse = await fetch(`${API_BASE}/api/voice/status`, { cache: "no-store" });
       if (!statusResponse.ok) throw new Error("无法读取语音服务状态");
       const status = await statusResponse.json() as VoiceStatusResponse;
-      if (!status.asr_ready) throw new Error("语音识别尚未配置，请先在后端配置讯飞 IAT");
+      if (!status.asr_ready) throw new Error("语音识别尚未配置，请先在后端配置 MiMo ASR");
       setTtsProvider(status.tts_provider);
 
       activeRef.current = true;
@@ -563,13 +672,26 @@ export function useRealtimeVoice({
         12_000,
         "麦克风启动超时，请检查系统麦克风权限或音频输入设备后重试",
       );
+      lastVadFrameAtRef.current = Date.now();
+      window.clearInterval(vadHealthTimerRef.current);
+      vadHealthTimerRef.current = window.setInterval(() => {
+        if (
+          !activeRef.current
+          || utteranceRef.current
+          || commitInFlightRef.current
+          || pendingCommitRef.current
+          || deferredSpeechRef.current
+          || speechDrainingRef.current
+        ) return;
+        if (Date.now() - lastVadFrameAtRef.current > 2_500) void rearmVad();
+      }, 1_000);
       setPhase("listening");
     } catch (caught) {
       await stop();
       setError(caught instanceof Error ? caught.message : String(caught));
       setPhase("error");
     }
-  }, [cancelMisfire, connectSocket, enabled, handleFrame, handleRealSpeechStart, handleSpeechEnd, messages, openUtterance, stop]);
+  }, [cancelMisfire, connectSocket, enabled, handleFrame, handleRealSpeechStart, handleSpeechEnd, messages, openUtterance, rearmVad, stop]);
 
   const toggle = useCallback(() => {
     if (activeRef.current) void stop();

@@ -16,7 +16,7 @@ import { DesktopEmptyState } from "@/components/desktop/desktop-empty-state";
 import { DesktopPaperCover } from "@/components/desktop/desktop-paper-cover";
 import {
   TeacherOpenButton,
-  useTeacherWindow,
+  useTeacherWindowActions,
 } from "@/components/desktop/teacher-window-provider";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { QuizRunner } from "@/components/quiz-runner";
@@ -48,8 +48,14 @@ const PRACTICE_TABS = ["papers", "wrongbook"] as const;
 
 export default function DesktopPractice() {
   const { mode, hydrated, resources, practiceAttempts, recordPractice } =
-    useOrchestratorContext();
-  const { openTeacher } = useTeacherWindow();
+    useOrchestratorContext((state) => ({
+      mode: state.mode,
+      hydrated: state.hydrated,
+      resources: state.resources,
+      practiceAttempts: state.practiceAttempts,
+      recordPractice: state.recordPractice,
+    }));
+  const { openTeacher } = useTeacherWindowActions();
 
   const sessionQuiz = findQuizResource(resources);
   const latestAttempt = practiceAttempts[0];

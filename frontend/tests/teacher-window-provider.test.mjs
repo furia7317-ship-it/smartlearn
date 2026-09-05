@@ -39,9 +39,9 @@ test("desktop teacher window state persists above the desktop shell and supports
   assert.match(shellSwitch, /import \{ TeacherWindowProvider \}/);
   assert.match(
     shellSwitch,
-    /<ApplicationProviders>[\s\S]*?<TeacherWindowProvider>[\s\S]*?<DesktopShell>[\s\S]*?<\/DesktopShell>[\s\S]*?<\/TeacherWindowProvider>[\s\S]*?<\/ApplicationProviders>/,
+    /<ApplicationProviders key=\{user\.id\}>[\s\S]*?<TeacherWindowProvider>[\s\S]*?<DesktopShell>[\s\S]*?<\/DesktopShell>[\s\S]*?<\/TeacherWindowProvider>[\s\S]*?<\/ApplicationProviders>/,
   );
-  const webBranch = shellSwitch.match(/return <ApplicationProviders><AppShell>[^\n]+/)?.[0] ?? "";
+  const webBranch = shellSwitch.match(/return <ApplicationProviders key=\{user\.id\}><AppShell>[^\n]+/)?.[0] ?? "";
   assert.match(webBranch, /<AppShell>/);
   assert.doesNotMatch(webBranch, /TeacherWindowProvider/);
 });

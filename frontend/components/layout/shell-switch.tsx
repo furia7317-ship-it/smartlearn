@@ -82,12 +82,12 @@ export function ShellSwitch({ children }: { children: React.ReactNode }) {
 
   if (pathname?.startsWith("/desktop")) {
     return (
-      <ApplicationProviders>
+      <ApplicationProviders key={user.id}>
         <TeacherWindowProvider>
           <DesktopShell>{children}</DesktopShell>
         </TeacherWindowProvider>
       </ApplicationProviders>
     );
   }
-  return <ApplicationProviders><AppShell>{children}</AppShell></ApplicationProviders>;
+  return <ApplicationProviders key={user.id}><AppShell>{children}</AppShell></ApplicationProviders>;
 }

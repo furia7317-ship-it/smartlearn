@@ -1,9 +1,10 @@
-"""SQLite-backed three-tier agent memory and global context budgeting.
+"""SQLite-backed four-layer agent memory and global context budgeting.
 
-The tiers are intentionally distinct:
-1. working memory: recent raw conversation messages;
-2. episodic memory: compressed conversation episodes;
-3. semantic memory: versioned learner facts with provenance.
+The layers are intentionally distinct:
+1. session metadata: routing and ownership, never retrieval text;
+2. structured profile: exact-key learner facts with provenance;
+3. episodic memory: incremental topic summaries with optional semantic recall;
+4. working window: recent complete conversation turns.
 
 No provider-specific tokenizer is required.  The estimator is conservative for
 Chinese and mixed JSON so every supported provider gets the same hard budget.
@@ -16,7 +17,7 @@ import json
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from sqlalchemy import select
@@ -24,11 +25,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import async_session, settings
 from app.models.learning import MemoryEpisode, SemanticMemoryFact
+from app.models.profile import Profile
 from app.services.learner_settings import get_learner_settings, teaching_preference_prompt
 
 
 _CJK_RE = re.compile(r"[\u3400-\u9fff]")
 _KEYWORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9_+-]{1,24}|[\u3400-\u9fff]{2,10}")
+_CROSS_SESSION_REFERENCE_RE = re.compile(
+    r"上次(?:会话|聊天|讨论|学习)?|上回|上个会话|另一个会话|历史会话|还记得|我们聊过|"
+    r"之前(?:聊|讨论|学|说过|的会话)|以前(?:聊|讨论|学|说过)|过去(?:聊|讨论|学习)|"
+    r"继续(?:上次|之前)|接着(?:上次|之前)"
+)
 _STOPWORDS = {
     "这个", "那个", "什么", "怎么", "可以", "需要", "一个", "一些", "然后", "当前",
     "用户", "学生", "老师", "回答", "问题", "资料", "学习", "请问", "帮我", "进行",
@@ -139,8 +146,11 @@ def _fingerprint(student_id: str, conversation_id: str, messages: list[dict[str,
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _episode_id(student_id: str, conversation_id: str) -> str:
-    digest = hashlib.sha256(f"{student_id}\0{conversation_id}".encode()).hexdigest()[:32]
+def _episode_id(student_id: str, conversation_id: str, source_start_index: int = 0) -> str:
+    # Preserve the original ID for the first segment so existing clients and
+    # stored rows remain compatible. Later segments are stable by start cursor.
+    suffix = "" if source_start_index <= 0 else f"\0{source_start_index}"
+    digest = hashlib.sha256(f"{student_id}\0{conversation_id}{suffix}".encode()).hexdigest()[:32]
     return f"episode_{digest}"
 
 
@@ -150,6 +160,68 @@ def _importance(messages: list[dict[str, str]]) -> float:
     score = 0.45 + min(len(messages), 12) * 0.015
     score += sum(0.05 for marker in markers if marker in user_text)
     return round(min(score, 0.95), 3)
+
+
+def _sentences(text: str) -> list[str]:
+    return [part.strip() for part in re.split(r"(?<=[。！？!?])|\n+", text) if part.strip()]
+
+
+def _structured_episode(messages: list[dict[str, str]]) -> dict[str, Any]:
+    """Create a compact, auditable episode instead of copying every old turn."""
+
+    user_messages = [item["content"] for item in messages if item["role"] == "user"]
+    assistant_messages = [item["content"] for item in messages if item["role"] == "assistant"]
+    full_text = "\n".join(item["content"] for item in messages)
+    entities = _keywords(full_text, 8)
+    topic = "、".join(entities[:4]) or "一般学习对话"
+    intent = _compact_excerpt(user_messages[-1], 220) if user_messages else ""
+
+    decisions: list[str] = []
+    for text in assistant_messages:
+        for sentence in _sentences(text):
+            if re.search(r"先|接着|建议|安排|决定|下一步|可以", sentence):
+                decisions.append(_compact_excerpt(sentence, 180))
+    if not decisions and assistant_messages:
+        decisions.append(_compact_excerpt(assistant_messages[-1], 180))
+
+    unresolved: list[str] = []
+    learning_changes: list[str] = []
+    for text in user_messages:
+        for sentence in _sentences(text):
+            if re.search(r"不懂|不会|薄弱|困难|没思路|还没|[？?]", sentence):
+                unresolved.append(_compact_excerpt(sentence, 180))
+            if re.search(r"掌握|完成|学会|理解|改为|目标|希望|想要", sentence):
+                learning_changes.append(_compact_excerpt(sentence, 180))
+
+    return {
+        "topic": topic,
+        "intent": intent,
+        "entities": entities,
+        "decisions": list(dict.fromkeys(decisions))[:3],
+        "unresolved": list(dict.fromkeys(unresolved))[:3],
+        "learning_changes": list(dict.fromkeys(learning_changes))[:3],
+    }
+
+
+def _render_episode_summary(structured: dict[str, Any]) -> str:
+    lines = [
+        "情景记忆摘要：",
+        f"- 主题：{structured.get('topic') or '一般学习对话'}",
+    ]
+    if structured.get("intent"):
+        lines.append(f"- 学生当前意图：{structured['intent']}")
+    for key, label in (
+        ("decisions", "已形成的安排"),
+        ("unresolved", "尚未解决"),
+        ("learning_changes", "学习状态变化"),
+    ):
+        values = structured.get(key)
+        if isinstance(values, list) and values:
+            lines.append(f"- {label}：" + "；".join(str(value) for value in values))
+    entities = structured.get("entities")
+    if isinstance(entities, list) and entities:
+        lines.append("- 关键实体：" + "、".join(str(value) for value in entities))
+    return "\n".join(lines)
 
 
 def _fact_candidates(messages: list[dict[str, str]]) -> list[dict[str, Any]]:
@@ -260,7 +332,7 @@ async def consolidate_conversation(
     occurred_at: int = 0,
     force: bool = False,
 ) -> MemoryEpisode | None:
-    """Create/update one compressed episode and explicit semantic facts."""
+    """Append one new episode segment and version explicit learner facts."""
 
     preferences = await get_learner_settings(db, student_id)
     if not preferences["long_term_memory_enabled"]:
@@ -275,34 +347,133 @@ async def consolidate_conversation(
             source=candidate.get("source", "conversation"),
             **{key: value for key, value in candidate.items() if key != "source"},
         )
-    if not force and len(normalized) < 4:
+    stored = list((await db.scalars(
+        select(MemoryEpisode).where(
+            MemoryEpisode.student_id == student_id,
+            MemoryEpisode.conversation_id == conversation_id,
+        ).order_by(MemoryEpisode.source_start_index.asc(), MemoryEpisode.created_at.asc())
+    )).all())
+    summarized_through = 0
+    for existing in stored:
+        start = max(int(existing.source_start_index or 0), 0)
+        end = int(existing.source_end_index or 0)
+        if end <= start:
+            end = start + max(int(existing.source_message_count or 0), 0)
+            existing.source_start_index = start
+            existing.source_end_index = end
+        summarized_through = max(summarized_through, end)
+        if not isinstance(existing.structured_summary, dict) or not existing.structured_summary:
+            segment = normalized[start:end]
+            if segment:
+                existing.structured_summary = {
+                    **_structured_episode(segment),
+                    "source_range": [start, end],
+                }
+                existing.summary = _render_episode_summary(existing.structured_summary)
+                existing.estimated_tokens = estimate_tokens(existing.summary)
+
+    # A caller may intentionally pass only the overflow prefix. Never treat a
+    # shorter prefix as a reason to rewrite or delete an already stored episode.
+    if len(normalized) <= summarized_through:
+        return stored[-1] if stored else None
+
+    segment = normalized[summarized_through:]
+    if not force and len(segment) < 4:
         return None
-    fingerprint = _fingerprint(student_id, conversation_id, normalized)
-    episode_id = _episode_id(student_id, conversation_id)
+
+    source_start = summarized_through
+    source_end = len(normalized)
+    fingerprint = _fingerprint(student_id, conversation_id, segment)
+    episode_id = _episode_id(student_id, conversation_id, source_start)
     episode = await db.get(MemoryEpisode, episode_id)
+    structured = {
+        **_structured_episode(segment),
+        "source_range": [source_start, source_end],
+    }
+    summary = _render_episode_summary(structured)
     if episode is None:
         episode = MemoryEpisode(
             id=episode_id,
             student_id=student_id,
             conversation_id=conversation_id,
             source_fingerprint=fingerprint,
-            summary="",
+            summary=summary,
         )
         db.add(episode)
-    if episode.source_fingerprint != fingerprint or not episode.summary:
-        episode.source_fingerprint = fingerprint
-        episode.summary = compress_messages(normalized, token_limit=1400)
-        episode.keywords = _keywords("\n".join(item["content"] for item in normalized))
-        episode.importance = _importance(normalized)
-        episode.source_message_count = len(normalized)
-        episode.estimated_tokens = estimate_tokens(episode.summary)
-        episode.occurred_at = max(int(occurred_at or 0), 0)
-
+    episode.source_fingerprint = fingerprint
+    episode.summary = fit_text(summary, 1400)
+    episode.structured_summary = structured
+    episode.keywords = _keywords("\n".join(item["content"] for item in segment))
+    episode.importance = _importance(segment)
+    episode.source_start_index = source_start
+    episode.source_end_index = source_end
+    episode.source_message_count = len(segment)
+    episode.estimated_tokens = estimate_tokens(episode.summary)
+    episode.occurred_at = max(int(occurred_at or 0), 0)
     return episode
 
 
 def _query_terms(query: str) -> set[str]:
     return set(_keywords(query, 24))
+
+
+def _requested_profile_dimensions(query: str) -> tuple[set[str], set[str]]:
+    """Choose exact profile keys for the current task; this is not retrieval."""
+
+    profile_fields = {"cognitive_style"}
+    fact_categories = {"identity", "preference"}
+    if re.search(r"规划|计划|目标|考试|备考|进度|复习", query):
+        profile_fields.update({"goals", "pace", "knowledge_level"})
+        fact_categories.update({"goal", "pace", "weakness"})
+    if re.search(r"不会|不懂|薄弱|错|难|怎么学|解释|练习", query):
+        profile_fields.update({"knowledge_level", "error_profile"})
+        fact_categories.add("weakness")
+    if re.search(r"推荐|兴趣|喜欢|偏好|资料|课程", query):
+        profile_fields.update({"interests", "goals"})
+        fact_categories.update({"goal", "pace"})
+    return profile_fields, fact_categories
+
+
+async def _structured_profile_snapshot(
+    db: AsyncSession,
+    *,
+    student_id: str,
+    query: str,
+) -> tuple[dict[str, Any], list[SemanticMemoryFact]]:
+    profile_fields, fact_categories = _requested_profile_dimensions(query)
+    profile = await db.get(Profile, student_id)
+    snapshot: dict[str, Any] = {}
+    if profile is not None:
+        for field_name in sorted(profile_fields):
+            value = getattr(profile, field_name, None)
+            if value:
+                snapshot[field_name] = value
+
+    facts = list((await db.scalars(
+        select(SemanticMemoryFact).where(
+            SemanticMemoryFact.student_id == student_id,
+            SemanticMemoryFact.status == "active",
+            SemanticMemoryFact.category.in_(fact_categories),
+        ).order_by(
+            SemanticMemoryFact.category.asc(),
+            SemanticMemoryFact.key.asc(),
+            SemanticMemoryFact.updated_at.desc(),
+        ).limit(24)
+    )).all())
+    snapshot["explicit_facts"] = [
+        {
+            "id": fact.id,
+            "category": fact.category,
+            "key": fact.key,
+            "value": fact.value,
+            "confidence": round(float(fact.confidence or 0), 3),
+            "evidence": (fact.evidence or "")[:300],
+        }
+        for fact in facts
+    ]
+    if not snapshot["explicit_facts"]:
+        snapshot.pop("explicit_facts")
+    return snapshot, facts
 
 
 async def recall_memory_context(
@@ -311,19 +482,19 @@ async def recall_memory_context(
     student_id: str,
     query: str,
     token_limit: int,
+    conversation_id: str = "",
 ) -> tuple[str, dict[str, int]]:
-    """Recall relevant episodic and semantic memory from SQLite."""
+    """Recall memory without allowing recency alone to cross session boundaries."""
 
     preferences = await get_learner_settings(db, student_id)
     if not preferences["long_term_memory_enabled"]:
         return "", {"facts": 0, "episodes": 0}
 
-    facts = list((await db.scalars(
-        select(SemanticMemoryFact).where(
-            SemanticMemoryFact.student_id == student_id,
-            SemanticMemoryFact.status == "active",
-        ).order_by(SemanticMemoryFact.updated_at.desc()).limit(100)
-    )).all())
+    profile_snapshot, selected_facts = await _structured_profile_snapshot(
+        db,
+        student_id=student_id,
+        query=query,
+    )
     episodes = list((await db.scalars(
         select(MemoryEpisode).where(MemoryEpisode.student_id == student_id)
         .order_by(MemoryEpisode.occurred_at.desc(), MemoryEpisode.created_at.desc())
@@ -331,36 +502,89 @@ async def recall_memory_context(
     )).all())
     terms = _query_terms(query)
 
-    def fact_score(fact: SemanticMemoryFact) -> float:
-        searchable = f"{fact.category} {fact.key} {json.dumps(fact.value, ensure_ascii=False)}".lower()
-        overlap = sum(1 for term in terms if term in searchable)
-        return float(fact.confidence or 0) + overlap * 0.35
+    from app.services.episodic_memory_index import (
+        schedule_episode_index,
+        semantic_episode_scores,
+    )
 
-    def episode_score(episode: MemoryEpisode) -> float:
+    semantic_scores = await semantic_episode_scores(student_id, query) if episodes else {}
+    # Reconcile old or newly committed SQLite episodes in the background. The
+    # current turn still has deterministic fallback ranking.
+    for episode in episodes:
+        schedule_episode_index(episode)
+
+    now_seconds = datetime.now(timezone.utc).timestamp()
+    current_conversation_id = conversation_id.strip()
+    explicit_cross_session_reference = bool(_CROSS_SESSION_REFERENCE_RE.search(query))
+    cross_session_min_score = max(
+        0.0,
+        min(float(settings.MEMORY_EPISODE_CROSS_SESSION_MIN_SCORE), 1.0),
+    )
+
+    def episode_relevance(episode: MemoryEpisode) -> tuple[float, float, int]:
         episode_terms = set(episode.keywords or [])
         overlap = len(terms & episode_terms)
-        return float(episode.importance or 0) + overlap * 0.45
+        timestamp = float(episode.occurred_at or 0)
+        if timestamp > 100_000_000_000:
+            timestamp /= 1000
+        age_days = max((now_seconds - timestamp) / 86_400, 0) if timestamp else 3650
+        recency = 1.0 / (1.0 + age_days / 30.0)
+        lexical = min(overlap / 3.0, 1.0)
+        semantic = semantic_scores.get(episode.id, 0.0)
+        score = (
+            semantic * 0.55
+            + recency * 0.20
+            + float(episode.importance or 0) * 0.15
+            + lexical * 0.10
+        )
+        return score, semantic, overlap
 
-    selected_facts = sorted(facts, key=fact_score, reverse=True)[:12]
-    selected_episodes = sorted(episodes, key=episode_score, reverse=True)[:4]
+    def is_current_session(episode: MemoryEpisode) -> bool:
+        return bool(
+            current_conversation_id
+            and episode.conversation_id == current_conversation_id
+        )
+
+    same_session = [episode for episode in episodes if is_current_session(episode)]
+    cross_session: list[MemoryEpisode] = []
+    strong_cross_session: list[MemoryEpisode] = []
+    for episode in episodes:
+        if is_current_session(episode):
+            continue
+        if not explicit_cross_session_reference:
+            continue
+        _score, semantic, overlap = episode_relevance(episode)
+        strongly_relevant = overlap > 0 or semantic >= cross_session_min_score
+        if strongly_relevant:
+            strong_cross_session.append(episode)
+        cross_session.append(episode)
+
+    same_session.sort(key=lambda episode: episode_relevance(episode)[0], reverse=True)
+    cross_session.sort(key=lambda episode: episode_relevance(episode)[0], reverse=True)
+    # A vague “continue last time” may refer to only one prior session. Pulling
+    # several recent summaries recreates the very contamination this gate avoids.
+    cross_limit = 2
+    if explicit_cross_session_reference and not strong_cross_session:
+        cross_limit = 1
+    selected_episodes = same_session[:4]
+    remaining = max(4 - len(selected_episodes), 0)
+    if remaining:
+        selected_episodes.extend(cross_session[: min(cross_limit, remaining)])
+
     payload = {
-        "semantic_facts": [
-            {
-                "id": fact.id,
-                "category": fact.category,
-                "key": fact.key,
-                "value": fact.value,
-                "confidence": round(float(fact.confidence or 0), 3),
-                "evidence": (fact.evidence or "")[:300],
-            }
-            for fact in selected_facts
-        ],
+        "profile_snapshot": profile_snapshot,
         "episodes": [
-            {"id": episode.id, "summary": episode.summary, "importance": episode.importance}
+            {
+                "id": episode.id,
+                "summary": episode.summary,
+                "structured_summary": episode.structured_summary,
+                "importance": episode.importance,
+                "source_range": [episode.source_start_index, episode.source_end_index],
+            }
             for episode in selected_episodes
         ],
     }
-    if not selected_facts and not selected_episodes:
+    if not profile_snapshot and not selected_episodes:
         return "", {"facts": 0, "episodes": 0}
     for item in [*selected_facts, *selected_episodes]:
         item.access_count = int(item.access_count or 0) + 1
@@ -387,16 +611,40 @@ class ContextAssembly:
 def _select_recent_history(
     history: list[dict[str, str]], token_limit: int
 ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
-    selected_reversed: list[dict[str, str]] = []
+    turns: list[list[dict[str, str]]] = []
+    current: list[dict[str, str]] = []
+    for message in history:
+        if message["role"] == "user":
+            if current:
+                turns.append(current)
+            current = [message]
+        elif current:
+            current.append(message)
+        else:
+            # Preserve an imported leading assistant message as its own turn.
+            current = [message]
+    if current:
+        turns.append(current)
+
+    selected_reversed: list[list[dict[str, str]]] = []
     used = 0
-    for message in reversed(history):
-        cost = estimate_tokens(message["content"]) + 4
+    for turn in reversed(turns):
+        cost = sum(estimate_tokens(message["content"]) + 4 for message in turn)
         if used + cost > token_limit:
             break
-        selected_reversed.append(message)
+        selected_reversed.append(turn)
         used += cost
-    selected = list(reversed(selected_reversed))
+    selected_turns = list(reversed(selected_reversed))
+    selected = [message for turn in selected_turns for message in turn]
     return selected, history[: max(len(history) - len(selected), 0)]
+
+
+def _task_context_policy(question: str, has_attachment: bool) -> tuple[str, tuple[str, ...]]:
+    if has_attachment and re.search(r"附件|文件|图片|这张|这份|文档", question):
+        return "attachment_analysis", ("memory", "knowledge", "attachment")
+    if re.search(r"规划|计划|目标|复习安排|学习路径|进度", question):
+        return "learning_coaching", ("knowledge", "attachment", "memory")
+    return "knowledge_tutoring", ("memory", "attachment", "knowledge")
 
 
 async def assemble_chat_context(
@@ -412,10 +660,12 @@ async def assemble_chat_context(
     """Assemble one provider request under a global token budget."""
 
     normalized_history = _message_dicts(history)
+    scoped_conversation_id = conversation_id.strip()
     recent, overflow = _select_recent_history(
         normalized_history, settings.CHAT_HISTORY_TOKEN_BUDGET
     )
     consolidated_overflow_count = len(overflow)
+    episodes_to_index: list[MemoryEpisode] = []
     memory_context = ""
     preference_context = ""
     recall_counts = {"facts": 0, "episodes": 0}
@@ -423,21 +673,29 @@ async def assemble_chat_context(
         async with async_session() as db:
             learner_preferences = await get_learner_settings(db, student_id)
             preference_context = teaching_preference_prompt(learner_preferences)
-            if overflow:
-                await consolidate_conversation(
+            if overflow and scoped_conversation_id:
+                episode = await consolidate_conversation(
                     db,
                     student_id=student_id,
-                    conversation_id=conversation_id or "current",
+                    conversation_id=scoped_conversation_id,
                     messages=overflow,
                     force=True,
                 )
+                if episode is not None:
+                    episodes_to_index.append(episode)
             memory_context, recall_counts = await recall_memory_context(
                 db,
                 student_id=student_id,
                 query=question,
                 token_limit=settings.CHAT_MEMORY_TOKEN_BUDGET,
+                conversation_id=scoped_conversation_id,
             )
             await db.commit()
+            if episodes_to_index:
+                from app.services.episodic_memory_index import schedule_episode_index
+
+                for episode in episodes_to_index:
+                    schedule_episode_index(episode)
     except Exception:
         # Memory enrichment must never make tutoring unavailable.  The report
         # exposes the fallback without leaking database details to the model.
@@ -461,7 +719,11 @@ async def assemble_chat_context(
             "role": "user",
             "content": fit_untrusted_context(attachment_context, settings.CHAT_ATTACHMENT_TOKEN_BUDGET),
         }))
-    labelled.extend(("history", message) for message in recent)
+    recent_turn_index = -1
+    for message in recent:
+        if message["role"] == "user" or recent_turn_index < 0:
+            recent_turn_index += 1
+        labelled.append((f"history:{recent_turn_index}", message))
     labelled.append(("question", {
         "role": "user",
         "content": fit_text(question, settings.CHAT_QUESTION_TOKEN_BUDGET),
@@ -475,15 +737,21 @@ async def assemble_chat_context(
     def total_tokens() -> int:
         return sum(estimate_tokens(message["content"]) + 4 for _, message in labelled)
 
-    # Provider-independent final guard. Drop the oldest raw turns first; their
-    # episode is already in SQLite. Then shrink lower-priority enrichment.
+    # Provider-independent final guard. Drop the oldest complete raw turn
+    # first; its episode is already in SQLite. Never orphan half a Q&A pair.
     while total_tokens() > input_budget:
-        history_index = next((index for index, item in enumerate(labelled) if item[0] == "history"), None)
-        if history_index is None:
+        oldest_history_label = next(
+            (label for label, _message in labelled if label.startswith("history:")),
+            None,
+        )
+        if oldest_history_label is None:
             break
-        overflow.append(labelled.pop(history_index)[1])
+        removed = [message for label, message in labelled if label == oldest_history_label]
+        labelled = [item for item in labelled if item[0] != oldest_history_label]
+        overflow.extend(removed)
 
-    for label in ("knowledge", "memory", "attachment"):
+    context_policy, shrink_order = _task_context_policy(question, bool(attachment_context))
+    for label in shrink_order:
         if total_tokens() <= input_budget:
             break
         index = next((i for i, item in enumerate(labelled) if item[0] == label), None)
@@ -501,23 +769,28 @@ async def assemble_chat_context(
     # message framing overhead can still force a few additional raw turns out
     # in the final guard. Persist those turns too so "compressed" never means
     # silently discarded.
-    if len(overflow) > consolidated_overflow_count:
+    if scoped_conversation_id and len(overflow) > consolidated_overflow_count:
         try:
             async with async_session() as db:
-                await consolidate_conversation(
+                episode = await consolidate_conversation(
                     db,
                     student_id=student_id,
-                    conversation_id=conversation_id or "current",
+                    conversation_id=scoped_conversation_id,
                     messages=overflow,
                     force=True,
                 )
                 await db.commit()
+                if episode is not None:
+                    from app.services.episodic_memory_index import schedule_episode_index
+
+                    schedule_episode_index(episode)
         except Exception:
             pass
 
     section_tokens: dict[str, int] = {}
     for label, message in labelled:
-        section_tokens[label] = section_tokens.get(label, 0) + estimate_tokens(message["content"]) + 4
+        section = "history" if label.startswith("history:") else label
+        section_tokens[section] = section_tokens.get(section, 0) + estimate_tokens(message["content"]) + 4
     used = total_tokens()
     return ContextAssembly(
         messages=[message for _, message in labelled if message["content"]],
@@ -528,6 +801,7 @@ async def assemble_chat_context(
             "estimated_input_tokens": used,
             "remaining_input_tokens": max(input_budget - used, 0),
             "compressed_history_messages": len(overflow),
+            "context_policy": context_policy,
             "recalled_facts": recall_counts["facts"],
             "recalled_episodes": recall_counts["episodes"],
             "sections": section_tokens,

@@ -75,8 +75,8 @@ def check_knowledge_gate(
         for item in context
         if item.get("retrieval_source") != "markdown"
     ]
-    fallback_scores = [
-        float(item.get("fallback_score") or 0.0)
+    lexical_scores = [
+        float(item.get("lexical_score") or 0.0)
         for item in context
         if item.get("retrieval_source") in {"markdown", "hybrid"}
     ]
@@ -84,7 +84,7 @@ def check_knowledge_gate(
     # score >= 1 means at least one meaningful query/topic term matched; exact
     # title matches score much higher and natural-language wrappers therefore
     # do not dilute a known topic into a false miss.
-    best_score = max(vector_scores + fallback_scores, default=0.0)
+    best_score = max(vector_scores + lexical_scores, default=0.0)
     authoritative_lexical = any(item.get("authoritative_match") is True for item in context)
     matched = max(vector_scores, default=0.0) >= settings.KB_RELEVANCE_THRESHOLD or authoritative_lexical
     status: KnowledgeGateStatus = "matched" if matched else "kb_miss"

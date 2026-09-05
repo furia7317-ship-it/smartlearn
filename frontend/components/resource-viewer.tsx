@@ -25,7 +25,10 @@ import { CodeExecutionVisualizer } from "@/components/code-execution-visualizer"
 import { HtmlSandbox } from "@/components/html-sandbox";
 import { Markdown } from "@/components/markdown";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
-import { useTeacherWindow } from "@/components/desktop/teacher-window-provider";
+import {
+  useTeacherWindowActions,
+  useTeacherWindowOpen,
+} from "@/components/desktop/teacher-window-provider";
 import { ResourcePathAttachmentDialog } from "@/components/resource-path-attachment-dialog";
 import { QuizRunner } from "@/components/quiz-runner";
 import { SlideDeck } from "@/components/slide-deck";
@@ -1000,7 +1003,8 @@ export function ResourceViewer({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { open: teacherOpen, openTeacher } = useTeacherWindow();
+  const teacherOpen = useTeacherWindowOpen();
+  const { openTeacher } = useTeacherWindowActions();
   const {
     askResourceQuestion,
     mode,
@@ -1010,7 +1014,16 @@ export function ResourceViewer({
     resourcePathAttachments,
     resources,
     running,
-  } = useOrchestratorContext();
+  } = useOrchestratorContext((state) => ({
+    askResourceQuestion: state.askResourceQuestion,
+    mode: state.mode,
+    patchResourceData: state.patchResourceData,
+    recordPractice: state.recordPractice,
+    recordResourceStudy: state.recordResourceStudy,
+    resourcePathAttachments: state.resourcePathAttachments,
+    resources: state.resources,
+    running: state.running,
+  }));
   const contentRef = useRef<HTMLDivElement>(null);
   const learningRecordedRef = useRef("");
   const lastTrackedScrollRef = useRef(0);

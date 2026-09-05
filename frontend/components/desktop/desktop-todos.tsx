@@ -8,7 +8,11 @@ import { ShellLink as Link } from "@/components/shell-link";
 import { buildLearningSchedule, localDateKey, pendingTasksForDate } from "@/lib/learning-schedule";
 
 export default function DesktopTodos() {
-  const { path, completedMaterials, hydrated } = useOrchestratorContext();
+  const { path, completedMaterials, hydrated } = useOrchestratorContext((state) => ({
+    path: state.path,
+    completedMaterials: state.completedMaterials,
+    hydrated: state.hydrated,
+  }));
   const today = localDateKey();
   const schedule = buildLearningSchedule(path, completedMaterials);
   const tasks = pendingTasksForDate(schedule, today);

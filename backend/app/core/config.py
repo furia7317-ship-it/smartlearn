@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     RAG_RRF_K: int = 60
     RAG_MAX_RESULTS_PER_SOURCE: int = 2
     RAG_INDEX_BATCH_SIZE: int = 64
+    RAG_ADJACENT_CHUNK_DEDUP: bool = True
+    # Optional local CrossEncoder model/path. Empty keeps the fast hybrid ranker.
+    RAG_RERANKER_MODEL: str = ""
+    RAG_RERANKER_CANDIDATES: int = 12
+    RAG_RERANKER_RETRY_SECONDS: float = 60.0
     PLAN_MAX_OUTPUT_TOKENS: int = 5000
     # Agent runtime safety bounds. Keep retries low because graph nodes already
     # own the business-level retry policy.
@@ -84,6 +89,13 @@ class Settings(BaseSettings):
     CHAT_ATTACHMENT_TOKEN_BUDGET: int = 5000
     CHAT_HISTORY_TOKEN_BUDGET: int = 4500
     CHAT_QUESTION_TOKEN_BUDGET: int = 1500
+    # Episodic memory owns a separate best-effort vector collection. Course
+    # knowledge retrieval remains authoritative and is never mixed into it.
+    MEMORY_EPISODE_VECTOR_ENABLED: bool = True
+    MEMORY_EPISODE_VECTOR_COLLECTION: str = "memory_episodes_v1"
+    MEMORY_EPISODE_VECTOR_TIMEOUT_SECONDS: float = 0.45
+    MEMORY_EPISODE_RECALL_CANDIDATES: int = 12
+    MEMORY_EPISODE_CROSS_SESSION_MIN_SCORE: float = 0.72
     # Optional stable HMAC key for short-lived server-issued material approval
     # markers. A random per-process key is used for local single-worker runs.
     MATERIAL_APPROVAL_SECRET: str = ""
@@ -121,7 +133,12 @@ class Settings(BaseSettings):
     IFLYTEK_PDF_OCR_STATUS_URL: str = "https://iocr.xfyun.cn/ocrzdq/v1/pdfOcr/status"
     IFLYTEK_PDF_OCR_TIMEOUT_SECONDS: int = 120
 
-    # ── Xiaomi MiMo 语音合成（可选，视频配音首选） ──
+    # ── Xiaomi MiMo 语音识别 / 合成 ──
+    MIMO_ASR_ENABLED: bool = False
+    MIMO_ASR_BASE_URL: str = "https://api.xiaomimimo.com/v1"
+    MIMO_ASR_MODEL: str = "mimo-v2.5-asr"
+    MIMO_ASR_LANGUAGE: str = "auto"
+    MIMO_ASR_MAX_SECONDS: int = 120
     MIMO_TTS_ENABLED: bool = False
     MIMO_API_KEY: str = ""
     MIMO_TTS_BASE_URL: str = "https://api.xiaomimimo.com/v1"
@@ -134,9 +151,12 @@ class Settings(BaseSettings):
     MINIMAX_API_KEY: str = ""
     MINIMAX_GROUP_ID: str = ""
     MINIMAX_TTS_URL: str = "https://api.minimaxi.com/v1/t2a_v2"
-    MINIMAX_TTS_MODEL: str = "speech-02-hd"
+    MINIMAX_TTS_MODEL: str = "speech-2.8-turbo"
     MINIMAX_TTS_VOICE_ID: str = "male-qn-qingse"
     MINIMAX_TTS_SPEED: float = 1.0
+    MINIMAX_VOICE_CLONE_UPLOAD_URL: str = "https://api.minimaxi.com/v1/files/upload"
+    MINIMAX_VOICE_CLONE_URL: str = "https://api.minimaxi.com/v1/voice_clone"
+    MINIMAX_VOICE_CLONE_SOURCE: str = ""
 
     # ── 讯飞 2D 虚拟人（数字人）—— 独立 App，与上面的智文/TTS 不是同一套凭证 ──
     IFLYTEK_AVATAR_APPID: str = ""

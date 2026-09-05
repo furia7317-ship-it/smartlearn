@@ -414,6 +414,9 @@ async def clear_long_term_agent_memory(
         delete(MemoryEpisode).where(MemoryEpisode.student_id == student_id)
     )
     await db.commit()
+    from app.services.episodic_memory_index import delete_student_episode_index
+
+    await delete_student_episode_index(student_id)
     return {
         "deleted": True,
         "semantic_facts": int(facts_result.rowcount or 0),
@@ -438,8 +441,11 @@ async def list_memory_episodes(
             "id": row.id,
             "conversation_id": row.conversation_id,
             "summary": row.summary,
+            "structured_summary": row.structured_summary,
             "keywords": row.keywords,
             "importance": row.importance,
+            "source_start_index": row.source_start_index,
+            "source_end_index": row.source_end_index,
             "source_message_count": row.source_message_count,
             "estimated_tokens": row.estimated_tokens,
             "occurred_at": row.occurred_at,

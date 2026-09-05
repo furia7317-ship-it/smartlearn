@@ -55,6 +55,19 @@ def test_chat_request_validates_teacher_persona() -> None:
         )
 
 
+def test_chat_request_validates_response_mode() -> None:
+    from app.schemas.chat import ChatRequest
+
+    assert ChatRequest(student_id="student-1", message="hello").response_mode == "text"
+    assert ChatRequest(
+        student_id="student-1",
+        message="hello",
+        response_mode="voice",
+    ).response_mode == "voice"
+    with pytest.raises(ValidationError):
+        ChatRequest(student_id="student-1", message="hello", response_mode="video")
+
+
 @pytest.mark.asyncio
 async def test_chat_router_copies_history_into_graph_state(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.routers import chat as chat_router

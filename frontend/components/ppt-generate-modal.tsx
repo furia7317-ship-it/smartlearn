@@ -32,7 +32,9 @@ export function PptGenerateModal({
   item: ResourceItem | null;
   onClose: () => void;
 }) {
-  const { mode } = useOrchestratorContext();
+  const { mode } = useOrchestratorContext((state) => ({
+    mode: state.mode,
+  }));
   const [provider, setProvider] = useState<"zhiwen" | "builtin">("builtin");
   const [templates, setTemplates] = useState<PptTemplate[]>([]);
   const [style, setStyle] = useState<string>("全部");
@@ -201,7 +203,6 @@ export function PptGenerateModal({
                   >
                     {/* 缩略图 */}
                     {t.thumbnail ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={t.thumbnail}
                         alt={t.style || "模板"}

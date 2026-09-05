@@ -1,4 +1,4 @@
-"""Hybrid RAG retrieval with versioned Chroma indexes and auditable fallback."""
+"""Hybrid RAG retrieval with versioned Chroma indexes and strict vector availability."""
 
 from __future__ import annotations
 
@@ -10,9 +10,11 @@ import re
 import sqlite3
 import sys
 import time
+import threading
 import unicodedata
 from collections import Counter
 from contextlib import contextmanager
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -29,11 +31,16 @@ _client = None
 _embedder = None
 _embedder_error = ""
 _embedder_error_at = 0.0
+_reranker = None
+_reranker_error = ""
+_reranker_error_at = 0.0
 _document_cache_key: tuple[Any, ...] | None = None
 _document_cache: list[dict[str, Any]] = []
 _model_identity_cache: tuple[tuple[Any, ...], str] | None = None
+_embedder_lock = threading.Lock()
 
 _BGE_QUERY_INSTRUCTION = "为这个句子生成表示以用于检索相关文章："
+_EMBEDDING_PROTOCOL_VERSION = "contextual-prefix-v1"
 _INDEX_MANIFEST_NAME = "knowledge-index.json"
 _QUERY_ALIASES: tuple[tuple[str, str], ...] = (
     ("computer science curriculum", "计算机科学课程体系"),
@@ -102,6 +109,13 @@ def _get_client():
 
 
 def _get_embedder():
+    # Concurrent cold searches must share one model instance. The model,
+    # tokenizer, normalization and retrieval protocol remain unchanged.
+    with _embedder_lock:
+        return _load_embedder()
+
+
+def _load_embedder():
     """Load the local embedding model once and cache failures briefly."""
 
     global _embedder, _embedder_error, _embedder_error_at
@@ -126,6 +140,36 @@ def _get_embedder():
         _embedder_error = f"local embedding model unavailable: {exc}"
         _embedder_error_at = time.monotonic()
         raise RetrievalUnavailable(_embedder_error) from exc
+
+
+def _get_reranker():
+    """Load an optional local CrossEncoder without making base retrieval depend on it."""
+
+    global _reranker, _reranker_error, _reranker_error_at
+    configured = str(settings.RAG_RERANKER_MODEL or "").strip()
+    if not configured:
+        return None
+    if _reranker is not None:
+        return _reranker
+    retry_seconds = max(1.0, float(settings.RAG_RERANKER_RETRY_SECONDS))
+    if _reranker_error and time.monotonic() - _reranker_error_at < retry_seconds:
+        raise RuntimeError(_reranker_error)
+
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+    try:
+        from sentence_transformers import CrossEncoder
+
+        _reranker = CrossEncoder(
+            _reranker_model_reference(),
+            local_files_only=True,
+        )
+        _reranker_error = ""
+        return _reranker
+    except Exception as exc:
+        _reranker_error = f"local reranker model unavailable: {exc}"
+        _reranker_error_at = time.monotonic()
+        raise RuntimeError(_reranker_error) from exc
 
 
 def _embedding_model_reference() -> str:
@@ -153,6 +197,34 @@ def _embedding_model_reference() -> str:
         if candidate.is_dir() and (candidate / "modules.json").is_file():
             return str(candidate.resolve())
     return str(settings.EMBEDDING_MODEL)
+
+
+def _reranker_model_reference() -> str:
+    """Resolve an optional reranker from an explicit or packaged local directory."""
+
+    configured_value = str(settings.RAG_RERANKER_MODEL or "").strip()
+    configured = Path(configured_value).expanduser()
+    if configured.is_dir():
+        return str(configured.resolve())
+    backend_root = Path(__file__).resolve().parents[2]
+    workspace_root = backend_root.parent
+    model_name = configured_value.rstrip("/\\").split("/")[-1]
+    candidates = (
+        backend_root / "models" / model_name,
+        workspace_root / "frontend" / "runtime" / "assets" / "models" / model_name,
+        workspace_root
+        / "frontend"
+        / "dist-electron"
+        / "win-unpacked"
+        / "resources"
+        / "assets"
+        / "models"
+        / model_name,
+    )
+    for candidate in candidates:
+        if candidate.is_dir() and (candidate / "config.json").is_file():
+            return str(candidate.resolve())
+    return configured_value
 
 
 def _embedding_model_identity() -> str:
@@ -186,11 +258,15 @@ def reset_rag_runtime() -> None:
     """Reset cached runtime state after configuration/model changes."""
 
     global _client, _embedder, _embedder_error, _embedder_error_at
+    global _reranker, _reranker_error, _reranker_error_at
     global _document_cache_key, _document_cache, _model_identity_cache
     _client = None
     _embedder = None
     _embedder_error = ""
     _embedder_error_at = 0.0
+    _reranker = None
+    _reranker_error = ""
+    _reranker_error_at = 0.0
     _document_cache_key = None
     _document_cache = []
     _model_identity_cache = None
@@ -198,9 +274,41 @@ def reset_rag_runtime() -> None:
 
 def _query_text(query: str) -> str:
     query = _expand_query(query)
-    if "bge" in str(settings.EMBEDDING_MODEL).lower():
+    model_name = str(settings.EMBEDDING_MODEL).lower()
+    if "bge" in model_name:
         return _BGE_QUERY_INSTRUCTION + query
+    if "e5" in model_name:
+        return f"query: {query}"
     return query
+
+
+def _document_context_text(document: dict[str, Any]) -> str:
+    metadata = document.get("metadata", {})
+    if not isinstance(metadata, dict):
+        metadata = {}
+    content = str(document.get("content") or "").strip()
+    values = (
+        metadata.get("document_title"),
+        metadata.get("section_title") or metadata.get("title"),
+        content,
+    )
+    parts: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        normalized = str(value or "").strip()
+        if normalized and normalized not in seen:
+            parts.append(normalized)
+            seen.add(normalized)
+    return "\n".join(parts)
+
+
+def _document_embedding_text(document: dict[str, Any]) -> str:
+    """Embed document and section context while keeping the displayed Chunk unchanged."""
+
+    contextual = _document_context_text(document)
+    if "e5" in str(settings.EMBEDDING_MODEL).lower():
+        return f"passage: {contextual}"
+    return contextual
 
 
 def _expand_query(query: str) -> str:
@@ -366,6 +474,21 @@ def _query_anchor_match(query: str, searchable: str) -> bool:
     return bool(english and english.intersection(_search_tokens(searchable)))
 
 
+@lru_cache(maxsize=1)
+def _lexical_corpus(searchable_values: tuple[str, ...]):
+    token_lists = tuple(_search_tokens(value) for value in searchable_values)
+    document_frequencies: Counter[str] = Counter()
+    for tokens in token_lists:
+        document_frequencies.update(set(tokens))
+    return (
+        token_lists,
+        document_frequencies,
+        sum(map(len, token_lists)) / max(1, len(token_lists)),
+        tuple(Counter(tokens) for tokens in token_lists),
+        tuple(_compact(value) for value in searchable_values),
+    )
+
+
 def _lexical_retrieve(query: str, n_results: int) -> list[dict[str, Any]]:
     documents = _markdown_chunks()
     if not documents or not query.strip():
@@ -373,23 +496,20 @@ def _lexical_retrieve(query: str, n_results: int) -> list[dict[str, Any]]:
 
     expanded_query = _expand_query(query)
 
-    searchable_values = [
+    searchable_values = tuple(
         f"{doc.get('metadata', {}).get('source', '')}\n{doc.get('metadata', {}).get('title', '')}\n{doc.get('content', '')}"
         for doc in documents
-    ]
-    token_lists = [_search_tokens(value) for value in searchable_values]
-    document_frequencies: Counter[str] = Counter()
-    for tokens in token_lists:
-        document_frequencies.update(set(tokens))
+    )
+    token_lists, document_frequencies, average_length, term_counts, compact_values = _lexical_corpus(searchable_values)
     query_tokens = list(dict.fromkeys(_search_tokens(expanded_query)))
     if not query_tokens:
         return []
-    average_length = sum(map(len, token_lists)) / max(1, len(token_lists))
     query_compact = _compact(expanded_query)
     ranked: list[tuple[float, dict[str, Any]]] = []
 
-    for document, searchable, tokens in zip(documents, searchable_values, token_lists, strict=True):
-        frequencies = Counter(tokens)
+    for document, searchable, tokens, frequencies, compact_searchable in zip(
+        documents, searchable_values, token_lists, term_counts, compact_values, strict=True,
+    ):
         score = 0.0
         for token in query_tokens:
             frequency = frequencies.get(token, 0)
@@ -400,7 +520,6 @@ def _lexical_retrieve(query: str, n_results: int) -> list[dict[str, Any]]:
             denominator = frequency + 1.5 * (1 - 0.75 + 0.75 * len(tokens) / max(1.0, average_length))
             score += inverse_frequency * frequency * 2.5 / denominator
 
-        compact_searchable = _compact(searchable)
         title_match = any(
             segment and segment in query_compact
             for segment in _topic_segments(document.get("metadata", {}))
@@ -417,7 +536,7 @@ def _lexical_retrieve(query: str, n_results: int) -> list[dict[str, Any]]:
         if score <= 0:
             continue
         authoritative = title_match or exact_phrase or (anchor_match and score >= 5.0)
-        fallback_score = (
+        lexical_score = (
             100.0 + score
             if title_match
             else 50.0 + score
@@ -433,12 +552,12 @@ def _lexical_retrieve(query: str, n_results: int) -> list[dict[str, Any]]:
                     **document,
                     "distance": round(1 / (score + 1), 6),
                     "bm25_score": round(score, 6),
-                    "fallback_score": round(fallback_score, 6),
+                    "lexical_score": round(lexical_score, 6),
                     "exact_match": exact_phrase,
                     "title_match": title_match,
                     "authoritative_match": authoritative,
                     "retrieval_source": "markdown",
-                    "retrieval_mode": "lexical_degraded",
+                    "retrieval_mode": "lexical_candidate",
                 },
             )
         )
@@ -447,14 +566,6 @@ def _lexical_retrieve(query: str, n_results: int) -> list[dict[str, Any]]:
     for index, doc in enumerate(docs, 1):
         doc["lexical_rank"] = index
     return docs
-
-
-def _fallback_retrieve(query: str, n_results: int) -> list[dict[str, Any]]:
-    return _lexical_retrieve(query, n_results)
-
-
-def _fallback_retrieve_for_gate(query: str, n_results: int) -> list[dict[str, Any]]:
-    return _lexical_retrieve(query, n_results)
 
 
 def _vector_retrieve(query: str, n_results: int, collection_name: str) -> list[dict[str, Any]]:
@@ -486,10 +597,9 @@ def _candidate_key(document: dict[str, Any]) -> str:
     return f"{source}\0{content}"
 
 
-def _merge_candidates(
+def _rank_candidates(
     vector_docs: list[dict[str, Any]],
     lexical_docs: list[dict[str, Any]],
-    n_results: int,
 ) -> list[dict[str, Any]]:
     candidates: dict[str, dict[str, Any]] = {}
     scores: Counter[str] = Counter()
@@ -505,7 +615,7 @@ def _merge_candidates(
             merged = candidates[key]
             for field in (
                 "bm25_score",
-                "fallback_score",
+                "lexical_score",
                 "exact_match",
                 "title_match",
                 "authoritative_match",
@@ -533,11 +643,119 @@ def _merge_candidates(
         )
     )
 
+    return ranked
+
+
+def _metadata_int(document: dict[str, Any], key: str) -> int | None:
+    metadata = document.get("metadata", {})
+    if not isinstance(metadata, dict) or metadata.get(key) is None:
+        return None
+    try:
+        return int(metadata[key])
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_redundant_chunk(candidate: dict[str, Any], selected: dict[str, Any]) -> bool:
+    candidate_metadata = candidate.get("metadata", {})
+    selected_metadata = selected.get("metadata", {})
+    if not isinstance(candidate_metadata, dict) or not isinstance(selected_metadata, dict):
+        return False
+    candidate_source = str(candidate_metadata.get("source") or "")
+    selected_source = str(selected_metadata.get("source") or "")
+    if not candidate_source or candidate_source != selected_source:
+        return False
+
+    candidate_sequence = _metadata_int(candidate, "sequence_index")
+    selected_sequence = _metadata_int(selected, "sequence_index")
+    if (
+        candidate_sequence is not None
+        and selected_sequence is not None
+        and abs(candidate_sequence - selected_sequence) <= 1
+    ):
+        return True
+
+    candidate_start = _metadata_int(candidate, "start_offset")
+    candidate_end = _metadata_int(candidate, "end_offset")
+    selected_start = _metadata_int(selected, "start_offset")
+    selected_end = _metadata_int(selected, "end_offset")
+    if None in {candidate_start, candidate_end, selected_start, selected_end}:
+        return False
+    assert candidate_start is not None and candidate_end is not None
+    assert selected_start is not None and selected_end is not None
+    overlap = max(0, min(candidate_end, selected_end) - max(candidate_start, selected_start))
+    shorter = min(candidate_end - candidate_start, selected_end - selected_start)
+    return shorter > 0 and overlap / shorter >= 0.15
+
+
+def _rerank_candidates(
+    query: str,
+    ranked: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    configured = str(settings.RAG_RERANKER_MODEL or "").strip()
+    diagnostics = {
+        "reranker_configured": bool(configured),
+        "reranker_used": False,
+        "reranker_model": configured,
+        "reranker_candidates": 0,
+        "reranker_error": "",
+    }
+    if not configured or not ranked:
+        return ranked, diagnostics
+
+    candidate_count = min(
+        len(ranked),
+        max(1, int(settings.RAG_RERANKER_CANDIDATES)),
+    )
+    candidates = [dict(document) for document in ranked[:candidate_count]]
+    try:
+        model = _get_reranker()
+        if model is None:
+            return ranked, diagnostics
+        predictions = model.predict(
+            [(query, _document_context_text(document)) for document in candidates]
+        )
+        raw_scores = predictions.tolist() if hasattr(predictions, "tolist") else list(predictions)
+        if not isinstance(raw_scores, list) or len(raw_scores) != len(candidates):
+            raise RuntimeError("reranker returned an unexpected score shape")
+        for index, (document, raw_score) in enumerate(zip(candidates, raw_scores, strict=True), 1):
+            value = float(raw_score)
+            normalized = 1.0 / (1.0 + math.exp(-max(-60.0, min(60.0, value))))
+            document["pre_rerank_rank"] = index
+            document["reranker_score"] = round(normalized, 8)
+        candidates.sort(
+            key=lambda item: (
+                -float(item.get("reranker_score") or 0.0),
+                -float(item.get("rrf_score") or 0.0),
+                str(item.get("id") or ""),
+            )
+        )
+    except Exception as exc:
+        diagnostics["reranker_error"] = str(exc)[:240]
+        return ranked, diagnostics
+
+    diagnostics["reranker_used"] = True
+    diagnostics["reranker_candidates"] = candidate_count
+    return [*candidates, *ranked[candidate_count:]], diagnostics
+
+
+def _select_diverse_candidates(
+    ranked: list[dict[str, Any]],
+    n_results: int,
+) -> tuple[list[dict[str, Any]], int]:
+    if n_results <= 0:
+        return [], 0
     max_per_source = max(1, int(settings.RAG_MAX_RESULTS_PER_SOURCE))
     selected: list[dict[str, Any]] = []
     deferred: list[dict[str, Any]] = []
     used_sources: Counter[str] = Counter()
+    filtered = 0
     for document in ranked:
+        if bool(settings.RAG_ADJACENT_CHUNK_DEDUP) and any(
+            _is_redundant_chunk(document, previous) for previous in selected
+        ):
+            filtered += 1
+            continue
         source = str(document.get("metadata", {}).get("source") or document.get("id") or "")
         if used_sources[source] >= max_per_source:
             deferred.append(document)
@@ -545,11 +763,30 @@ def _merge_candidates(
         selected.append(document)
         used_sources[source] += 1
         if len(selected) >= n_results:
-            return selected
+            return selected, filtered
     for document in deferred:
+        if bool(settings.RAG_ADJACENT_CHUNK_DEDUP) and any(
+            _is_redundant_chunk(document, previous) for previous in selected
+        ):
+            filtered += 1
+            continue
         selected.append(document)
         if len(selected) >= n_results:
             break
+    return selected, filtered
+
+
+def _merge_candidates(
+    vector_docs: list[dict[str, Any]],
+    lexical_docs: list[dict[str, Any]],
+    n_results: int,
+) -> list[dict[str, Any]]:
+    """Compatibility helper used by tests and older callers without reranking."""
+
+    selected, _ = _select_diverse_candidates(
+        _rank_candidates(vector_docs, lexical_docs),
+        n_results,
+    )
     return selected
 
 
@@ -567,33 +804,40 @@ def _retrieve_internal(
             "lexical_candidates": 0,
             "vector_available": _embedder is not None,
             "vector_error": "",
+            "adjacent_chunks_filtered": 0,
+            "reranker_configured": bool(str(settings.RAG_RERANKER_MODEL or "").strip()),
+            "reranker_used": False,
+            "reranker_model": str(settings.RAG_RERANKER_MODEL or "").strip(),
+            "reranker_candidates": 0,
+            "reranker_error": "",
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
         }
-    lexical_count = max(n_results, int(settings.RAG_LEXICAL_CANDIDATES))
     vector_count = max(n_results, int(settings.RAG_VECTOR_CANDIDATES))
-    lexical_docs = _lexical_retrieve(query, lexical_count)
-    vector_docs: list[dict[str, Any]] = []
-    vector_error = ""
     try:
         vector_docs = _vector_retrieve(query, vector_count, collection_name)
     except Exception as exc:
-        vector_error = str(exc)
+        raise RetrievalUnavailable("vector retrieval unavailable") from exc
+    if not vector_docs:
+        raise RetrievalUnavailable("vector index returned no candidates")
 
-    if vector_docs:
-        docs = _merge_candidates(vector_docs, lexical_docs, n_results)
-        mode = "hybrid" if lexical_docs else "vector"
-    else:
-        docs = lexical_docs[:n_results]
-        mode = "lexical_degraded"
-        for doc in docs:
-            doc["retrieval_mode"] = mode
+    lexical_count = max(n_results, int(settings.RAG_LEXICAL_CANDIDATES))
+    try:
+        lexical_docs = _lexical_retrieve(query, lexical_count)
+    except MarkdownKnowledgeUnavailable:
+        lexical_docs = []
+    ranked = _rank_candidates(vector_docs, lexical_docs)
+    reranked, reranker_diagnostics = _rerank_candidates(query, ranked)
+    docs, adjacent_chunks_filtered = _select_diverse_candidates(reranked, n_results)
+    mode = "hybrid" if lexical_docs else "vector"
     diagnostics = {
         "mode": mode,
         "index_version": str(_read_manifest().get("fingerprint") or "legacy"),
         "vector_candidates": len(vector_docs),
         "lexical_candidates": len(lexical_docs),
-        "vector_available": bool(vector_docs) or not vector_error,
-        "vector_error": vector_error[:240],
+        "vector_available": True,
+        "vector_error": "",
+        "adjacent_chunks_filtered": adjacent_chunks_filtered,
+        **reranker_diagnostics,
         "latency_ms": round((time.perf_counter() - started) * 1000, 3),
     }
     for doc in docs:
@@ -637,13 +881,15 @@ def add_documents(
     collection = get_or_create_collection(collection_name)
     ids = [str(document["id"]) for document in docs]
     texts = [str(document["content"]) for document in docs]
+    embedding_texts = [_document_embedding_text(document) for document in docs]
     cleaned_metadatas: list[dict[str, str | int | float | bool]] = []
-    for document in docs:
+    for index, document in enumerate(docs):
         cleaned: dict[str, str | int | float | bool] = {}
         for key, value in document.get("metadata", {}).items():
             cleaned[key] = value if isinstance(value, (str, int, float, bool)) else str(value)
+        cleaned.setdefault("sequence_index", index)
         cleaned_metadatas.append(cleaned)
-    embeddings = embedder.encode(texts, normalize_embeddings=True).tolist()
+    embeddings = embedder.encode(embedding_texts, normalize_embeddings=True).tolist()
     collection.upsert(
         ids=ids,
         documents=texts,
@@ -659,7 +905,8 @@ def build_knowledge_index(force: bool = False) -> dict[str, Any]:
     documents = load_knowledge_documents(settings.KNOWLEDGE_DIR)
     expected_sources = source_counts(documents)
     model_identity = _embedding_model_identity()
-    fingerprint = knowledge_fingerprint(settings.KNOWLEDGE_DIR, model_identity)
+    embedding_identity = f"{model_identity}:{_EMBEDDING_PROTOCOL_VERSION}"
+    fingerprint = knowledge_fingerprint(settings.KNOWLEDGE_DIR, embedding_identity)
     collection_name = f"knowledge_{fingerprint[:16]}"
     manifest = _read_manifest()
     if not force and manifest.get("fingerprint") == fingerprint:
@@ -688,6 +935,7 @@ def build_knowledge_index(force: bool = False) -> dict[str, Any]:
             "hnsw:space": "cosine",
             "fingerprint": fingerprint[:32],
             "chunker_version": CHUNKER_VERSION,
+            "embedding_protocol": _EMBEDDING_PROTOCOL_VERSION,
         },
     )
 
@@ -695,7 +943,8 @@ def build_knowledge_index(force: bool = False) -> dict[str, Any]:
     for offset in range(0, len(documents), batch_size):
         batch = documents[offset : offset + batch_size]
         texts = [str(document["content"]) for document in batch]
-        embeddings = embedder.encode(texts, normalize_embeddings=True).tolist()
+        embedding_texts = [_document_embedding_text(document) for document in batch]
+        embeddings = embedder.encode(embedding_texts, normalize_embeddings=True).tolist()
         collection.upsert(
             ids=[str(document["id"]) for document in batch],
             documents=texts,
@@ -721,6 +970,7 @@ def build_knowledge_index(force: bool = False) -> dict[str, Any]:
         "fingerprint": fingerprint,
         "embedding_model": settings.EMBEDDING_MODEL,
         "embedding_model_identity": model_identity,
+        "embedding_protocol": _EMBEDDING_PROTOCOL_VERSION,
         "chunker_version": CHUNKER_VERSION,
         "chunks": len(documents),
         "source_counts": expected_sources,
@@ -740,7 +990,10 @@ def build_knowledge_index(force: bool = False) -> dict[str, Any]:
 def get_retrieval_health(*, load_model: bool = False) -> dict[str, Any]:
     documents = _markdown_chunks()
     expected_sources = source_counts(documents)
-    expected_fingerprint = knowledge_fingerprint(settings.KNOWLEDGE_DIR, _embedding_model_identity())
+    expected_fingerprint = knowledge_fingerprint(
+        settings.KNOWLEDGE_DIR,
+        f"{_embedding_model_identity()}:{_EMBEDDING_PROTOCOL_VERSION}",
+    )
     manifest = _read_manifest()
     active_name = str(manifest.get("active_collection") or "knowledge")
     actual_count = 0
@@ -767,6 +1020,10 @@ def get_retrieval_health(*, load_model: bool = False) -> dict[str, Any]:
         except RetrievalUnavailable as exc:
             model_error = str(exc)
 
+    reranker_model = str(settings.RAG_RERANKER_MODEL or "").strip()
+    reranker_available = _reranker is not None
+    reranker_error = _reranker_error
+
     complete = (
         actual_count == len(documents)
         and actual_sources == set(expected_sources)
@@ -774,10 +1031,16 @@ def get_retrieval_health(*, load_model: bool = False) -> dict[str, Any]:
     )
     return {
         "status": "ready" if model_available and complete else "degraded",
-        "retrieval_mode": "hybrid" if model_available and complete else "lexical_degraded",
+        "retrieval_mode": "hybrid" if model_available and complete else "unavailable",
         "model_available": model_available,
         "model": settings.EMBEDDING_MODEL,
         "model_error": model_error[:240],
+        "embedding_protocol": _EMBEDDING_PROTOCOL_VERSION,
+        "adjacent_chunk_dedup": bool(settings.RAG_ADJACENT_CHUNK_DEDUP),
+        "reranker_configured": bool(reranker_model),
+        "reranker_available": reranker_available,
+        "reranker_model": reranker_model,
+        "reranker_error": reranker_error[:240],
         "index_complete": complete,
         "active_collection": active_name,
         "index_version": str(manifest.get("fingerprint") or "legacy"),
@@ -803,7 +1066,10 @@ def retrieve_with_diagnostics(
             "content": str(document.get("content") or "")[:200],
             "metadata": document.get("metadata", {}),
             "retrieval_source": document.get("retrieval_source"),
-            "score": document.get("rrf_score", document.get("bm25_score")),
+            "score": document.get(
+                "reranker_score",
+                document.get("rrf_score", document.get("bm25_score")),
+            ),
         }
         for index, document in enumerate(docs, 1)
     ]

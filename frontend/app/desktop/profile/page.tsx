@@ -100,7 +100,16 @@ function evidenceIcon(kind: ProfileEvidenceRow["kind"]) {
 
 export default function DesktopProfilePage() {
   const { user } = useAuth();
-  const orchestrator = useOrchestratorContext();
+  const orchestrator = useOrchestratorContext((state) => ({
+    profile: state.profile,
+    practiceAttempts: state.practiceAttempts,
+    taskEvidence: state.taskEvidence,
+    completedMaterials: state.completedMaterials,
+    watchedVideos: state.watchedVideos,
+    subjectPaths: state.subjectPaths,
+    hydrated: state.hydrated,
+    mode: state.mode,
+  }));
   const localSettings = useUserSettings();
   const reducedMotion = useReducedMotion();
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");

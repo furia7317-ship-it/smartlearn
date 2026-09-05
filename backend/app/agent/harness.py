@@ -322,6 +322,11 @@ class AgentHarness:
         }
         if self.tool_schemas:
             kwargs["tools"] = self.tool_schemas
+        if self.provider_id == "mimo":
+            # MiMo thinking output must be replayed on later tool turns. The harness
+            # intentionally does not retain private reasoning, so disable it and keep
+            # the tool loop stateless and protocol-compliant.
+            kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
 
         stream = await self.client.chat.completions.create(**kwargs)
 
@@ -826,6 +831,12 @@ def _external_input_narrative(input_items: list[dict[str, Any]]) -> str:
             raw_user = item.get("content")
             if isinstance(raw_user, str):
                 compact = " ".join(raw_user.split())
+            elif isinstance(raw_user, list):
+                compact = " ".join(
+                    str(part.get("text") or "").strip()
+                    for part in raw_user
+                    if isinstance(part, dict) and part.get("type") == "text"
+                ).strip()
             else:
                 compact = ""
             if compact:

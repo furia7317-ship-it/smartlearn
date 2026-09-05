@@ -52,12 +52,44 @@ test("desktop shell keeps account identity at the bottom of the rail and mounts 
   assert.match(launcher, /window\.addEventListener\("pointerup", onWindowPointerEnd\)/);
   assert.match(launcher, /onDragStart=\{\(event\) => event\.preventDefault\(\)\}/);
   assert.match(launcher, /draggable=\{false\}/);
-  assert.match(launcher, /aria-label="拖动智能教师窗口"/);
-  assert.match(launcher, /data-teacher-drag-handle/);
+  assert.doesNotMatch(launcher, /aria-label="拖动智能教师窗口"/);
+  assert.doesNotMatch(launcher, /data-teacher-drag-handle/);
+  assert.doesNotMatch(launcher, /GripHorizontal/);
+  assert.match(launcher, /ml-auto w-fit min-w-12 max-w-\[82%\]/);
   assert.match(launcher, /grid size-16/);
   assert.match(launcher, /拖动气泡，点击提问/);
+  assert.match(launcher, /const TeacherMessageList = memo\(forwardRef/);
+  assert.match(launcher, /const recentMessages = useMemo/);
+  assert.match(launcher, /previewPosition\(clampTeacherLauncherPosition/);
+  assert.match(launcher, /node\.style\.left = `\$\{next\.left\}px`/);
+  assert.match(launcher, /dragFrameRef\.current = window\.requestAnimationFrame/);
+  assert.match(launcher, /event\.target instanceof Element/);
+  assert.doesNotMatch(launcher, /event\.target instanceof HTMLElement/);
+  assert.match(launcher, /<AnimatePresence initial=\{false\}>/);
+  assert.match(launcher, /layout="size"/);
+  assert.match(launcher, /CONTROL_BUTTON_CLASS/);
+  assert.doesNotMatch(launcher, /transition-\[width,height\]/);
   assert.doesNotMatch(launcher, /min-w-\[330px\]/);
   assert.doesNotMatch(launcher, /教师会结合当前课程、学习路径和已经生成的资料回答/);
+});
+
+test("teacher window actions do not repaint unrelated desktop consumers", async () => {
+  const [provider, practice, viewer, voice] = await Promise.all([
+    read("../components/desktop/teacher-window-provider.tsx"),
+    read("../components/desktop/desktop-practice.tsx"),
+    read("../components/resource-viewer.tsx"),
+    read("../components/voice-call-control.tsx"),
+  ]);
+
+  assert.match(provider, /TeacherWindowActionsContext/);
+  assert.match(provider, /TeacherWindowOpenContext/);
+  assert.match(provider, /export function useTeacherWindowActions/);
+  assert.match(provider, /export function useTeacherWindowOpen/);
+  assert.match(provider, /const \{ openTeacher \} = useTeacherWindowActions\(\)/);
+  assert.match(practice, /useTeacherWindowActions/);
+  assert.match(viewer, /useTeacherWindowOpen/);
+  assert.match(voice, /AnimatePresence/);
+  assert.match(voice, /VOICE_ACTION_CLASS/);
 });
 
 test("path keeps the knowledge canvas visible beside the node resource drawer", async () => {

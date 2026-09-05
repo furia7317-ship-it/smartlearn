@@ -63,9 +63,10 @@ async def upload_chat_attachment(file: UploadFile = File(...)):
     except AttachmentExtractionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     payload["id"] = f"attachment_{hashlib.sha256(data).hexdigest()[:16]}"
-    # Recognition has already happened. Do not send multi-megabyte image bytes
-    # back through the browser and then charge the provider a second time.
-    payload["image_data"] = ""
+    # Image bytes are returned only in this transient upload response and are
+    # never copied into persisted conversation history. The following chat
+    # request sends them directly to MiMo V2.5 native multimodal input.
+    payload.setdefault("image_data", "")
     return payload
 
 

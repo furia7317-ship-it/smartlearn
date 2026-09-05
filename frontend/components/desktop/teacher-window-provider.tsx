@@ -31,7 +31,12 @@ export interface TeacherWindowValue {
   clearContext: () => void;
 }
 
-const TeacherWindowContextState = createContext<TeacherWindowValue | null>(null);
+type TeacherWindowStateValue = Pick<TeacherWindowValue, "open" | "wide" | "draft" | "context">;
+type TeacherWindowActionsValue = Omit<TeacherWindowValue, keyof TeacherWindowStateValue>;
+
+const TeacherWindowStateContext = createContext<TeacherWindowStateValue | null>(null);
+const TeacherWindowActionsContext = createContext<TeacherWindowActionsValue | null>(null);
+const TeacherWindowOpenContext = createContext<boolean | null>(null);
 
 function TeacherWindowQuerySync({ onOpen }: { onOpen: () => void }) {
   const pathname = usePathname();
@@ -69,34 +74,60 @@ export function TeacherWindowProvider({ children }: { children: ReactNode }) {
     setContext(null);
   }, [pathname]);
 
-  const value = useMemo<TeacherWindowValue>(() => ({
+  const stateValue = useMemo<TeacherWindowStateValue>(() => ({
     open,
     wide,
     draft,
     context,
+  }), [context, draft, open, wide]);
+  const actionsValue = useMemo<TeacherWindowActionsValue>(() => ({
     openTeacher,
     minimizeTeacher,
     toggleWide,
     setDraft,
     clearContext,
-  }), [clearContext, context, draft, minimizeTeacher, open, openTeacher, toggleWide, wide]);
+  }), [clearContext, minimizeTeacher, openTeacher, toggleWide]);
 
   return (
-    <TeacherWindowContextState.Provider value={value}>
-      {children}
-      <Suspense fallback={null}>
-        <TeacherWindowQuerySync onOpen={openTeacherFromQuery} />
-      </Suspense>
-    </TeacherWindowContextState.Provider>
+    <TeacherWindowActionsContext.Provider value={actionsValue}>
+      <TeacherWindowOpenContext.Provider value={open}>
+        <TeacherWindowStateContext.Provider value={stateValue}>
+          {children}
+          <Suspense fallback={null}>
+            <TeacherWindowQuerySync onOpen={openTeacherFromQuery} />
+          </Suspense>
+        </TeacherWindowStateContext.Provider>
+      </TeacherWindowOpenContext.Provider>
+    </TeacherWindowActionsContext.Provider>
   );
 }
 
 export function useTeacherWindow(): TeacherWindowValue {
-  const value = useContext(TeacherWindowContextState);
+  const state = useContext(TeacherWindowStateContext);
+  const actions = useContext(TeacherWindowActionsContext);
+  const value = useMemo(() => state && actions ? { ...state, ...actions } : null, [actions, state]);
   if (!value) {
     throw new Error("useTeacherWindow 必须在 <TeacherWindowProvider> 内使用");
   }
   return value;
+}
+
+/** Read stable window actions without subscribing the caller to draft/window state. */
+export function useTeacherWindowActions(): TeacherWindowActionsValue {
+  const actions = useContext(TeacherWindowActionsContext);
+  if (!actions) {
+    throw new Error("useTeacherWindowActions 必须在 <TeacherWindowProvider> 内使用");
+  }
+  return actions;
+}
+
+/** Subscribe only to the open flag, avoiding updates from draft and size changes. */
+export function useTeacherWindowOpen(): boolean {
+  const open = useContext(TeacherWindowOpenContext);
+  if (open === null) {
+    throw new Error("useTeacherWindowOpen 必须在 <TeacherWindowProvider> 内使用");
+  }
+  return open;
 }
 
 export type TeacherOpenButtonProps = ComponentPropsWithoutRef<"button"> & {
@@ -111,7 +142,7 @@ export function TeacherOpenButton({
   type = "button",
   ...props
 }: TeacherOpenButtonProps) {
-  const { openTeacher } = useTeacherWindow();
+  const { openTeacher } = useTeacherWindowActions();
 
   return (
     <button

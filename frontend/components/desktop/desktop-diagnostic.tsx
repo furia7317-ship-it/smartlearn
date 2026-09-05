@@ -98,7 +98,10 @@ function ResultChips({ title, items, tone }: { title: string; items?: string[]; 
 }
 
 export function DesktopDiagnostic() {
-  const { mode, applyAssessment } = useOrchestratorContext();
+  const { mode, applyAssessment } = useOrchestratorContext((state) => ({
+    mode: state.mode,
+    applyAssessment: state.applyAssessment,
+  }));
   const [subject, setSubject] = useState("");
   const [level, setLevel] = useState<MasteryLevel>("基础");
   const [stage, setStage] = useState<DiagnosticStage>("idle");

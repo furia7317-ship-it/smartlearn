@@ -101,10 +101,10 @@ test("resource generation chat result stays concise instead of rendering cards",
   const chat = await read("../components/chat.tsx");
 
   assert.doesNotMatch(orchestrator, /addMessage\("assistant", "resources"\)/);
-  assert.match(orchestrator, /已更新到学习路径/);
+  assert.match(await read("../lib/conversation-state.ts"), /已更新到学习路径/);
   assert.match(orchestrator, /资源中心/);
   assert.match(orchestrator, /normalizeStoredMessages/);
-  assert.match(orchestrator, /本轮协同完成：/);
+  assert.match(await read("../lib/conversation-state.ts"), /本轮协同完成：/);
   assert.doesNotMatch(chat, /m\.kind === "resources"[\s\S]*?<ResourceCard/);
   assert.doesNotMatch(chat, /m\.kind === "path"[\s\S]*?<PathBlock/);
   assert.match(chat, /生成资料已更新/);

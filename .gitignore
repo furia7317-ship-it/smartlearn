@@ -5,6 +5,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 .pytest-tmp/
+.schema-backups/
 .run/
 *.egg-info/
 

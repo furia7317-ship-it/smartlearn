@@ -1,6 +1,19 @@
 from __future__ import annotations
 
+import os
+import tempfile
+from pathlib import Path
+
 import pytest
+
+
+def pytest_configure(config):
+    """Never point a normal test invocation at the developer's database/.env."""
+    directory = Path(tempfile.mkdtemp(prefix="smartlearn-tests-"))
+    os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{directory / 'tests.sqlite'}"
+    os.environ["CHROMA_PERSIST_DIR"] = str(directory / "chroma")
+    os.environ["MEDIA_OUTPUT_DIR"] = str(directory / "media")
+    os.environ["DEBUG"] = "true"
 
 
 @pytest.fixture(autouse=True)
@@ -10,6 +23,8 @@ def disable_external_mimo_tts(monkeypatch):
     from app.core.config import settings
 
     monkeypatch.setattr(settings, "MIMO_TTS_ENABLED", False)
+    monkeypatch.setattr(settings, "MINIMAX_TTS_ENABLED", False)
+    monkeypatch.setattr(settings, "IFLYTEK_TTS_ENABLED", False)
 
 
 @pytest.fixture(autouse=True)

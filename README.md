@@ -12,7 +12,7 @@
 - **多智能体协同生成**：总控调度官分诊 → 7 个生成智能体并行扇出 → 质检审核官逐项审核（可驳回重做），全过程经 SSE 实时回传到前端。
 - **云端 LLM + 本地 RAG**：用云端大模型（DeepSeek）负责"想"，本地向量库（bge 中文嵌入 + ChromaDB）负责"查"。知识库提前准备，生成内容必须引用库内片段。
 - **真·防幻觉**：审核环节用**嵌入相似度**把每条事实性陈述与知识库溯源比对（而非字符串匹配），未对齐的内容驳回重做并标注。
-- **一份学习会话，全站联动**：对话产出的画像、资源、路径、练习成绩共用同一份会话，**跨页面切换 / 刷新都不丢**（Provider 提升到路由之上 + localStorage 持久化）。
+- **一份学习会话，全站联动**：对话产出的画像、资源、路径、练习成绩共用同一份会话。会话存入 SQLite，浏览器保留当前窗口的未同步草稿；多个窗口同时修改时保留冲突副本并显示提示。
 - **资源点开即用**：讲义（Markdown）、思维导图（可折叠 + 点节点跳章节）、题库（在线作答 + 即时评分 + 解析）、代码、拓展阅读、**应用内动画讲解播放器**（无需 ffmpeg）、课件大纲，七类资源各有专属查看器。
 - **缺什么补什么**：知识库没有的科目 → 联网找教材（博查，国内可达）/ 按专业年级智能荐书 / **未命中自动询问"下载哪一版"教材**（类 Claude 单选），下载即向量化入库。
 - **桌面端零安装依赖启动**：Electron 一体安装包自带 Python 后端 + 中文嵌入模型 + 知识库种子；需要模型生成或联网检索时仍须配置相应服务凭据并联网。
@@ -93,8 +93,10 @@
 
 ## 🛡️ 知识库与防幻觉
 
-- **嵌入模型**：`BAAI/bge-small-zh-v1.5`（中文检索，512 维），余弦空间 + 向量归一化 + bge 查询指令前缀。
-- **向量库**：ChromaDB 持久化；课程精编库由 `knowledge/` 下 10 章 Markdown 智能分块导入。
+- **嵌入模型**：`BAAI/bge-small-zh-v1.5`（中文检索，512 维），余弦空间 + 向量归一化 + bge 查询指令前缀；索引向量额外携带文档标题和章节标题，展示正文保持不变。
+- **混合检索**：Chroma 向量召回 + BM25 + RRF 融合，并抑制同一文档的相邻/重叠 Chunk；可通过本地 CrossEncoder 做候选精排。
+- **版本化索引**：课程精编库由 `knowledge/` Markdown 智能分块导入，新集合校验完整后再原子切换；模型、分块或嵌入协议变化会触发重建。
+- **检索评测**：`backend/scripts/evaluate_rag.py` 输出 Recall@K、MRR、负样本误命中率、P95 延迟和重排器状态，支持基线/重排 A/B。
 - **防幻觉**：`anti_hallucination.verify_factual_claims` 抽取陈述 → 与知识库片段计算嵌入相似度 → 低于阈值即判为未溯源（可注入 embedder 便于单测）。
 - **联网资料隔离**：博查搜索/下载的教材进**独立 `web_kb` 集合**，不污染精编库、不参与防幻觉裁判。
 - **未命中即荐版**：检索按**相关度**（非条数）判断"没这门科目"，触发 LLM 列出该科目主流教材版本供选择下载。
@@ -114,7 +116,7 @@
 - DeepSeek（云端 LLM）、讯飞 IAT/OCR/TTS、Remotion + FFmpeg（视频）、httpx + BeautifulSoup（联网抓取）
 
 **桌面端** `frontend/electron/`
-- Electron 42 + electron-builder（NSIS），自包含 Python 运行时（base CPython 核心 + venv site-packages 覆盖）+ 离线中文嵌入模型 + ChromaDB 种子
+- Electron 42 + electron-builder（NSIS），按哈希锁文件构建的独立 Python 3.11.15 运行时 + 离线中文嵌入模型 + ChromaDB 种子
 - 主进程监管后端（spawn uvicorn、健康轮询、退出杀进程树），渲染进程经 `app://` 协议加载静态前端
 
 ---
@@ -144,19 +146,27 @@ smartlearn/
 
 ## 🚀 运行方式
 
-> 前置：Node 24、Python 3.10+。后端服务凭据写入 `backend/.env`；桌面安装版也可在用户数据目录的 `backend.env` 中配置。仓库和安装包不内置服务密钥。
+> 前置：Node 24、uv、Python 3.11.15（由 uv 安装）。后端服务凭据写入 `backend/.env`；桌面安装版也可在用户数据目录的 `backend.env` 中配置。仓库和安装包不内置服务密钥。
 
 **① 开发预览**
-```bash
-# 后端
+```powershell
+# Windows / PowerShell 7：后端
 cd backend
-source .venv/bin/activate
-uvicorn app.main:app --port 8000
+uv python install 3.11.15
+uv venv --python 3.11.15
+uv pip sync --python .venv/Scripts/python.exe --require-hashes requirements-windows.lock
+# 若 .env 仍指向旧 WSL 路径，指定同一嵌入模型的本机文件目录：
+# $env:EMBEDDING_MODEL = (Resolve-Path ../frontend/runtime/assets/models/bge-small-zh-v1.5).Path
+.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 # 前端（另开一个终端）
 cd frontend
-npm install
+npm ci
 npm run dev                                    # http://localhost:3000/desktop/
 ```
+
+Linux 使用同一 Python 版本和 `requirements-linux.lock`，解释器路径为 `.venv/bin/python`。Linux 锁文件保留现有 PyTorch 版本所声明的 CUDA 依赖，下载量比 Windows 大；本次没有替换嵌入模型或改用另一套推理引擎。
+
+生产静态预览运行 `npm run build` 后执行 `npm start`，默认监听 `127.0.0.1:3000`，可通过 `PORT` 更改端口。
 
 首次使用请在登录页自行注册账户；仓库和安装包均不包含预置账号、数据库或服务密钥。
 
@@ -168,6 +178,13 @@ cd frontend && npm run app:dist                # next build + electron-builder
 
 > **模式说明**：前端启动时自动探测后端。后端在线时提供真实生成、检索、荐书与答疑；后端不可达时明确显示连接问题，不自动填充示例资源或虚构结果。
 
+**运行时与数据升级**
+
+- `prepare:python-runtime` 在独立目录安装并校验 `requirements-windows.lock`，校验通过后才切换；旧运行时保留在 `frontend/runtime/python.previous-*` 以便回退。可用 `--stage-only` 只构建，用 `--check` 检查当前运行时。
+- 更新依赖时先维护 `runtime-constraints.txt`，再用 `uv pip compile` 分别生成 Windows / Linux 的哈希锁文件；不要把开发环境的整个 `site-packages` 复制进安装包。
+- 数据库启动迁移由 `schema_migrations` 记录版本，升级前在数据库旁的 `.schema-backups/` 创建 SQLite 一致性备份；迁移失败会回滚，较旧程序拒绝打开未知的新版本结构。
+- 会话保存携带 `revision`，冲突返回 409；仅 `deleted_session_ids` 明确列出的会话会被删除。前后端应同时更新。未同步草稿按账户和窗口隔离，刷新当前窗口可恢复；关闭窗口后的草稿尚无独立恢复入口。
+
 **提交前检查**
 ```bash
 cd frontend
@@ -177,8 +194,9 @@ npx eslint app components hooks lib electron --max-warnings=0
 npm run build
 
 cd ../backend
-python -m pytest
-python -m ruff check app tests
+uv pip install --python .venv/Scripts/python.exe -e ".[dev]" -c runtime-constraints.txt
+.venv/Scripts/python.exe -m pytest
+.venv/Scripts/python.exe -m ruff check app tests
 ```
 
 ---

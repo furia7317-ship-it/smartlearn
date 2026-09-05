@@ -107,6 +107,16 @@ def chunk_plain_text(text: str, source: str, size: int = 700) -> list[dict[str, 
         chunks.append(buf)
 
     return [
-        {"content": c, "metadata": {"source": source, "char_count": len(c)}}
-        for c in chunks
+        {
+            "content": chunk,
+            "metadata": {
+                "source": source,
+                "title": source,
+                "document_title": source,
+                "section_title": source,
+                "sequence_index": index,
+                "char_count": len(chunk),
+            },
+        }
+        for index, chunk in enumerate(chunks)
     ]
