@@ -10,10 +10,7 @@ import { saveNote } from "@/lib/library";
 import { clearNoteSourceDraft, readNoteSourceDraft, type NoteSourceDraft } from "@/lib/note-draft";
 
 export function NoteWorkspace() {
-  const session = useOrchestratorContext((state) => ({
-    mode: state.mode,
-    appendResources: state.appendResources,
-  }));
+  const session = useOrchestratorContext();
   const router = useRouter();
   const shellBase = useShellBase();
   const resourcesHref = shellHref(shellBase, "/resources?type=reading");

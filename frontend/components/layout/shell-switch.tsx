@@ -5,7 +5,6 @@ import { LoaderCircle } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth-provider";
-import { TeacherWindowProvider } from "@/components/desktop/teacher-window-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { DesktopShell } from "@/components/layout/desktop-shell";
 import { OrchestratorProvider } from "@/components/orchestrator-provider";
@@ -81,13 +80,7 @@ export function ShellSwitch({ children }: { children: React.ReactNode }) {
   if (!user || !user.onboarding_completed) return <AuthLoadingScreen />;
 
   if (pathname?.startsWith("/desktop")) {
-    return (
-      <ApplicationProviders key={user.id}>
-        <TeacherWindowProvider>
-          <DesktopShell>{children}</DesktopShell>
-        </TeacherWindowProvider>
-      </ApplicationProviders>
-    );
+    return <ApplicationProviders><DesktopShell>{children}</DesktopShell></ApplicationProviders>;
   }
-  return <ApplicationProviders key={user.id}><AppShell>{children}</AppShell></ApplicationProviders>;
+  return <ApplicationProviders><AppShell>{children}</AppShell></ApplicationProviders>;
 }

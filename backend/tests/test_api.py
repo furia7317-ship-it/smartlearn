@@ -186,7 +186,3 @@ def hello():
             assert "content" in chunk
             assert "metadata" in chunk
             assert "source" in chunk["metadata"]
-            assert "document_title" in chunk["metadata"]
-            assert "section_title" in chunk["metadata"]
-            assert isinstance(chunk["metadata"]["sequence_index"], int)
-            assert chunk["metadata"]["start_offset"] < chunk["metadata"]["end_offset"]

@@ -29,13 +29,7 @@ interface OpenPaper {
 
 export default function PracticePage() {
   const { mode, hydrated, resources, practiceAttempts, recordPractice } =
-    useOrchestratorContext((state) => ({
-      mode: state.mode,
-      hydrated: state.hydrated,
-      resources: state.resources,
-      practiceAttempts: state.practiceAttempts,
-      recordPractice: state.recordPractice,
-    }));
+    useOrchestratorContext();
 
   const sessionQuiz = findQuizResource(resources);
   const latestAttempt = practiceAttempts[0];

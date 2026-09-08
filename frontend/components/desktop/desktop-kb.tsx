@@ -19,7 +19,6 @@ import {
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
-import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import {
   autoImport,
   kbSearch,
@@ -36,7 +35,6 @@ import { getUserSettings, onUserSettingsChange } from "@/lib/user-settings";
 import { cn } from "@/lib/utils";
 import { KB_DOCS } from "@/lib/knowledge-catalog";
 import { DesktopBookshelf } from "@/components/desktop/desktop-bookshelf";
-import { ResourceCenterBackButton } from "@/components/desktop/resource-center-back-button";
 import { readBookshelf, shelfBookFromResult, writeBookshelf, type ShelfBook } from "@/lib/bookshelf";
 
 /**
@@ -204,11 +202,7 @@ function BookEditionAsk({ subject }: { subject: string }) {
 }
 
 function SearchDemo() {
-  const [query, setQuery] = useDesktopModuleStringState<string>(
-    "resources",
-    "knowledge.search",
-    ""
-  );
+  const [query, setQuery] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
   const [hits, setHits] = useState<KbHit[]>([]);
   const [notFound, setNotFound] = useState(false);
@@ -654,11 +648,7 @@ function WebResultCard({
 }
 
 function WebFind({ onAddBook, shelfUrls }: { onAddBook: (result: WebResult) => void; shelfUrls: Set<string> }) {
-  const [query, setQuery] = useDesktopModuleStringState<string>(
-    "resources",
-    "knowledge.webQuery",
-    ""
-  );
+  const [query, setQuery] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
   const [results, setResults] = useState<WebResult[]>([]);
   const [status, setStatus] = useState<Record<string, ImportState>>({});
@@ -778,14 +768,11 @@ export default function DesktopKb() {
   return (
     <div className="thin-scroll h-full overflow-y-auto">
       <div className="mx-auto max-w-[1440px] space-y-6 px-8 py-7">
-        <header className="desktop-resource-subpage-heading">
-          <ResourceCenterBackButton />
-          <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight">课程知识库</h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              系统输入的初始知识库 · 所有生成内容的事实校验依据
-            </p>
-          </div>
+        <header>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">课程知识库</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            系统输入的初始知识库 · 所有生成内容的事实校验依据
+          </p>
         </header>
         <DesktopBookshelf books={books} onChange={updateBooks} />
         <SmartRecommend />

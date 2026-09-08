@@ -8,12 +8,10 @@ const eslintConfig = defineConfig([
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
-    "**/.next/**",
+    ".next/**",
     "out/**",
     "build/**",
     "dist-electron/**",
-    ".electron-app/**",
-    ".electron-app-*.tmp/**",
     "runtime/**",
     "coverage/**",
     // Third-party prebuilt SDK bundles are immutable runtime assets, not app source.
@@ -26,8 +24,6 @@ const eslintConfig = defineConfig([
     rules: {
       // 客户端壳需要在挂载/会话回灌 effect 中同步 React 状态。
       "react-hooks/set-state-in-effect": "off",
-      // Static export uses unoptimized local images; there is no Next image server.
-      "@next/next/no-img-element": "off",
     },
   },
   {

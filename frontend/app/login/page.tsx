@@ -75,7 +75,7 @@ export default function LoginPage() {
       >
         <header className="mb-6 text-center">
           <Image
-            src="/brand/xueshu-app-icon-128.webp"
+            src="/brand/xueshu-app-icon.png"
             alt=""
             width={48}
             height={48}

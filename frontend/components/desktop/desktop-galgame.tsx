@@ -108,10 +108,7 @@ async function withDeadline<T>(promise: Promise<T>, timeoutMs: number, message: 
 }
 
 export default function DesktopGalgame() {
-  const session = useOrchestratorContext((state) => ({
-    resources: state.resources,
-    mode: state.mode,
-  }));
+  const session = useOrchestratorContext();
   const reducedMotion = useReducedMotion();
   const [studentId, setStudentId] = useState("");
   const [library, setLibrary] = useState<StoredMaterial[]>([]);

@@ -218,9 +218,6 @@ export interface PathStep {
   desc: string;
   types: ResourceType[];
   state: "current" | "todo";
-  /** Knowledge points and prerequisite labels are used to render the desktop path as a dependency graph. */
-  knowledge_points?: string[];
-  prerequisites?: string[];
   subject_ids?: string[];
   subject_titles?: string[];
   objective?: string;
@@ -390,17 +387,9 @@ export interface ChatAttachmentMeta {
 export interface TutorAttachment extends ChatAttachmentMeta {
   extracted_text: string;
   image_data: string;
-  recognition_status: "native" | "recognized" | "parsed" | "fallback";
+  recognition_status: "recognized" | "parsed" | "fallback";
   recognition_provider: string;
   recognition_notice: string;
-}
-
-/** A bounded, user-visible snapshot of the desktop surface that opened the teacher. */
-export interface TutorPageContext {
-  module?: string;
-  title?: string;
-  detail?: string;
-  entityId?: string;
 }
 
 export type Phase =

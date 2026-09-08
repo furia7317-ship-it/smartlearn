@@ -40,12 +40,7 @@ function ResourcePathAttachmentForm({
     detachResourceFromPath,
     resourcePathAttachments,
     subjectPaths,
-  } = useOrchestratorContext((state) => ({
-    attachResourceToPath: state.attachResourceToPath,
-    detachResourceFromPath: state.detachResourceFromPath,
-    resourcePathAttachments: state.resourcePathAttachments,
-    subjectPaths: state.subjectPaths,
-  }));
+  } = useOrchestratorContext();
   const current = resourcePathAttachments[item.id];
   const availableSubjects = useMemo(
     () => subjectPaths.filter((subject) => targetsForSubject(subject).length > 0),

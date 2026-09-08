@@ -34,19 +34,17 @@ test("delivery uses built frontend, persistent sqlite, production dependencies, 
 });
 
 test("desktop delivery packages runtime source without local accounts or credentials", async () => {
-  const [packageJsonSource, serviceEnvKeysSource, runtimeScript, knowledgeSeedScript, knowledgeSeedBuilder, remotionScript, remotionPackageSource, electronMain, builderConfig] = await Promise.all([
+  const [packageJsonSource, serviceEnvKeysSource, runtimeScript, knowledgeSeedScript, knowledgeSeedBuilder, remotionScript, electronMain, builderConfig] = await Promise.all([
     read("../package.json"),
     read("../electron/backend-env-keys.json"),
     read("../scripts/prepare-python-runtime.mjs"),
     read("../scripts/prepare-knowledge-seed.mjs"),
     read("../../backend/scripts/build_packaged_knowledge_seed.py"),
     read("../scripts/prepare-remotion-runtime.mjs"),
-    read("../remotion-runtime/package.json"),
     read("../electron/main.js"),
     read("../electron-builder.yml"),
   ]);
   const packageJson = JSON.parse(packageJsonSource);
-  const remotionPackage = JSON.parse(remotionPackageSource);
   const serviceEnvKeys = JSON.parse(serviceEnvKeysSource);
 
   const expectedPreparation = "npm run prepare:python-runtime && npm run prepare:knowledge-seed && npm run prepare:remotion-runtime";
@@ -78,32 +76,14 @@ test("desktop delivery packages runtime source without local accounts or credent
   assert.doesNotMatch(electronMain, /loadPackagedBackendEnv/);
   assert.doesNotMatch(electronMain, /runDemoSeedUpgrade/);
   assert.doesNotMatch(electronMain, /ASSETS, "smartlearn\.db"/);
-  const runtimeLock = await read("../../backend/requirements-windows.lock");
-  for (const name of ["pypdf", "python-docx", "openpyxl"]) {
-    assert.match(runtimeLock, new RegExp(`^${name}==`, "m"));
-  }
-  assert.match(runtimeScript, /--require-hashes/);
-  assert.match(runtimeScript, /python\.previous-/);
-  for (const excludedDistribution of [
-    "smartlearn-backend",
-    "matplotlib",
-    "manim",
-    "pytest",
-    "coverage",
-    "ruff",
-  ]) {
-    assert.doesNotMatch(runtimeLock, new RegExp(`^${excludedDistribution}==`, "m"));
-  }
-  assert.match(runtimeScript, /PYTHONDONTWRITEBYTECODE: "1"/);
-  assert.match(electronMain, /PYTHONDONTWRITEBYTECODE: "1"/);
+  assert.match(runtimeScript, /\["pypdf", "pypdf>=5\.0"\]/);
+  assert.match(runtimeScript, /\["docx", "python-docx>=1\.1"\]/);
+  assert.match(runtimeScript, /\["openpyxl", "openpyxl>=3\.1"\]/);
   assert.match(knowledgeSeedScript, /chroma_seed_cs2026_v1/);
   assert.match(knowledgeSeedBuilder, /collection_count != len\(documents\)/);
   assert.match(electronMain, /chroma-cs-2026-v1/);
   assert.match(electronMain, /chroma_seed_cs2026_v1/);
-  assert.equal(remotionPackage.dependencies["@remotion/bundler"], remotionPackage.dependencies.remotion);
-  assert.equal(remotionPackage.dependencies["@remotion/renderer"], remotionPackage.dependencies.remotion);
-  assert.equal(remotionPackage.dependencies["@remotion/cli"], undefined);
-  assert.match(remotionScript, /preparedLockStamp/);
+  assert.match(remotionScript, /node_modules", "@remotion", "renderer"/);
   assert.match(remotionScript, /fs\.copyFileSync\(process\.execPath, bundledNode\)/);
   assert.match(remotionScript, /"-m",\s*"zipfile",\s*"-c"/);
   assert.match(electronMain, /DEFAULT_LLM_PROVIDER \|\|= "deepseek"/);

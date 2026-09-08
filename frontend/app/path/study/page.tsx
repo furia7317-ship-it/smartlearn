@@ -50,13 +50,7 @@ export default function StudyPage() {
     masterPath,
     resources,
     completedMaterials,
-  } = useOrchestratorContext((state) => ({
-    hydrated: state.hydrated,
-    mode: state.mode,
-    masterPath: state.masterPath,
-    resources: state.resources,
-    completedMaterials: state.completedMaterials,
-  }));
+  } = useOrchestratorContext();
   const path = masterPath;
   const stages = useMemo(() => buildStudyPlan(path, resources), [path, resources]);
   const done = useMemo(() => new Set(completedMaterials), [completedMaterials]);

@@ -11,7 +11,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.core.deps import get_llm
-from app.core.blocking import run_retrieval
 from app.core.llm import parse_json_response
 from app.services.knowledge_documents import smart_chunk_markdown
 from app.services.rag import (
@@ -49,9 +48,7 @@ async def import_knowledge():
 async def search_knowledge(query: str, n_results: int = 5):
     """检索知识库。"""
     try:
-        docs, sources, retrieval = await run_retrieval(
-            retrieve_with_diagnostics, query, n_results=n_results,
-        )
+        docs, sources, retrieval = retrieve_with_diagnostics(query, n_results=n_results)
         return {"query": query, "results": docs, "sources": sources, "retrieval": retrieval}
     except Exception as e:
         traceback.print_exc()
@@ -60,7 +57,7 @@ async def search_knowledge(query: str, n_results: int = 5):
 
 @router.get("/status")
 async def retrieval_status():
-    """Expose whether complete hybrid retrieval is ready or unavailable."""
+    """Expose whether requests use complete hybrid retrieval or a visible fallback."""
     return await asyncio.to_thread(get_retrieval_health)
 
 

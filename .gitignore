@@ -5,7 +5,6 @@ __pycache__/
 .venv/
 .pytest_cache/
 .pytest-tmp/
-.schema-backups/
 .run/
 *.egg-info/
 
@@ -69,13 +68,8 @@ frontend/runtime/
 /NUL
 /tmp/
 /.codex-smoke/
-/.codex_tmp/
 /.ruff_cache/
 /.superpowers/
-/design-audit/
-/design-qa.md
-/design-qa-*.png
-/项目交接说明.md
 /artifacts/smartlearn-web-*
 /artifacts/smartlearn-frontend-*.tar.gz
 /artifacts/competition_doc/rendered*/

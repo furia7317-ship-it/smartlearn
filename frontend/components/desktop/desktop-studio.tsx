@@ -29,6 +29,7 @@ import { AssistantAvatar } from "@/components/agent-bits";
 import { Chat } from "@/components/chat";
 import { PathPanel } from "@/components/path-panel";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
+import { ResourceViewer } from "@/components/resource-viewer";
 import { Button } from "@/components/ui/button";
 import { useStudioPanels, type StudioPanelKey } from "@/hooks/use-studio-panels";
 import type { ResourceItem } from "@/lib/types";
@@ -46,11 +47,6 @@ const ProfilePanel = dynamic(
     ssr: false,
     loading: () => <div className="p-6 text-center text-xs text-muted-foreground">画像加载中…</div>,
   },
-);
-
-const ResourceViewer = dynamic(
-  () => import("@/components/resource-viewer").then((module) => module.ResourceViewer),
-  { ssr: false },
 );
 
 type InspectorTab = "trace" | "profile" | "path" | "browser";
@@ -152,68 +148,12 @@ function TeacherChooser({
 }
 
 export default function DesktopStudio() {
-  const o = useOrchestratorContext((state) => ({
-    hydrated: state.hydrated,
-    activeConversationKind: state.activeConversationKind,
-    tags: state.tags,
-    path: state.path,
-    conversations: state.conversations,
-    pendingSoftwareAction: state.pendingSoftwareAction,
-    acknowledgeSoftwareAction: state.acknowledgeSoftwareAction,
-    resources: state.resources,
-    mode: state.mode,
-    activeTeacher: state.activeTeacher,
-    messages: state.messages,
-    running: state.running,
-    clearMessages: state.clearMessages,
-    reset: state.reset,
-    renameConversation: state.renameConversation,
-    conversationSwitchLocked: state.conversationSwitchLocked,
-    openConversation: state.openConversation,
-    deleteConversation: state.deleteConversation,
-    agents: state.agents,
-    masterPath: state.masterPath,
-    planTasks: state.planTasks,
-    planReason: state.planReason,
-    conversationRunning: state.conversationRunning,
-    hasRunMain: state.hasRunMain,
-    send: state.send,
-    stop: state.stop,
-    retryLast: state.retryLast,
-    canRetryLast: state.canRetryLast,
-    agentRunStore: state.agentRunStore,
-    deleteMessage: state.deleteMessage,
-    focusMessageRun: state.focusMessageRun,
-    plans: state.plans,
-    planSavingId: state.planSavingId,
-    planExecutingId: state.planExecutingId,
-    planErrors: state.planErrors,
-    savePlan: state.savePlan,
-    confirmResourcePlan: state.confirmResourcePlan,
-    replanPlan: state.replanPlan,
-    cancelPlan: state.cancelPlan,
-    pendingLearningPath: state.pendingLearningPath,
-    continueLearningPath: state.continueLearningPath,
-    retryLearningPath: state.retryLearningPath,
-    editLearningPath: state.editLearningPath,
-    openLearningPathKnowledgeBase: state.openLearningPathKnowledgeBase,
-    recordLearningPathClarification: state.recordLearningPathClarification,
-    cancelLearningPath: state.cancelLearningPath,
-    activeAgentRun: state.activeAgentRun,
-    profile: state.profile,
-    profileUpdatedAt: state.profileUpdatedAt,
-    profileSources: state.profileSources,
-    masterPathScheduleAnchor: state.masterPathScheduleAnchor,
-    completedMaterials: state.completedMaterials,
-    recordTaskEvidence: state.recordTaskEvidence,
-    newConversation: state.newConversation,
-  }));
+  const o = useOrchestratorContext();
   const studioHydrated = o.hydrated;
   const [openResource, setOpenResource] = useState<{
     item: ResourceItem;
     taskKey?: string;
   } | null>(null);
-  const [resourceViewerActivated, setResourceViewerActivated] = useState(false);
   const [teacherChooserOpen, setTeacherChooserOpen] = useState(false);
   const [sessionMenuId, setSessionMenuId] = useState("");
   const [renamingConversationId, setRenamingConversationId] = useState("");
@@ -256,7 +196,6 @@ export default function DesktopStudio() {
     const resource = o.resources.find((item) => item.id === resourceId && item.status === "ready");
     if (!resource) return;
     const data = resource.data ?? await getMaterialData(o.mode, resource.id).catch(() => undefined);
-    setResourceViewerActivated(true);
     setOpenResource({ item: data ? { ...resource, data } : resource });
   }, [o.mode, o.resources]);
 
@@ -650,10 +589,7 @@ export default function DesktopStudio() {
                 onRecordEvidence={(key, content) =>
                   o.recordTaskEvidence(key, content, "written_response")
                 }
-                onOpenResource={(item, taskKey) => {
-                  setResourceViewerActivated(true);
-                  setOpenResource({ item, taskKey });
-                }}
+                onOpenResource={(item, taskKey) => setOpenResource({ item, taskKey })}
               />
             )}
             {activeTab === "browser" && <div ref={browserSlotRef} className="h-full" />}
@@ -669,13 +605,11 @@ export default function DesktopStudio() {
         </aside>
       </div>
 
-      {resourceViewerActivated ? (
-        <ResourceViewer
-          item={openResource?.item ?? null}
-          taskKey={openResource?.taskKey}
-          onClose={() => setOpenResource(null)}
-        />
-      ) : null}
+      <ResourceViewer
+        item={openResource?.item ?? null}
+        taskKey={openResource?.taskKey}
+        onClose={() => setOpenResource(null)}
+      />
       <TeacherChooser
         open={teacherChooserOpen}
         onClose={() => setTeacherChooserOpen(false)}

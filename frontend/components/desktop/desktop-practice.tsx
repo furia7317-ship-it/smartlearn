@@ -14,13 +14,8 @@ import {
 
 import { DesktopEmptyState } from "@/components/desktop/desktop-empty-state";
 import { DesktopPaperCover } from "@/components/desktop/desktop-paper-cover";
-import {
-  TeacherOpenButton,
-  useTeacherWindowActions,
-} from "@/components/desktop/teacher-window-provider";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { QuizRunner } from "@/components/quiz-runner";
-import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   deletePaper,
@@ -44,18 +39,9 @@ interface OpenPaper {
   resourceId: string;
 }
 
-const PRACTICE_TABS = ["papers", "wrongbook"] as const;
-
 export default function DesktopPractice() {
   const { mode, hydrated, resources, practiceAttempts, recordPractice } =
-    useOrchestratorContext((state) => ({
-      mode: state.mode,
-      hydrated: state.hydrated,
-      resources: state.resources,
-      practiceAttempts: state.practiceAttempts,
-      recordPractice: state.recordPractice,
-    }));
-  const { openTeacher } = useTeacherWindowActions();
+    useOrchestratorContext();
 
   const sessionQuiz = findQuizResource(resources);
   const latestAttempt = practiceAttempts[0];
@@ -66,12 +52,6 @@ export default function DesktopPractice() {
   const [papers, setPapers] = useState<PaperSummary[]>([]);
   const [loadingPapers, setLoadingPapers] = useState(true);
   const [open, setOpen] = useState<OpenPaper | null>(null);
-  const [activeTab, setActiveTab] = useDesktopModuleStringState<"papers" | "wrongbook">(
-    "practice",
-    "library.tab",
-    "papers",
-    PRACTICE_TABS
-  );
 
   const refresh = useCallback(() => {
     if (mode === "checking") return;
@@ -163,17 +143,13 @@ export default function DesktopPractice() {
               每次生成的练习卷独立存档于试题库 · 批改后自动归档错因
             </p>
           </div>
-          <TeacherOpenButton
-            context={{
-              module: "practice",
-              title: "练习与错题",
-              detail: "请结合当前学习内容或薄弱项，为我生成一组有针对性的练习题。",
-            }}
+          <Link
+            href="/desktop/studio"
             className="flex items-center gap-1 rounded-lg border px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-accent"
           >
             <FilePlus2 className="size-4" />
             让教师出题
-          </TeacherOpenButton>
+          </Link>
         </header>
 
         <section className="grid gap-3 md:grid-cols-2" aria-label="练习工具">
@@ -203,7 +179,7 @@ export default function DesktopPractice() {
           </Link>
         </section>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "papers" | "wrongbook")}>
+        <Tabs defaultValue="papers">
           <TabsList>
             <TabsTrigger value="papers">试题库</TabsTrigger>
             <TabsTrigger value="wrongbook">错题本</TabsTrigger>
@@ -236,14 +212,7 @@ export default function DesktopPractice() {
                 icon={FilePlus2}
                 title="试题库还是空的"
                 desc="告诉智能教师你的知识点或薄弱项，教师会按需组卷；生成的每份练习卷都会独立存档在这里。"
-                cta={{
-                  label: "找智能教师出题",
-                  onClick: () => openTeacher({
-                    module: "practice",
-                    title: "试题库",
-                    detail: "试题库为空，请结合当前学习内容或薄弱项为我生成一份练习卷。",
-                  }),
-                }}
+                cta={{ href: "/desktop/studio", label: "找智能教师出题" }}
               />
             )}
           </TabsContent>

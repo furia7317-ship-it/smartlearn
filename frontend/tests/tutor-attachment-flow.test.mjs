@@ -15,10 +15,10 @@ test("smart tutor accepts click and drag-drop attachments", () => {
   assert.match(chat, /uploadTutorAttachment/);
   assert.match(chat, /图片、PDF、Word/);
   assert.match(api, /\/api\/chat\/attachments/);
-  assert.match(chat, /MiMo 原生理解/);
-  assert.match(chat, /正在处理/);
+  assert.match(chat, /讯飞已识别/);
+  assert.match(chat, /正在识别/);
   assert.match(orchestrator, /attachments,/);
-  assert.match(orchestrator, /void runTutorLive\(question, question, undefined, attachments, pageContext\)/);
+  assert.match(orchestrator, /void runTutorLive\(question, question, undefined, attachments\)/);
 });
 
 test("chat history persists only public attachment metadata", () => {

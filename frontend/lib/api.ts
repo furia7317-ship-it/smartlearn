@@ -4,12 +4,9 @@ import type { AgentResourceAction, AgentResourceCandidate } from "@/lib/agent-ac
 import type { AgentTraceProtocolV2 } from "@/lib/generated/agent-run-protocol";
 import type { TutorAttachment } from "@/lib/types";
 
-// Keep browser and API on the same hostname.  A page opened through a WSL/LAN
-// address must not silently send credentials to `localhost`, which is a
-// different browser site and also fails the backend CORS policy.
 const browserApiHost =
-  typeof window !== "undefined" && window.location.hostname
-    ? window.location.hostname
+  typeof window !== "undefined" && window.location.hostname === "127.0.0.1"
+    ? "127.0.0.1"
     : "localhost";
 const browserApiBase =
   typeof window !== "undefined" && window.location.protocol === "https:"
@@ -18,25 +15,8 @@ const browserApiBase =
 const desktopApiBase =
   typeof window !== "undefined" ? window.desktop?.apiBase?.trim() : undefined;
 
-function normalizeBrowserApiBase(value: string | undefined): string | undefined {
-  if (typeof window === "undefined" || !value) return value;
-  try {
-    const configured = new URL(value);
-    const pageHost = window.location.hostname;
-    const isConfiguredLoopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(configured.hostname);
-    const isPageLoopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(pageHost);
-    if (isConfiguredLoopback && isPageLoopback && configured.hostname !== pageHost) {
-      configured.hostname = pageHost;
-      return configured.toString().replace(/\/$/, "");
-    }
-  } catch {
-    return value;
-  }
-  return value;
-}
-
 export const API_BASE =
-  normalizeBrowserApiBase(desktopApiBase || process.env.NEXT_PUBLIC_API_BASE) || browserApiBase;
+  desktopApiBase || process.env.NEXT_PUBLIC_API_BASE || browserApiBase;
 
 const BACKEND_STATUS_CACHE_MS = 5_000;
 let backendStatusCache: { online: boolean; checkedAt: number } | null = null;

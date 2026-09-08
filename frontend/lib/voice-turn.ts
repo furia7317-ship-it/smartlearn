@@ -35,7 +35,6 @@ export function adaptiveEndpointDelayMs(transcript: string, speechSeconds: numbe
 
 export function cleanSpeechText(text: string): string {
   return text
-    .replace(/^【按要求展示】\s*/, "")
     .replace(/```[\s\S]*?```/g, " 代码示例 ")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "")

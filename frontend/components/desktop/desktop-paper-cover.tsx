@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 function Seal() {
   return (
     <Image
-      src="/brand/xueshu-app-icon-128.webp"
+      src="/brand/xueshu-app-icon.png"
       alt=""
       width={36}
       height={36}

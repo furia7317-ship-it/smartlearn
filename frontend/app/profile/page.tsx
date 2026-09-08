@@ -8,11 +8,7 @@ import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { ProfilePanel } from "@/components/profile-panel";
 
 export default function ProfilePage() {
-  const { hydrated, profile, tags } = useOrchestratorContext((state) => ({
-    hydrated: state.hydrated,
-    profile: state.profile,
-    tags: state.tags,
-  }));
+  const { hydrated, profile, tags } = useOrchestratorContext();
 
   return (
     <div className="thin-scroll h-full overflow-y-auto">

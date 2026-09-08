@@ -61,15 +61,6 @@ class AgentRequirementContract(Base):
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 
-class ConversationSyncState(Base):
-    """Atomic version gate for all conversation mutations of one account."""
-
-    __tablename__ = "conversation_sync_states"
-
-    student_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    revision: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-
-
 class ConversationSessionRecord(Base):
     """Persisted teacher conversation, including resource-specific QA sessions."""
 
@@ -80,8 +71,6 @@ class ConversationSessionRecord(Base):
     title: Mapped[str] = mapped_column(String(256), default="新会话")
     kind: Mapped[str] = mapped_column(String(32), default="general", index=True)
     teacher: Mapped[str] = mapped_column(String(32), default="raccoon")
-    entry_channel: Mapped[str] = mapped_column(String(32), default="desktop", index=True)
-    context_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
     messages: Mapped[list] = mapped_column(JSON, default=list)
     resource_id: Mapped[str] = mapped_column(String(160), default="")
     resource_title: Mapped[str] = mapped_column(String(256), default="")
@@ -196,18 +185,14 @@ class MemoryEpisode(Base):
     conversation_id: Mapped[str] = mapped_column(String(96), default="", index=True)
     source_fingerprint: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     summary: Mapped[str] = mapped_column(Text)
-    structured_summary: Mapped[dict] = mapped_column(JSON, default=dict)
     keywords: Mapped[list] = mapped_column(JSON, default=list)
     importance: Mapped[float] = mapped_column(Float, default=0.5)
-    source_start_index: Mapped[int] = mapped_column(Integer, default=0)
-    source_end_index: Mapped[int] = mapped_column(Integer, default=0)
     source_message_count: Mapped[int] = mapped_column(Integer, default=0)
     estimated_tokens: Mapped[int] = mapped_column(Integer, default=0)
     occurred_at: Mapped[int] = mapped_column(BigInteger, default=0, index=True)
     access_count: Mapped[int] = mapped_column(Integer, default=0)
     last_accessed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 
 class SemanticMemoryFact(Base):
@@ -301,23 +286,6 @@ class GeneratedMaterial(Base):
     source: Mapped[str] = mapped_column(String(16), default="form")  # form / studio
     exam_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-
-
-class ResourceCollection(Base):
-    """One learner-owned collection of approved resource-center materials."""
-
-    __tablename__ = "resource_collections"
-    __table_args__ = (
-        UniqueConstraint("student_id", "name", name="uq_resource_collection_student_name"),
-    )
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    student_id: Mapped[str] = mapped_column(String(64), index=True)
-    name: Mapped[str] = mapped_column(String(64))
-    position: Mapped[int] = mapped_column(Integer, default=0)
-    resource_ids: Mapped[list] = mapped_column(JSON, default=list)
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime | None] = mapped_column(nullable=True, onupdate=func.now())
 
 
 class LearningMarketListing(Base):

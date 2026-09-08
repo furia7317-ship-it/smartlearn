@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import Link from "next/link";
 import {
+  ArrowLeft,
   Binary,
   BookOpen,
   CalendarDays,
@@ -14,7 +15,6 @@ import {
   Layers3,
   ListTree,
   Lightbulb,
-  MessageCircle,
   Network,
   RotateCcw,
   Search,
@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
-import { TeacherOpenButton } from "@/components/desktop/teacher-window-provider";
 import { listAssessments, type AssessmentRecord } from "@/lib/library";
 import type { ProfileDim } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -283,13 +282,7 @@ function scoreLabel(score: MasteryScore): string {
 }
 
 export function KnowledgeMasteryGraph() {
-  const orchestrator = useOrchestratorContext((state) => ({
-    hydrated: state.hydrated,
-    mode: state.mode,
-    profile: state.profile,
-    profileUpdatedAt: state.profileUpdatedAt,
-    profileSources: state.profileSources,
-  }));
+  const orchestrator = useOrchestratorContext();
   const [assessments, setAssessments] = useState<AssessmentRecord[]>([]);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
@@ -347,18 +340,7 @@ export function KnowledgeMasteryGraph() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.titleBlock}>
-          <TeacherOpenButton
-            context={{
-              module: "profile",
-              title: "知识掌握图谱",
-              detail: selected
-                ? `请结合${graph.title}图谱中“${selected.label}”的掌握情况进行讲解。`
-                : `请结合${graph.title}图谱中的掌握情况进行讲解。`,
-            }}
-            className={styles.back}
-          >
-            <MessageCircle className="size-3.5" />询问智能教师
-          </TeacherOpenButton>
+          <Link href="/desktop/studio" className={styles.back}><ArrowLeft className="size-3.5" />返回智能教师</Link>
           <div className={styles.titleRow}><h1>学习画像 · 知识掌握图谱</h1><Info className="size-4" aria-label="掌握度会随学习证据持续更新" /></div>
           <p>把诊断、练习与复盘证据连接成一张可追踪的知识网络</p>
         </div>

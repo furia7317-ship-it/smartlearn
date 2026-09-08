@@ -80,9 +80,7 @@ function draftToInput(draft: AgentDraft): CustomAgentInput {
 }
 
 export function CustomAgentWorkspace() {
-  const { mode } = useOrchestratorContext((state) => ({
-    mode: state.mode,
-  }));
+  const { mode } = useOrchestratorContext();
   const [agents, setAgents] = useState<CustomAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);

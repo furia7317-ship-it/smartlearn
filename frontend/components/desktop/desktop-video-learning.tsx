@@ -14,11 +14,9 @@ import {
 } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
-import { ResourceCenterBackButton } from "@/components/desktop/resource-center-back-button";
 import { PageHeader } from "@/components/layout/page-header";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { Button } from "@/components/ui/button";
-import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import { saveMaterial } from "@/lib/library";
 import {
   analyzeBilibiliVideo,
@@ -40,20 +38,11 @@ function displayDuration(seconds: number): string {
 }
 
 export default function VideoLearningPage() {
-  const { mode, hydrated, appendResources, recordWatchedVideo } = useOrchestratorContext((state) => ({
-    mode: state.mode,
-    hydrated: state.hydrated,
-    appendResources: state.appendResources,
-    recordWatchedVideo: state.recordWatchedVideo,
-  }));
-  const [query, setQuery] = useDesktopModuleStringState<string>(
-    "resources",
-    "video.query",
-    DEFAULT_QUERY
-  );
+  const { mode, hydrated, appendResources, recordWatchedVideo } = useOrchestratorContext();
+  const [query, setQuery] = useState(DEFAULT_QUERY);
   const [results, setResults] = useState<BilibiliVideoResult[]>([]);
   const [selected, setSelected] = useState<BilibiliVideoResult | null>(null);
-  const [note, setNote] = useDesktopModuleStringState<string>("resources", "video.note", "");
+  const [note, setNote] = useState("");
   const [watchedSeconds, setWatchedSeconds] = useState(0);
   const [searching, setSearching] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -145,7 +134,6 @@ export default function VideoLearningPage() {
         <PageHeader
           title="视频学习"
         >
-          <ResourceCenterBackButton />
           <Link
             href="/resources?type=quiz"
             className="flex items-center gap-1 rounded-lg border bg-background px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent"

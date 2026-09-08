@@ -3,10 +3,8 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
 
-import { TeacherOpenButton } from "@/components/desktop/teacher-window-provider";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { ShellLink as Link } from "@/components/shell-link";
-import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import { addLocalDays, buildLearningSchedule, localDateKey } from "@/lib/learning-schedule";
 import { cn } from "@/lib/utils";
 
@@ -19,27 +17,10 @@ function monthCells(month: Date): Date[] {
 }
 
 export default function DesktopCalendar() {
-  const { path, pathScheduleAnchor, completedMaterials, hydrated } = useOrchestratorContext((state) => ({
-    path: state.path,
-    pathScheduleAnchor: state.pathScheduleAnchor,
-    completedMaterials: state.completedMaterials,
-    hydrated: state.hydrated,
-  }));
+  const { path, pathScheduleAnchor, completedMaterials, hydrated } = useOrchestratorContext();
   const [anchor] = useState(() => new Date());
-  const [monthKey, setMonthKey] = useDesktopModuleStringState<string>(
-    "home",
-    "calendar.month",
-    localDateKey(anchor).slice(0, 7)
-  );
-  const [selected, setSelected] = useDesktopModuleStringState<string>(
-    "home",
-    "calendar.selected",
-    localDateKey(anchor)
-  );
-  const [monthYear, monthNumber] = monthKey.split("-").map(Number);
-  const month = Number.isInteger(monthYear) && monthNumber >= 1 && monthNumber <= 12
-    ? new Date(monthYear, monthNumber - 1, 1, 12)
-    : new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12);
+  const [month, setMonth] = useState(new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12));
+  const [selected, setSelected] = useState(localDateKey(anchor));
   const schedule = useMemo(
     () => buildLearningSchedule(path, completedMaterials, pathScheduleAnchor || anchor),
     [anchor, completedMaterials, path, pathScheduleAnchor],
@@ -59,9 +40,9 @@ export default function DesktopCalendar() {
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <section className="rounded-2xl border bg-card p-5">
             <div className="flex items-center justify-between">
-              <button type="button" onClick={() => setMonthKey(localDateKey(new Date(month.getFullYear(), month.getMonth() - 1, 1, 12)).slice(0, 7))} aria-label="上个月" className="grid size-8 place-items-center rounded-lg border hover:bg-accent"><ChevronLeft className="size-4" /></button>
+              <button type="button" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1, 12))} aria-label="上个月" className="grid size-8 place-items-center rounded-lg border hover:bg-accent"><ChevronLeft className="size-4" /></button>
               <h2 className="font-display text-lg font-semibold">{month.getFullYear()} 年 {month.getMonth() + 1} 月</h2>
-              <button type="button" onClick={() => setMonthKey(localDateKey(new Date(month.getFullYear(), month.getMonth() + 1, 1, 12)).slice(0, 7))} aria-label="下个月" className="grid size-8 place-items-center rounded-lg border hover:bg-accent"><ChevronRight className="size-4" /></button>
+              <button type="button" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1, 12))} aria-label="下个月" className="grid size-8 place-items-center rounded-lg border hover:bg-accent"><ChevronRight className="size-4" /></button>
             </div>
             <div className="mt-4 grid grid-cols-7 gap-1.5">
               {WEEKDAYS.map((day) => <div key={day} className="py-2 text-center text-xs text-muted-foreground">{day}</div>)}
@@ -89,7 +70,7 @@ export default function DesktopCalendar() {
 
           <aside className="self-start rounded-2xl border bg-card p-5 lg:sticky lg:top-5">
             <div className="flex items-center gap-2"><CalendarDays className="size-4 text-primary" /><h2 className="text-sm font-semibold">{selected} 的任务</h2></div>
-          {!hydrated ? <p className="mt-4 text-sm text-muted-foreground">正在恢复日程…</p> : selectedDay ? <div className="mt-4 space-y-2">{selectedDay.plan.tasks.map((task) => <article key={task.key} className={cn("rounded-xl border p-3", task.completed && "border-success/30 bg-success/[0.07]")}><div className="flex items-center gap-2"><span className="rounded bg-foreground px-1.5 py-0.5 text-[10px] font-semibold text-background">{task.action}</span><strong className="min-w-0 flex-1 text-xs">{task.title}</strong><span className="font-mono text-[10px] text-muted-foreground">{task.minutes} 分钟</span></div><p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{task.detail}</p><span className={cn("mt-2 inline-block text-[10px]", task.completed ? "text-success" : "text-danger")}>{task.completed ? "已按真实学习记录完成" : "尚未完成"}</span></article>)}<TeacherOpenButton context={{ module: "calendar", title: `${selected} 学习任务`, detail: `${selectedDay.step.day} · ${selectedDay.step.title}，共 ${selectedDay.plan.tasks.length} 项任务。` }} className="mt-3 flex h-9 w-full items-center justify-center rounded-lg bg-primary text-sm font-medium text-primary-foreground">进入智能教师完成任务</TeacherOpenButton></div> : <p className="mt-4 rounded-xl border border-dashed px-3 py-10 text-center text-sm text-foreground">当天没有学习任务</p>}
+            {!hydrated ? <p className="mt-4 text-sm text-muted-foreground">正在恢复日程…</p> : selectedDay ? <div className="mt-4 space-y-2">{selectedDay.plan.tasks.map((task) => <article key={task.key} className={cn("rounded-xl border p-3", task.completed && "border-success/30 bg-success/[0.07]")}><div className="flex items-center gap-2"><span className="rounded bg-foreground px-1.5 py-0.5 text-[10px] font-semibold text-background">{task.action}</span><strong className="min-w-0 flex-1 text-xs">{task.title}</strong><span className="font-mono text-[10px] text-muted-foreground">{task.minutes} 分钟</span></div><p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{task.detail}</p><span className={cn("mt-2 inline-block text-[10px]", task.completed ? "text-success" : "text-danger")}>{task.completed ? "已按真实学习记录完成" : "尚未完成"}</span></article>)}<Link href="/studio" className="mt-3 flex h-9 items-center justify-center rounded-lg bg-primary text-sm font-medium text-primary-foreground">进入智能教师完成任务</Link></div> : <p className="mt-4 rounded-xl border border-dashed px-3 py-10 text-center text-sm text-foreground">当天没有学习任务</p>}
           </aside>
         </div>
       </div>

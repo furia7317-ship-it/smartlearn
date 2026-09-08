@@ -75,9 +75,7 @@ export default function SettingsPage() {
   const timer = useRef<number | undefined>(undefined);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const { mode } = useOrchestratorContext((state) => ({
-    mode: state.mode,
-  }));
+  const { mode } = useOrchestratorContext();
 
   useEffect(() => {
     setMounted(true);

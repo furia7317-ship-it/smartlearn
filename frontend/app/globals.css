@@ -164,7 +164,7 @@
   border: 1px solid #4a3821;
   border-radius: 0 18px 18px 0;
   background-color: #201810;
-  background-image: url("/brand/desktop/book-spine-texture-v2.webp");
+  background-image: url("/brand/desktop/book-spine-texture-v2.png");
   background-size: 430px 430px;
   box-shadow: inset -10px 0 28px rgb(0 0 0 / 0.38), 8px 0 24px rgb(20 13 7 / 0.28);
   transition: width 180ms ease, flex-basis 180ms ease, padding 180ms ease;
@@ -325,6 +325,26 @@
   pointer-events: none;
 }
 
+.desktop-book-rings {
+  position: absolute;
+  z-index: 45;
+  top: 0;
+  bottom: 0;
+  left: 137px;
+  display: flex;
+  width: 98px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  padding: 52px 0 40px;
+  pointer-events: none;
+  filter: drop-shadow(2px 4px 3px rgb(24 14 5 / .42));
+}
+.desktop-book-rings img {
+  width: 94px;
+  height: auto;
+  object-fit: contain;
+}
 .desktop-rail-profile {
   position: relative;
   z-index: 3;
@@ -355,7 +375,7 @@
 }
 /* will-change 鍙湪鎾斁鏈熼棿鎵撳紑锛屽父椹讳細缁欓〉鍐?position:fixed 寮圭獥鍒堕€犲寘鍚潡 */
 .desktop-page-transition[data-transition="running"] {
-  will-change: transform, opacity;
+  will-change: transform;
 }
 
 /*
@@ -371,15 +391,13 @@
   justify-items: center;
   gap: 24px;
   overflow: hidden;
-  contain: strict;
   background:
     radial-gradient(circle at 50% 44%, rgb(255 250 239 / 0.96), rgb(238 228 211 / 0.96) 58%, rgb(222 207 184 / 0.97));
   pointer-events: auto;
-  will-change: opacity;
-  animation: desktop-book-overlay-in 80ms ease-out both;
+  animation: desktop-book-overlay-in 120ms ease-out both;
 }
 .desktop-book-transition[data-phase="opening"] {
-  animation: desktop-book-overlay-out 220ms ease-in both;
+  animation: desktop-book-overlay-out 420ms ease-in both;
 }
 .desktop-book-transition__stage {
   position: relative;
@@ -416,13 +434,13 @@
   will-change: transform;
 }
 .desktop-book-transition[data-phase="closing"] .desktop-book-transition__turning-cover {
-  animation: desktop-book-close 160ms cubic-bezier(0.55, 0.02, 0.42, 1) both;
+  animation: desktop-book-close 220ms cubic-bezier(0.55, 0.02, 0.42, 1) both;
 }
 .desktop-book-transition[data-phase="closed"] .desktop-book-transition__turning-cover {
   transform: rotateY(-178deg) translateZ(1px);
 }
 .desktop-book-transition[data-phase="opening"] .desktop-book-transition__turning-cover {
-  animation: desktop-book-open 180ms cubic-bezier(0.2, 0.78, 0.24, 1) both;
+  animation: desktop-book-open 260ms cubic-bezier(0.2, 0.78, 0.24, 1) both;
 }
 .desktop-book-transition__page-face,
 .desktop-book-transition__cover-face {
@@ -1474,17 +1492,14 @@
 .desktop-resource-empty > div { min-width: 0; flex: 1; }
 .desktop-resource-empty strong { color: var(--foreground); font-size: 13px; }
 .desktop-resource-empty p { margin-top: 4px; font-size: 10px; line-height: 1.55; }
-.desktop-resource-empty a,
-.desktop-resource-empty button {
+.desktop-resource-empty a {
   flex-shrink: 0;
   padding: 8px 12px;
-  border: 0;
   border-radius: 7px;
   color: var(--primary-foreground);
   background: var(--primary);
   font-size: 10px;
   font-weight: 700;
-  cursor: pointer;
 }
 
 .desktop-resource-workspace {

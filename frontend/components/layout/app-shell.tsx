@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   BookMarked,
   Bot,
@@ -85,7 +85,6 @@ function UserLink() {
 
 function LogoutButton() {
   const { logout } = useAuth();
-  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
   return (
@@ -99,7 +98,7 @@ function LogoutButton() {
         if (submitting) return;
         setSubmitting(true);
         await logout();
-        router.replace("/");
+        window.location.assign("/");
       }}
     >
       {submitting ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <LogOut className="size-4" aria-hidden />}

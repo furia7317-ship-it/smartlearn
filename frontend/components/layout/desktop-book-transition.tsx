@@ -41,7 +41,7 @@ export function DesktopBookTransition({
           </div>
           <div className="desktop-book-transition__cover-face">
             <Image
-              src="/brand/xueshu-app-icon-128.webp"
+              src="/brand/xueshu-app-icon.png"
               alt=""
               width={44}
               height={44}
