@@ -17,6 +17,7 @@ import {
   logoutAccount,
   registerAccount,
   saveOnboarding,
+  saveGuideCompletion,
   type AuthUser,
   type OnboardingInput,
 } from "@/lib/auth";
@@ -35,11 +36,30 @@ interface AuthContextValue {
   login: (login: string, password: string) => Promise<AuthUser>;
   register: (login: string, password: string) => Promise<AuthUser>;
   completeOnboarding: (input: OnboardingInput) => Promise<AuthUser>;
+  completeGuide: () => Promise<AuthUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const LOCALLY_SIGNED_OUT_KEY = "sl_auth_locally_signed_out_v1";
+
+function isLocallySignedOut(): boolean {
+  try {
+    return window.localStorage.getItem(LOCALLY_SIGNED_OUT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setLocallySignedOut(value: boolean): void {
+  try {
+    if (value) window.localStorage.setItem(LOCALLY_SIGNED_OUT_KEY, "1");
+    else window.localStorage.removeItem(LOCALLY_SIGNED_OUT_KEY);
+  } catch {
+    /* the in-memory auth state remains authoritative for this page */
+  }
+}
 
 function syncAccountToLocalSettings(user: AuthUser): void {
   setUserSettings({
@@ -55,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [serviceError, setServiceError] = useState("");
 
   const applyUser = useCallback((nextUser: AuthUser) => {
+    setLocallySignedOut(false);
     setAuthenticatedStudentId(nextUser.id);
     syncAccountToLocalSettings(nextUser);
     setUser(nextUser);
@@ -63,6 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
+    if (isLocallySignedOut()) {
+      clearAuthenticatedStudentId();
+      setUser(null);
+      setServiceError("");
+      setLoading(false);
+      return;
+    }
     try {
       const nextUser = await getCurrentUser();
       if (nextUser) {
@@ -89,6 +117,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!serviceError || isLocallySignedOut()) return;
+    const retry = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const interval = window.setInterval(retry, 2_500);
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", retry);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", retry);
+    };
+  }, [refresh, serviceError]);
+
   const login = useCallback(async (account: string, password: string) => {
     return applyUser(await loginAccount(account, password));
   }, [applyUser]);
@@ -102,14 +145,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return applyUser(await saveOnboarding(input));
   }, [applyUser]);
 
+  const completeGuide = useCallback(async () => {
+    return applyUser(await saveGuideCompletion());
+  }, [applyUser]);
+
   const logout = useCallback(async () => {
+    setLocallySignedOut(true);
+    clearAuthenticatedStudentId();
+    setUser(null);
+    setServiceError("");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 5_000);
     try {
-      await logoutAccount();
+      await logoutAccount(controller.signal);
     } catch {
       // Local identity must still be cleared when the backend is temporarily unavailable.
     } finally {
-      clearAuthenticatedStudentId();
-      setUser(null);
+      window.clearTimeout(timeout);
     }
   }, []);
 
@@ -120,9 +172,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     register,
     completeOnboarding,
+    completeGuide,
     logout,
     refresh,
-  }), [completeOnboarding, loading, login, logout, refresh, register, serviceError, user]);
+  }), [completeGuide, completeOnboarding, loading, login, logout, refresh, register, serviceError, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

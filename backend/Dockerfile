@@ -1,19 +1,15 @@
-FROM python:3.11-slim
+FROM python:3.11.15-slim
 
 WORKDIR /app
 
-# 系统依赖（FFmpeg 用于视频合成）
+# FFmpeg 用于视频合成、字幕与兼容视频渲染。
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    libpango1.0-dev \
-    libcairo2-dev \
-    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 依赖
-COPY pyproject.toml .
-COPY app ./app
-RUN pip install --no-cache-dir .
+COPY requirements-linux.lock .
+RUN pip install --no-cache-dir --require-hashes -r requirements-linux.lock
 
 # 应用代码
 COPY . .

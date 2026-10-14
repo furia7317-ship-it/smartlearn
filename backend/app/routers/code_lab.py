@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_db
 from app.models.learning import CodeExercise, CodeSubmission
+from app.routers.auth import get_current_account
+from app.services.native_code_execution import available_languages, execute_native
 from app.schemas.code_lab import (
     CodeEligibilityRequest,
     CodeExerciseGenerateRequest,
@@ -155,6 +158,8 @@ async def submit_code_exercise(
         if not bool(item.get("passed"))
     ]
     try:
+        if not req.include_ai_review:
+            raise RuntimeError("AI review not requested")
         feedback = await asyncio.wait_for(
             asyncio.to_thread(
                 grade_code_feedback,
@@ -175,7 +180,7 @@ async def submit_code_exercise(
             execution=execution,
             failed_cases=failed_cases,
         )
-        ai_status = "unavailable"
+        ai_status = "unavailable" if req.include_ai_review else "not_requested"
     submission = CodeSubmission(
         id=f"code-submission-{uuid.uuid4().hex}",
         exercise_id=exercise.id,
@@ -187,6 +192,7 @@ async def submit_code_exercise(
         total_tests=total_tests,
         feedback=feedback,
         execution=execution,
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db.add(submission)
     await update_profile_from_code_submission(
@@ -224,10 +230,10 @@ async def code_visualization_eligibility(req: CodeEligibilityRequest):
 
 
 @router.post("/execute")
-async def execute_code(req: CodeExecuteRequest):
-    """Run Python in the bounded worker and optionally request an AI review."""
+async def execute_code(req: CodeExecuteRequest, account=Depends(get_current_account)):
+    """Run an authenticated student's selected language locally."""
 
-    execution = await asyncio.to_thread(execute_python, req.code)
+    execution = await asyncio.to_thread(execute_python, req.code, req.stdin) if req.language == "python" else await asyncio.to_thread(execute_native, req.code, req.language, req.stdin)
     response = {"execution": execution, "ai_status": "not_requested", "diagnosis": None}
     if not req.include_ai_review:
         return response
@@ -246,6 +252,11 @@ async def execute_code(req: CodeExecuteRequest):
         response["diagnosis"] = fallback_diagnosis(execution)
         response["ai_status"] = "unavailable"
     return response
+
+
+@router.get("/languages")
+async def code_languages(account=Depends(get_current_account)):
+    return await asyncio.to_thread(available_languages)
 
 
 @router.post("/visualizations/restore")

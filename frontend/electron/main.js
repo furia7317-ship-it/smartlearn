@@ -1,6 +1,6 @@
 // 学枢 — Electron 桌面壳（一体版）
 // 双击即自动拉起自带的 Python 后端(FastAPI :8000) + 前端静态站，无需任何环境。
-// 后端运行时/依赖/嵌入模型/公共知识索引随安装包分发；db/chroma/media 写入 userData。
+// 嵌入和重排序调用云端；公共知识索引随包分发，db/chroma/media 写入 userData。
 
 const { app, BrowserWindow, Menu, protocol, session, shell } = require("electron");
 const { randomUUID } = require("node:crypto");
@@ -11,6 +11,7 @@ const http = require("node:http");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
 const DESKTOP_BACKEND_ENV_KEYS = require("./backend-env-keys.json");
+const { readDemoManifest, ensureDemoSeed } = require("./demo-seed.cjs");
 
 function isClosedPipeError(error) {
   const code = String(error?.code || error?.errno || "").toUpperCase();
@@ -62,11 +63,16 @@ function endBackendLog(stream, data) {
   }
 }
 
-const PRODUCT_NAME = "学枢";
+const DEMO_SEED = app.isPackaged ? path.join(process.resourcesPath, "private-demo") : "";
+const DEMO_MANIFEST = DEMO_SEED ? readDemoManifest(DEMO_SEED) : null;
+const PRODUCT_NAME = DEMO_MANIFEST ? DEMO_MANIFEST.product_name : "学枢";
 const LEGACY_PRODUCT_NAMES = ["智学伴A3"];
 
 // 新品牌使用独立 userData 目录；首次启动时从旧目录无损迁移现有学习数据。
 app.setName(PRODUCT_NAME);
+const requestedUserData = app.commandLine.getSwitchValue("user-data-dir");
+if (requestedUserData) app.setPath("userData", path.resolve(requestedUserData));
+else if (DEMO_MANIFEST) app.setPath("userData", path.join(app.getPath("appData"), PRODUCT_NAME));
 
 const SCHEME = "app";
 const ROOT = path.join(__dirname, "..", "out"); // 静态站根目录（打包进 asar）
@@ -132,6 +138,7 @@ function copyMissingTree(source, target) {
 }
 
 function migrateLegacyUserData() {
+  if (DEMO_MANIFEST) return; // 演示版有独立数据目录，不导入本机其他账户。
   const currentUserData = app.getPath("userData");
   for (const legacyName of LEGACY_PRODUCT_NAMES) {
     const legacyUserData = path.join(app.getPath("appData"), legacyName);
@@ -148,7 +155,7 @@ function migrateLegacyUserData() {
 const USER_BACKEND_ENV_KEYS = new Set(DESKTOP_BACKEND_ENV_KEYS);
 
 /**
- * 桌面端只从用户数据目录读取允许项。安装包不携带账号或服务密钥；
+ * 桌面端从用户数据目录读取允许项；授权制作的演示包在首次启动时初始化此文件。
  * 开发版后端仍可独立使用 backend/.env。
  */
 function loadBackendEnvFile(envPath) {
@@ -318,7 +325,7 @@ function backendEnv() {
   const env = { ...process.env };
   delete env.PYTHONHOME; // 防止外部 Python 环境串扰
   delete env.PYTHONPATH;
-  // 服务凭据属于当前用户，只能从 userData/backend.env 注入。
+  // 首次初始化之后，仍只从用户数据目录读取服务配置。
   Object.assign(env, loadUserBackendEnv(userData));
   env.SMARTLEARN_STUDENT_ID = ensureRuntimeStudentId();
   Object.assign(env, {
@@ -327,15 +334,24 @@ function backendEnv() {
     CHROMA_PERSIST_DIR: chromaDir,
     MEDIA_OUTPUT_DIR: mediaDir,
     KNOWLEDGE_DIR: KNOWLEDGE,
-    EMBEDDING_MODEL: path.join(ASSETS, "models", "bge-small-zh-v1.5"),
-    HF_HUB_OFFLINE: "1",
-    TRANSFORMERS_OFFLINE: "1",
     PYTHONUTF8: "1",
     PYTHONIOENCODING: "utf-8",
+    PYTHONDONTWRITEBYTECODE: "1",
     REMOTION_RUNTIME_DIR: REMOTION_RUNTIME,
     SMARTLEARN_FFMPEG_THREADS: env.SMARTLEARN_FFMPEG_THREADS || "2",
   });
   if (REMOTION_NODE) env.REMOTION_NODE_BINARY = REMOTION_NODE;
+  if (packaged) {
+    const toolchains = path.join(process.resourcesPath, "toolchains");
+    const ffmpeg = path.join(process.resourcesPath, "ffmpeg", "bin");
+    if (fs.existsSync(ffmpeg)) env.PATH = ffmpeg + path.delimiter + (env.PATH || "");
+    for (const [key, file] of Object.entries({
+      CODE_LAB_CC: path.join(toolchains, "w64devkit", "bin", "gcc.exe"),
+      CODE_LAB_CXX: path.join(toolchains, "w64devkit", "bin", "g++.exe"),
+      CODE_LAB_JAVAC: path.join(toolchains, "jdk", "bin", "javac.exe"),
+      REMOTION_BROWSER_EXECUTABLE: path.join(process.resourcesPath, "chromium", "chrome-headless-shell.exe"),
+    })) if (fs.existsSync(file)) env[key] = file;
+  }
   env.DEFAULT_LLM_PROVIDER ||= "deepseek";
   return { env, dbPath, chromaDir, mediaDir, userData };
 }
@@ -343,7 +359,7 @@ function backendEnv() {
 async function ensureKnowledgeSeed(chromaDir) {
   try {
     if (!fs.existsSync(chromaDir)) {
-      const seedChroma = path.join(ASSETS, "chroma_seed_cs2026_v1");
+      const seedChroma = path.join(ASSETS, "chroma_seed_cs2026_cloud_v1");
       if (fs.existsSync(seedChroma)) await fsp.cp(seedChroma, chromaDir, { recursive: true });
     }
   } catch (e) {
@@ -391,7 +407,7 @@ function stopBackend() {
   if (backendProc && backendProc.pid && !backendProc.killed) {
     try {
       if (process.platform === "win32") {
-        spawn("taskkill", ["/pid", String(backendProc.pid), "/T", "/F"]);
+        spawn("taskkill", ["/pid", String(backendProc.pid), "/T", "/F"], { windowsHide: true });
       } else {
         backendProc.kill("SIGTERM");
       }
@@ -426,7 +442,7 @@ async function bootBackendThenLoad(win) {
   await setStatus(win, "正在准备本地数据…");
   await ensureKnowledgeSeed(chromaDir);
 
-  await setStatus(win, "正在启动本地 AI 引擎（首次启动较慢，请稍候）…");
+  await setStatus(win, "正在启动应用服务并准备云端检索…");
   startBackend(env, userData);
 
   const deadline = Date.now() + 90000;
@@ -470,7 +486,9 @@ function createWindow() {
   mainWin = win;
 
   Menu.setApplicationMenu(null);
-  win.once("ready-to-show", () => win.show());
+  win.once("ready-to-show", () => {
+    if (!app.commandLine.hasSwitch("start-hidden")) win.show();
+  });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("http")) shell.openExternal(url);
@@ -523,6 +541,7 @@ if (!gotLock) {
   app.whenReady()
     .then(async () => {
       migrateLegacyUserData();
+      if (DEMO_MANIFEST) await ensureDemoSeed(DEMO_SEED, app.getPath("userData"));
       ensureRuntimeStudentId();
       backendPort = packaged ? await allocateBackendPort() : DEFAULT_BACKEND_PORT;
       process.env.SMARTLEARN_API_BASE = `http://${BACKEND_HOST}:${backendPort}`;

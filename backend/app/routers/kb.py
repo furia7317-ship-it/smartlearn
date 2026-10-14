@@ -7,10 +7,13 @@ import hashlib
 import re
 import traceback
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from app.routers.auth import get_current_account
+from app.services.evidence import personal_collection
 from pydantic import BaseModel
 
 from app.core.deps import get_llm
+from app.core.blocking import run_retrieval
 from app.core.llm import parse_json_response
 from app.services.knowledge_documents import smart_chunk_markdown
 from app.services.rag import (
@@ -48,7 +51,9 @@ async def import_knowledge():
 async def search_knowledge(query: str, n_results: int = 5):
     """检索知识库。"""
     try:
-        docs, sources, retrieval = retrieve_with_diagnostics(query, n_results=n_results)
+        docs, sources, retrieval = await run_retrieval(
+            retrieve_with_diagnostics, query, n_results=n_results,
+        )
         return {"query": query, "results": docs, "sources": sources, "retrieval": retrieval}
     except Exception as e:
         traceback.print_exc()
@@ -57,7 +62,7 @@ async def search_knowledge(query: str, n_results: int = 5):
 
 @router.get("/status")
 async def retrieval_status():
-    """Expose whether requests use complete hybrid retrieval or a visible fallback."""
+    """Expose whether complete hybrid retrieval is ready or unavailable."""
     return await asyncio.to_thread(get_retrieval_health)
 
 
@@ -253,7 +258,7 @@ async def book_graph(req: BookGraphRequest):
 
 
 @router.post("/webimport")
-async def web_import(req: WebImportRequest):
+async def web_import(req: WebImportRequest, account=Depends(get_current_account)):
     """抓取网页正文 → 分块 → bge 向量化 → 写入独立 web_kb 集合（不污染精编库）。"""
     if not req.url:
         raise HTTPException(status_code=400, detail="url 不能为空")
@@ -272,9 +277,11 @@ async def web_import(req: WebImportRequest):
         c["id"] = f"web_{uid}_{i}"
         c["metadata"]["origin"] = "web"
         c["metadata"]["url"] = req.url
+        c["metadata"]["owner_id"] = account.id
+        c["metadata"]["document_id"] = req.url
 
     try:
-        await asyncio.to_thread(add_documents, chunks, WEB_KB_COLLECTION)
+        await asyncio.to_thread(add_documents, chunks, personal_collection(account.id))
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"入库失败: {e}")
@@ -283,13 +290,13 @@ async def web_import(req: WebImportRequest):
 
 
 @router.get("/webdocs")
-async def web_docs():
+async def web_docs(account=Depends(get_current_account)):
     """列出已导入的网络资料（按 url 聚合，供前端在知识库展示）。"""
     try:
         from app.services.rag import get_or_create_collection
 
-        col = get_or_create_collection(WEB_KB_COLLECTION)
-        got = col.get(include=["metadatas"])
+        col = get_or_create_collection(personal_collection(account.id))
+        got = col.get(include=["metadatas"], where={"owner_id": account.id})
         agg: dict[str, dict] = {}
         for m in got.get("metadatas") or []:
             url = m.get("url", "")
@@ -390,7 +397,7 @@ class AutoImportRequest(BaseModel):
 
 
 @router.post("/autoimport")
-async def auto_import(req: AutoImportRequest):
+async def auto_import(req: AutoImportRequest, account=Depends(get_current_account)):
     """给定书名/关键词：博查搜索 → 逐条尝试抓取 → 第一条能抓到正文的入 web_kb。"""
     q = (req.query or "").strip()
     if not q:
@@ -417,8 +424,10 @@ async def auto_import(req: AutoImportRequest):
             c["id"] = f"web_{uid}_{i}"
             c["metadata"]["origin"] = "web"
             c["metadata"]["url"] = url
+            c["metadata"]["owner_id"] = account.id
+            c["metadata"]["document_id"] = url
         try:
-            await asyncio.to_thread(add_documents, chunks, WEB_KB_COLLECTION)
+            await asyncio.to_thread(add_documents, chunks, personal_collection(account.id))
         except Exception:
             continue
         return {"imported": len(chunks), "title": source, "url": url, "site": r.get("site", "")}

@@ -25,7 +25,18 @@ import {
 } from "@/lib/reflection";
 
 export function ReflectionWorkspace() {
-  const orchestrator = useOrchestratorContext();
+  const orchestrator = useOrchestratorContext((state) => ({
+    masterPath: state.masterPath,
+    subjectPaths: state.subjectPaths,
+    path: state.path,
+    completedMaterials: state.completedMaterials,
+    messages: state.messages,
+    practiceAttempts: state.practiceAttempts,
+    taskEvidence: state.taskEvidence,
+    activeTeacher: state.activeTeacher,
+    mode: state.mode,
+    recordReflection: state.recordReflection,
+  }));
   const search = useSearchParams();
   const router = useRouter();
   const base = useShellBase();

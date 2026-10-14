@@ -98,6 +98,16 @@ def test_markdown_complexity_heading_is_not_treated_as_a_fact_claim():
     assert not any("关键事实声明缺少来源映射" in issue for issue in issues)
 
 
+def test_real_evidence_titles_and_headings_resolve_without_accepting_invented_sources():
+    from app.services.resource_grounding import _grounding_issues
+    kb = [{"id": "kb-real", "title": "栈和队列", "content": "# 第3章 栈和队列\n\n## 3.3 栈和队列的对比\n课程正文"}]
+    issues, ids, _ = _grounding_issues({"sources": ["第3章 栈和队列", "3.3 栈和队列的对比"]}, {}, kb)
+    assert not issues
+    assert ids == ['kb-real']
+    issues, _, _ = _grounding_issues({"sources": ["虚构的第4章", "课程正文"]}, {}, kb)
+    assert len([issue for issue in issues if '无法核验的来源' in issue]) == 2
+
+
 def test_illustrative_analogy_is_not_forced_into_fact_source_mapping():
     from app.services.resource_grounding import _grounding_issues
 

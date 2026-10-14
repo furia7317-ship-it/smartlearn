@@ -1,6 +1,7 @@
 /** 与后端 SSE 协议对齐的领域类型（core/sse.py: plan / progress / content / review / done）。 */
 
 export type AgentId =
+  | "learning_data"
   | "profiler"
   | "outliner"
   | "supervisor"
@@ -212,12 +213,40 @@ export interface PathTask {
   }[];
 }
 
+export interface PathKnowledgeNode {
+  id: string;
+  title: string;
+  objective?: string;
+  /** Optional exact task keys. Without these, progress remains chapter-scoped. */
+  task_keys?: string[];
+}
+
+export interface PathKnowledgeRelation {
+  from: string;
+  to: string;
+  kind: "prerequisite" | "related";
+  label?: string;
+}
+
 export interface PathStep {
   day: string;
   title: string;
   desc: string;
   types: ResourceType[];
   state: "current" | "todo";
+  /** Knowledge points and prerequisite labels are used to render the desktop path as a dependency graph. */
+  knowledge_points?: string[];
+  knowledge_nodes?: PathKnowledgeNode[];
+  knowledge_relations?: PathKnowledgeRelation[];
+  prerequisites?: string[];
+  /** Ability structure stays separate from the calendar's daily task buckets. */
+  node_id?: string;
+  module?: string;
+  node_kind?: "main" | "reinforcement" | "extension" | "milestone";
+  prerequisite_mode?: "all" | "any";
+  recommended_prerequisites?: string[];
+  completion_criteria?: string;
+  progress_weight?: number;
   subject_ids?: string[];
   subject_titles?: string[];
   objective?: string;
@@ -348,6 +377,13 @@ export interface ResourcePhaseState {
   autoExecute: boolean;
 }
 
+export interface AgentMessageProgress {
+  title: string;
+  detail: string;
+  status: AgentRunStatus;
+  receivedAt: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -359,6 +395,10 @@ export interface ChatMessage {
   processingEndedAt?: number;
   /** 公开处理过程（检索、工具调用、生成阶段），不包含模型私密推理。 */
   reasoning?: string;
+  /** Latest public progress event received for this message, separate from the answer. */
+  progress?: AgentMessageProgress;
+  /** A stop request is pending; only the server may confirm the terminal state. */
+  cancellationRequested?: boolean;
   /** 绑定本次消息对应的真实后端 run；重新打开会话时由事件库回放。 */
   runId?: string;
   /** 旧存档迁移兼容；新运行不再把轨迹数组写进消息。 */
@@ -387,9 +427,17 @@ export interface ChatAttachmentMeta {
 export interface TutorAttachment extends ChatAttachmentMeta {
   extracted_text: string;
   image_data: string;
-  recognition_status: "recognized" | "parsed" | "fallback";
+  recognition_status: "native" | "recognized" | "parsed" | "fallback";
   recognition_provider: string;
   recognition_notice: string;
+}
+
+/** A bounded, user-visible snapshot of the desktop surface that opened the teacher. */
+export interface TutorPageContext {
+  module?: string;
+  title?: string;
+  detail?: string;
+  entityId?: string;
 }
 
 export type Phase =

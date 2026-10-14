@@ -62,7 +62,9 @@ def test_schedule_uses_plan_days_and_exact_resource_ids():
     from app.services.planned_integration import integrate_approved_plan
     from tests.test_resource_plan_models import sample_plan_dict
 
-    plan = PlanArtifact.model_validate(sample_plan_dict())
+    payload = sample_plan_dict()
+    payload["days"][1].update(module="线性结构", node_kind="milestone", prerequisite_mode="any", completion_criteria="独立完成栈与队列测验", progress_weight=60)
+    plan = PlanArtifact.model_validate(payload)
     resources = [
         {
             "id": "explainer-d1",
@@ -89,6 +91,10 @@ def test_schedule_uses_plan_days_and_exact_resource_ids():
     assert result["schedule"][0]["title"] == "线性表：数组与链表"
     assert result["schedule"][0]["steps"][0]["resources"][0]["id"] == "explainer-d1"
     assert result["schedule"][1]["steps"][1]["resources"][0]["id"] == "quiz-d2"
+    assert result["schedule"][1]["node_kind"] == "milestone"
+    assert result["schedule"][1]["prerequisite_mode"] == "any"
+    assert result["schedule"][1]["prerequisites"] == ["线性表"]
+    assert result["schedule"][1]["completion_criteria"] == "独立完成栈与队列测验"
     assert result["schedule"][0]["steps"][-1]["type"] == "review"
     assert all(
         sum(step["minutes"] for step in scheduled_day["steps"])
@@ -99,14 +105,15 @@ def test_schedule_uses_plan_days_and_exact_resource_ids():
         {step["type"] for step in scheduled_day["steps"]} >= {"practice", "review"}
         for scheduled_day in result["schedule"]
     )
-    assert all(
-        step["completion_kind"] == "quiz_submission"
-        for scheduled_day in result["schedule"]
-        for step in scheduled_day["steps"]
-        if step["type"] == "practice"
-    )
-    assert result["schedule"][0]["steps"][-2]["resources"][0]["id"] == "quiz-d2"
-    assert "1 道题" in result["schedule"][0]["steps"][-2]["detail"]
+    first_practice = result["schedule"][0]["steps"][-2]
+    second_practice = result["schedule"][1]["steps"][-2]
+    # A later ability's quiz must not certify an earlier, unrelated ability.
+    assert first_practice["completion_kind"] == "written_response"
+    assert first_practice["resources"] == []
+    assert first_practice["prompts"]
+    assert second_practice["completion_kind"] == "quiz_submission"
+    assert second_practice["resources"][0]["id"] == "quiz-d2"
+    assert "1 道题" in second_practice["detail"]
     assert all(
         step["prompts"]
         and step["completion_kind"] == "written_response"
@@ -116,7 +123,7 @@ def test_schedule_uses_plan_days_and_exact_resource_ids():
     )
 
 
-def test_auto_released_rework_is_selected_and_can_integrate_with_warnings():
+def test_legacy_auto_released_rework_cannot_be_published():
     from app.schemas.resource_plan import PlanArtifact
     from app.services.resource_coverage import audit_plan_coverage, select_best_resources
     from tests.test_resource_plan_models import sample_plan_dict
@@ -158,8 +165,29 @@ def test_auto_released_rework_is_selected_and_can_integrate_with_warnings():
     assert selected["explainer-d1"]["id"] == "reworked"
     assert selected["explainer-d1"]["review_warnings"] == ["仍缺少边界案例"]
     assert duplicates == ["old"]
-    assert coverage["ready_task_ids"] == ["explainer-d1"]
-    assert coverage["complete"] is True
+    assert coverage["ready_task_ids"] == []
+    assert coverage["complete"] is False
+
+
+def test_knowledge_structure_survives_plan_storage_and_schedule_integration():
+    from app.schemas.resource_plan import PlanArtifact
+    from app.services.planned_integration import integrate_approved_plan
+    from tests.test_resource_plan_models import sample_plan_dict
+
+    payload = sample_plan_dict()
+    payload["days"][0]["knowledge_nodes"] = [
+        {"id": "array", "title": "数组存储", "objective": "解释连续存储"},
+        {"id": "list", "title": "链表存储", "objective": "解释链式存储"},
+    ]
+    payload["days"][0]["knowledge_relations"] = [
+        {"from": "array", "to": "list", "kind": "related", "label": "存储方式对比"}
+    ]
+    plan = PlanArtifact.model_validate(payload)
+    assert plan.model_dump(mode="json")["days"][0]["knowledge_relations"][0]["from"] == "array"
+    restored = PlanArtifact.model_validate(plan.model_dump(mode="json"))
+    day = integrate_approved_plan(restored, [])["schedule"][0]
+    assert [node["id"] for node in day["knowledge_nodes"]] == ["array", "list"]
+    assert day["knowledge_relations"] == payload["days"][0]["knowledge_relations"]
 
 
 def test_task_free_calendar_day_still_fills_the_selected_learning_time():
@@ -239,7 +267,7 @@ def test_coverage_accepts_definition_terms_explained_in_natural_language():
     assert coverage["ready_task_ids"] == ["explainer-d1"]
 
 
-def test_integration_embeds_code_and_reading_in_one_daily_handout():
+def test_integration_binds_approved_bodies_without_rewriting():
     import copy
 
     from app.schemas.resource_plan import PlanArtifact
@@ -267,9 +295,7 @@ def test_integration_embeds_code_and_reading_in_one_daily_handout():
 
     result = integrate_approved_plan(plan, resources)
     study = result["schedule"][0]["steps"][0]
-    handout = result["composite_resources"][0]
-
-    assert [item["type"] for item in study["resources"]] == ["explainer"]
-    assert study["resource_types"] == ["explainer"]
-    assert handout["embedded_code_examples"][0]["task_id"] == "code-d1"
-    assert handout["embedded_readings"][0]["task_id"] == "reading-d1"
+    assert [item["type"] for item in study["resources"]] == ["explainer", "code", "reading"]
+    assert study["resource_types"] == ["explainer", "code", "reading"]
+    assert result["composite_resources"] == []
+    assert resources[0]["title"] == "讲义"

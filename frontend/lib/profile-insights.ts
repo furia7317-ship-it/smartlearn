@@ -3,6 +3,7 @@ import type { SubjectLearningPath, SubjectPathStatus } from "./master-learning-p
 import type { PracticeAttempt } from "./practice-feedback.ts";
 import type { ProfileDim } from "./types.ts";
 import type { WatchedVideoRecord } from "./video-learning.ts";
+import { normalizeTrainingEvidence, type TrainingEvidence } from "./training-evidence.ts";
 
 export type ProfileEvidenceKind = "diagnostic" | "practice" | "review";
 
@@ -60,6 +61,7 @@ export interface BuildProfileInsightsOptions {
   assessments: AssessmentRecord[];
   papers: PaperSummary[];
   now?: Date;
+  training?: TrainingEvidence[];
 }
 
 export interface ProfileInsights {
@@ -316,6 +318,12 @@ function buildEvidence(
   now: Date,
 ): ProfileEvidenceRow[] {
   const rows: ProfileEvidenceRow[] = [];
+  normalizeTrainingEvidence(options.training).forEach((item) => rows.push({
+    id: `training-${item.id}`, kind: "practice", label: "实训", content: item.title,
+    knowledge: `${item.course} · ${item.knowledgePoints.join("、")}`, result: `得分 ${item.score}% · 测试 ${item.passedTests}/${item.totalTests}`,
+    time: evidenceTime(item.createdAt, now), occurredAt: item.createdAt,
+    href: `/desktop/training/records/?task=${encodeURIComponent(item.taskId)}`,
+  }));
 
   options.assessments.forEach((assessment) => {
     const score = diagnosticScore(assessment);
@@ -330,7 +338,7 @@ function buildEvidence(
         .join(" "),
       time: evidenceTime(assessment.created_at, now),
       occurredAt: assessment.created_at,
-      href: "/desktop/diagnostic",
+      href: "/desktop/path/assessment",
     });
   });
 
@@ -379,13 +387,15 @@ function buildEvidence(
     rows.push({
       id: `paper-${paper.id}`,
       kind: "practice",
-      label: "练习",
+      label: paper.category === "课程测评" ? "测评" : "练习",
       content: paper.title || "试卷练习",
       knowledge: paper.topic || paper.tags.slice(0, 3).join("、") || "综合练习",
       result: `得分 ${clampPercent(paper.overall_score)}%`,
       time: evidenceTime(paper.created_at, now),
       occurredAt: paper.created_at,
-      href: "/desktop/practice",
+      href: paper.category === "课程测评"
+        ? "/desktop/path/assessment"
+        : "/desktop/practice",
     });
   });
 
@@ -402,6 +412,7 @@ export function buildProfileInsights(
   const now = options.now ? new Date(options.now.getTime()) : new Date();
   const start = rangeStart(now);
   const completed = new Set(options.completedMaterials);
+  const training = normalizeTrainingEvidence(options.training).filter((item) => isRecent(item.createdAt, start, now));
   const recentAttempts = options.practiceAttempts.filter((attempt) =>
     isRecent(attempt.submittedAt, start, now));
   const recentPapers = options.papers.filter((paper) =>
@@ -430,18 +441,10 @@ export function buildProfileInsights(
     : paperQuestionCount > 0
       ? clampPercent(paperWeightedScore / paperQuestionCount)
       : null;
-  const mastery = options.profile.length > 0
-    ? clampPercent(
-        options.profile.reduce((total, item) => total + item.value, 0)
-        / options.profile.length,
-      )
-    : 0;
-  const masteryDelta = options.profile.length > 0
-    ? Math.round(
-        options.profile.reduce((total, item) => total + item.delta, 0)
-        / options.profile.length,
-      )
-    : 0;
+  // Interest, pace and goal clarity are not knowledge scores.
+  const knowledgeDimension = options.profile.find((item) => item.key === "knowledge_level" || item.key === "knowledge");
+  const mastery = knowledgeDimension ? clampPercent(knowledgeDimension.value) : 0;
+  const masteryDelta = knowledgeDimension ? Math.round(knowledgeDimension.delta) : 0;
   const studyMinutes = completedStudyMinutes(
     options.subjectPaths,
     options.taskEvidence,
@@ -450,6 +453,7 @@ export function buildProfileInsights(
     now,
   );
   const activityLevels = buildActivityLevels([
+    ...training.map((item) => item.createdAt),
     ...options.assessments.map((item) => item.created_at),
     ...options.practiceAttempts.map((item) => item.submittedAt),
     ...Object.values(options.taskEvidence).map((item) => item.completedAt),
@@ -466,8 +470,8 @@ export function buildProfileInsights(
       dailyAverageLabel: (studyMinutes / 60 / 30).toFixed(2),
       mastery,
       masteryDelta,
-      completedQuestions,
-      accuracy,
+      completedQuestions: completedQuestions + training.length,
+      accuracy: training.length ? clampPercent(((accuracy ?? 0) * completedQuestions + training.reduce((sum, item) => sum + item.score, 0)) / (completedQuestions + training.length)) : accuracy,
       activityLevels,
       rangeStartLabel: shortDate(start),
       rangeEndLabel: shortDate(now),

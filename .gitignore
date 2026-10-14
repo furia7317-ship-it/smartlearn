@@ -5,6 +5,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 .pytest-tmp/
+.schema-backups/
 .run/
 *.egg-info/
 
@@ -18,6 +19,8 @@ data/
 chroma/
 /backend/media/
 /output/
+/artifacts/
+/软件著作权申请资料/
 *.mp4
 *.pptx
 *.srt
@@ -49,6 +52,7 @@ dist/
 .next/
 out/
 dist-electron/
+dist-electron-demo/
 *.tsbuildinfo
 coverage/
 .coverage
@@ -65,11 +69,18 @@ frontend/runtime/
 .vscode/
 
 # Local QA, smoke-test, and generated review artifacts
+/.planning/
+/教师端/备份_*/
 /NUL
 /tmp/
 /.codex-smoke/
+/.codex_tmp/
 /.ruff_cache/
 /.superpowers/
+/design-audit/
+/design-qa.md
+/design-qa-*.png
+/项目交接说明.md
 /artifacts/smartlearn-web-*
 /artifacts/smartlearn-frontend-*.tar.gz
 /artifacts/competition_doc/rendered*/

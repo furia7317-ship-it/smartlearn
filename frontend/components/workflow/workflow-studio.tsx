@@ -166,7 +166,9 @@ export function WorkflowStudio({
   onBack,
   onSaved,
 }: WorkflowStudioProps) {
-  const { mode } = useOrchestratorContext();
+  const { mode } = useOrchestratorContext((state) => ({
+    mode: state.mode,
+  }));
   const reduceMotion = useReducedMotion();
   const stageRef = useRef<HTMLDivElement>(null);
   const timersRef = useRef<number[]>([]);

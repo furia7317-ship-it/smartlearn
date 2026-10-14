@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   clearAuthenticatedStudentId,
+  createAnonymousUuid,
   getStudentId,
   setAuthenticatedStudentId,
 } from "../lib/student-identity.ts";
@@ -37,6 +38,17 @@ test("browser identity is generated once and reused", () => {
 
   assert.equal(first, "local_11111111-1111-4111-8111-111111111111");
   assert.equal(second, first);
+});
+
+test("browser identity falls back when randomUUID is unavailable on an HTTP IP origin", () => {
+  const uuid = createAnonymousUuid({
+    getRandomValues(values) {
+      values.set(Array.from({ length: 16 }, (_, index) => index));
+      return values;
+    },
+  });
+
+  assert.equal(uuid, "00010203-0405-4607-8809-0a0b0c0d0e0f");
 });
 
 test("desktop installation identity wins over browser storage", () => {
@@ -93,7 +105,7 @@ test("learner API callers use the runtime identity instead of a hard-coded accou
       "../lib/ppt-export.ts",
       "../hooks/use-material-generator.ts",
       "../hooks/use-orchestrator.ts",
-      "../app/diagnostic/page.tsx",
+      "../components/learning-baseline-gate.tsx",
       "../app/path/study/page.tsx",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8"))
   );

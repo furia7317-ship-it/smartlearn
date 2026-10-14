@@ -1,0 +1,446 @@
+{
+  "version": 1,
+  "notice": "当前版本仅保留学生端功能。智能教师是 AI 学习助手；没有教师端、班级管理、代码挑战或学情摸底入口。软件操作说明使用本内置指南，课程概念使用课程知识库。不要编造按钮、数据或已经执行的操作。",
+  "entries": [
+    {
+      "id": "teaching-methods",
+      "title": "教学方法",
+      "href": "/desktop/settings/?section=methods",
+      "aliases": ["方法库", "教学方法管理", "Skill管理", "技能管理"],
+      "keywords": ["候选方法", "启用方法", "停用方法", "方法版本", "回退方法"],
+      "location": "设置 → 教学方法",
+      "content": "查看内置和本账户积累的教学方法。候选方法可以检查、查看步骤和来源，通过检查后可启用；个人方法可停用或切回已通过检查的旧版本。资源任务按需选用已启用方法，内置方法只读。方法检查与资料审核不代表学生成绩已经提高。"
+    },
+    {
+      "id": "home",
+      "title": "首页",
+      "href": "/desktop/",
+      "aliases": [
+        "工作台",
+        "主页"
+      ],
+      "location": "左侧导航栏 → 首页",
+      "content": "查看今日任务、最近继续、学习安排和学习分析；首页快捷入口可进入练习、笔记和智能教师。"
+    },
+    {
+      "id": "path",
+      "title": "学习路径",
+      "href": "/desktop/path/?tab=overview",
+      "aliases": [
+        "路径总览",
+        "总学习路径"
+      ],
+      "location": "左侧导航栏 → 学习路径 → 顶部「路径总览」",
+      "content": "点击知识节点，在右侧查看节点资料、今日任务和「继续学习」。节点区分已掌握、当前学习、可学习和待解锁。"
+    },
+    {
+      "id": "courses",
+      "title": "课程管理",
+      "href": "/desktop/path/?tab=courses",
+      "aliases": [
+        "课程列表",
+        "我的课程"
+      ],
+      "location": "学习路径 → 顶部「课程管理」",
+      "content": "查看课程和知识点，为学习路径添加课程，管理课程启用状态。这里是个人学习课程，不是班级管理。"
+    },
+    {
+      "id": "plan",
+      "title": "学习计划",
+      "href": "/desktop/path/?tab=plan",
+      "aliases": [
+        "计划管理",
+        "每日计划"
+      ],
+      "location": "学习路径 → 顶部「学习计划」",
+      "content": "安排每日学习节奏和目标，查看后续任务。智能教师放大窗口左栏也有「学习计划」，点击会打开独立小窗。"
+    },
+    {
+      "id": "assessment",
+      "title": "考试测评",
+      "href": "/desktop/path/assessment/",
+      "aliases": [
+        "课程测评",
+        "考试",
+        "测评"
+      ],
+      "location": "学习路径 → 顶部「考试测评」",
+      "content": "选择课程、知识范围与题型，生成测评后作答、提交，查看成绩和分析。"
+    },
+    {
+      "id": "resources",
+      "title": "资源中心",
+      "href": "/desktop/resources/",
+      "aliases": [
+        "资料中心",
+        "资源库",
+        "资料库",
+        "生成资料库"
+      ],
+      "location": "左侧导航栏 → 资源中心",
+      "content": "点击书本进入资源工作台。可搜索标题、知识点或类型，按类型、状态、来源筛选。选中资料后点击「打开资料」，还可以加入集合、挂载路径和导出 Markdown。页面上的「AI生成资料」和「进入知识库」分别进入创作页和课程知识库。"
+    },
+    {
+      "id": "create",
+      "title": "资源生成",
+      "href": "/desktop/create/",
+      "aliases": [
+        "AI生成资料",
+        "AI资源创作",
+        "资源创作",
+        "生成资料",
+        "创建资料"
+      ],
+      "location": "资源中心 →「AI生成资料」",
+      "content": "左侧选择生成模式，填写「主题 / 科目」「知识点与要求」，勾选资料类型，点击底部「开始生成」；右侧「生成内容」展示过程和结果。快速、标准、深度直接切换；「更多生成设置」里的「完整模式」可选择严谨模式。可生成讲义文档、练习题库、题目解析、扩展阅读、代码示例、讲解视频、课件 PPT、交互演示。",
+      "keywords": [
+        "严谨模式",
+        "协作模式",
+        "生成模式",
+        "讲解视频",
+        "生成课件",
+        "生成资料",
+        "开始生成",
+        "知识点与要求"
+      ]
+    },
+    {
+      "id": "kb",
+      "title": "课程知识库",
+      "href": "/desktop/kb/",
+      "aliases": [
+        "知识库",
+        "我的书库",
+        "智能荐书",
+        "联网找教材"
+      ],
+      "location": "资源中心 →「进入知识库」",
+      "content": "「我的书库」可以预览已保存教材正文、查看或生成章节图谱。「智能荐书」点击「生成书单」，根据专业和年级推荐教材；可通过「去设置」修改学情。「联网找教材」输入关键词并搜索，再保存或下载嵌入正文。下方文档集和「检索示例」用于查看文档与检索片段；检索使用云端嵌入与重排序。",
+      "keywords": [
+        "云端嵌入",
+        "重排序",
+        "荐书",
+        "检索示例",
+        "导入教材"
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "练习与错题",
+      "href": "/desktop/practice/?tab=recommended",
+      "aliases": [
+        "练习",
+        "练习中心",
+        "题库",
+        "练习题库"
+      ],
+      "location": "首页快捷入口「生成练习」→ 练习与错题",
+      "content": "顶部可切换推荐题库、我的题库、最近练习、收藏题库和错题本。题库卡片点击「开始练习」，答题后提交并查看答案解析，错题自动整理。"
+    },
+    {
+      "id": "wrongbook",
+      "title": "错题本",
+      "href": "/desktop/practice/?tab=wrongbook",
+      "aliases": [
+        "错题",
+        "我的错题"
+      ],
+      "location": "练习与错题 → 顶部「错题本」",
+      "content": "查看自己的错误答案、正确答案与解析；点击「同类再练」向智能教师提出针对该知识点的练习需求。"
+    },
+    {
+      "id": "practice-mine",
+      "title": "我的题库",
+      "href": "/desktop/practice/?tab=mine",
+      "aliases": [],
+      "location": "练习与错题 →「我的题库」",
+      "content": "查看已保存的练习卷，选择题库并开始练习。"
+    },
+    {
+      "id": "practice-recent",
+      "title": "最近练习",
+      "href": "/desktop/practice/?tab=recent",
+      "aliases": [],
+      "location": "练习与错题 →「最近练习」",
+      "content": "按最近作答情况继续练习，查看练习记录。"
+    },
+    {
+      "id": "practice-starred",
+      "title": "收藏题库",
+      "href": "/desktop/practice/?tab=starred",
+      "aliases": [
+        "收藏的题库"
+      ],
+      "location": "练习与错题 →「收藏题库」",
+      "content": "题库卡片的收藏按钮可以收藏或取消收藏，在此集中查看。"
+    },
+    {
+      "id": "training",
+      "title": "实训中心",
+      "href": "/desktop/training/",
+      "aliases": [
+        "代码实训",
+        "编程实训"
+      ],
+      "location": "左侧导航栏 → 实训中心",
+      "content": "从实训概览进入任务库，选择任务查看要求，再进入工作台编写与运行代码。工作台可「请教智能教师」。Python 任务支持平台自测和执行轨迹，其他语言按页面支持的运行方式使用。"
+    },
+    {
+      "id": "training-tasks",
+      "title": "实训任务库",
+      "href": "/desktop/training/tasks/",
+      "aliases": [
+        "任务库"
+      ],
+      "location": "实训中心 →「任务库」",
+      "content": "选择任务后查看任务要求和示例，进入实训工作台完成代码。"
+    },
+    {
+      "id": "training-records",
+      "title": "实训档案",
+      "href": "/desktop/training/records/",
+      "aliases": [
+        "实训记录"
+      ],
+      "location": "实训中心 →「实训档案」",
+      "content": "查看保存的实训记录、代码及运行情况。"
+    },
+    {
+      "id": "training-generate",
+      "title": "生成实训",
+      "href": "/desktop/training/generate/",
+      "aliases": [
+        "实训生成"
+      ],
+      "location": "实训中心 → 生成实训任务",
+      "content": "填写实训主题与要求，生成任务后再进入工作台。"
+    },
+    {
+      "id": "profile",
+      "title": "个人主页",
+      "href": "/desktop/profile/",
+      "aliases": [
+        "个人中心",
+        "我的主页"
+      ],
+      "location": "左下角账号头像 / 名称 → 个人主页",
+      "content": "查看个人概览、学习记录、成果档案与账号设置。"
+    },
+    {
+      "id": "graph",
+      "title": "个人知识图谱",
+      "href": "/desktop/profile/?view=graph",
+      "aliases": [
+        "知识图谱"
+      ],
+      "location": "首页学习分析 → 个人知识图谱",
+      "content": "查看个人知识掌握情况。智能教师放大窗口右侧也有知识图谱，可点击节点结合当前问题学习。"
+    },
+    {
+      "id": "achievements",
+      "title": "成果档案",
+      "href": "/desktop/profile/?tab=achievements",
+      "aliases": [
+        "学习成果"
+      ],
+      "location": "个人主页 →「成果档案」",
+      "content": "查看个人学习成果与归档记录。"
+    },
+    {
+      "id": "settings",
+      "title": "设置",
+      "href": "/desktop/settings/",
+      "aliases": [
+        "系统设置",
+        "账号设置"
+      ],
+      "location": "左下角账号旁的菜单 → 设置",
+      "content": "设置中包含学情与外观、学习与 AI、目标管理、记忆与隐私、模型与服务。"
+    },
+    {
+      "id": "memory",
+      "title": "记忆与隐私",
+      "href": "/desktop/settings/?section=memory",
+      "aliases": [
+        "记忆系统",
+        "记忆管理",
+        "长期记忆"
+      ],
+      "location": "设置 → 左侧「记忆与隐私」",
+      "content": "查看工作记忆、情景记忆和语义记忆，按页面按钮导出或删除记忆。进入此页不会自动删除任何记录。"
+    },
+    {
+      "id": "services",
+      "title": "模型与服务",
+      "href": "/desktop/settings/?section=services",
+      "aliases": [
+        "模型设置",
+        "模型配置",
+        "服务设置"
+      ],
+      "location": "设置 → 左侧「模型与服务」",
+      "content": "查看模型能力、配置和连接状态。修改配置需要在页面填写并保存，不会因为打开页面而改动密钥。"
+    },
+    {
+      "id": "goals",
+      "title": "目标管理",
+      "href": "/desktop/settings/?section=goals",
+      "aliases": [
+        "学习目标"
+      ],
+      "location": "设置 → 左侧「目标管理」",
+      "content": "设置长期、中期和短期学习目标。"
+    },
+    {
+      "id": "preferences",
+      "title": "学习与 AI",
+      "href": "/desktop/settings/?section=preferences",
+      "aliases": [
+        "学习与AI",
+        "学习偏好",
+        "AI设置"
+      ],
+      "location": "设置 → 左侧「学习与 AI」",
+      "content": "设置教学偏好与学习默认值。"
+    },
+    {
+      "id": "appearance",
+      "title": "学情与外观",
+      "href": "/desktop/settings/?section=profile",
+      "aliases": [
+        "外观设置",
+        "学情设置",
+        "主题设置"
+      ],
+      "location": "设置 → 左侧「学情与外观」",
+      "content": "修改姓名、专业、年级和界面主题，完成后保存。"
+    },
+    {
+      "id": "discover",
+      "title": "发现",
+      "href": "/desktop/discover/",
+      "aliases": [],
+      "location": "左侧导航栏 → 发现",
+      "content": "进入互动教学和学习市场，体验情景学习或使用共享学习内容。"
+    },
+    {
+      "id": "theater",
+      "title": "互动教学",
+      "href": "/desktop/theater/",
+      "aliases": [
+        "情景教学",
+        "教学剧场"
+      ],
+      "location": "发现 → 互动教学",
+      "content": "导入 PDF、Word、PPT、表格或文本，也可选择已有资料，生成情景内容并通过选择与反馈学习；单文件大小以页面提示为准。"
+    },
+    {
+      "id": "market",
+      "title": "学习市场",
+      "href": "/desktop/market/",
+      "aliases": [
+        "市场",
+        "共享资源"
+      ],
+      "location": "发现 → 学习市场",
+      "content": "浏览和导入学习路径、资料、资源包及工作流；发布内容需由你选择并确认。"
+    },
+    {
+      "id": "calendar",
+      "title": "学习日历",
+      "href": "/desktop/calendar/",
+      "aliases": [
+        "日历",
+        "日程"
+      ],
+      "location": "首页 → 今日安排 / 日历入口",
+      "content": "按日期查看学习安排。"
+    },
+    {
+      "id": "todos",
+      "title": "待办事项",
+      "href": "/desktop/todos/",
+      "aliases": [
+        "待办",
+        "今日任务"
+      ],
+      "location": "首页 → 今日任务 / 待办入口",
+      "content": "查看待办学习任务，按任务进入相应学习内容。"
+    },
+    {
+      "id": "notes",
+      "title": "新建笔记",
+      "href": "/desktop/notes/new/",
+      "aliases": [
+        "笔记",
+        "学习笔记"
+      ],
+      "location": "首页快捷入口 → 新建笔记",
+      "content": "记录学习内容并保存笔记。"
+    },
+    {
+      "id": "teacher",
+      "title": "智能教师",
+      "href": "/desktop/studio/",
+      "aliases": [
+        "智能老师",
+        "学习问答"
+      ],
+      "location": "任意学习页面右下角 → 智能教师",
+      "content": "点击气泡打开问答小窗，输入问题并发送，可结合当前页面答疑；输入框附件按钮支持图片、PDF 和文档。窗口可调整大小、放大为中央窗口，关闭按钮收起窗口。窗口顶部的双对话框图标是「会话管理」，可搜索、按学习问答或资料问答筛选、切换、重命名和删除会话；加号新建会话，列表底部可清除本账号全部会话，删除操作需要确认。切换会话会保留各自未发送的文字和附件，进行中的回答会继续。可以直接说「打开资源中心」「打开错题本」，也可以问「严谨模式在哪里」。",
+      "keywords": [
+        "上传附件",
+        "上传图片",
+        "上传文档",
+        "语音通话",
+        "小窗大小",
+        "会话管理",
+        "历史会话",
+        "重命名会话",
+        "删除会话"
+      ]
+    },
+    {
+      "id": "teacher-create",
+      "title": "资源创作小窗",
+      "href": "/desktop/create/",
+      "aliases": [
+        "生成资料小窗"
+      ],
+      "location": "智能教师放大窗口 → 左侧「资源创作」",
+      "content": "在独立小窗填写生成要求并查看进度，不离开当前学习页面。",
+      "window": "create"
+    },
+    {
+      "id": "teacher-plan",
+      "title": "学习计划小窗",
+      "href": "/desktop/path/?tab=plan",
+      "aliases": [
+        "计划小窗"
+      ],
+      "location": "智能教师放大窗口 → 左侧「学习计划」",
+      "content": "在独立小窗查看和安排学习计划，不离开当前学习页面。",
+      "window": "plan"
+    },
+    {
+      "id": "video-learning",
+      "title": "视频学习",
+      "href": "/desktop/video-learning/",
+      "aliases": [
+        "学习视频"
+      ],
+      "location": "资源中心 → 选择视频资料后进入学习",
+      "content": "查看学习视频与关联资料；可以从资源中心选择已有的视频资料进行播放，也可以在智能教师里明确指定要打开的视频标题。"
+    },
+    {
+      "id": "profile-records",
+      "title": "学习记录",
+      "href": "/desktop/profile/?tab=records",
+      "aliases": [
+        "我的学习记录"
+      ],
+      "location": "左下角账号 → 个人主页 →「学习记录」",
+      "content": "查看练习、复习等学习行为形成的个人学习记录，按页面提供的类别筛选。"
+    }
+  ]
+}

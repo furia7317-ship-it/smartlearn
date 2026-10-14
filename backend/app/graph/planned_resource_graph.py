@@ -9,6 +9,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
+from contextvars import ContextVar
 
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
@@ -41,10 +42,10 @@ from app.services.resource_quality import (
 )
 from app.services.resource_grounding import apply_grounding_gate, verify_resource_semantics
 from app.services.resource_planning import normalize_plan_task_types
+from app.services.orchestration_profiles import resolve_policy
 
 DEFAULT_RETRY_POLICY: dict[str, int | float] = {
-    # A candidate may be regenerated once. A second quality rejection is
-    # released with warnings so one imperfect artifact cannot strand a plan.
+    # Default repair allowance; remaining rejections stay unpublished.
     "max_task_retries": 1,
     "max_reviewer_attempts": 2,
     "max_run_seconds": 300.0,
@@ -57,6 +58,7 @@ DEFAULT_RETRY_POLICY: dict[str, int | float] = {
 }
 
 REVIEW_MAX_CONCURRENCY = min(30, max(1, settings.AGENT_MAX_CONCURRENCY))
+runtime_writer: ContextVar[Any] = ContextVar("resource_runtime_writer", default=None)
 
 
 def _review_can_retry(
@@ -78,7 +80,7 @@ def _review_can_retry(
     policy = dict(DEFAULT_RETRY_POLICY)
     if state:
         policy.update(state.get("retry_policy") or {})
-        policy["max_task_retries"] = min(1, int(policy.get("max_task_retries") or 1))
+        policy["max_task_retries"] = min(3, max(0, int(policy.get("max_task_retries", 1))))
         started_at = float(state.get("run_started_at") or time.time())
         if time.time() - started_at >= float(policy["max_run_seconds"]):
             return False
@@ -107,33 +109,8 @@ def _auto_release_after_rework_limit(
     review: dict[str, Any],
     resource: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Release an existing candidate after its single allowed quality rework."""
-    if (
-        resource is None
-        or review.get("approved")
-        or review.get("failure_kind") != "quality"
-        or int(review.get("retry_count") or 0) < 1
-    ):
-        return review
-    blocking = [str(item) for item in review.get("blocking_issues") or [] if str(item)]
-    issues = [str(item) for item in review.get("issues") or [] if str(item)]
-    warnings = list(dict.fromkeys([
-        *[str(item) for item in review.get("warnings") or [] if str(item)],
-        *blocking,
-        *issues,
-        "已完成一次自动返工；达到返工上限后携带审核告警自动放行。",
-    ]))
-    return {
-        **review,
-        "approved": True,
-        "auto_released": True,
-        "gate_status": "approved_after_rework_limit",
-        "release_reason": "single_rework_limit_reached",
-        "blocking_issues": [],
-        "warnings": warnings,
-        "retryable": False,
-        "terminal": True,
-    }
+    """Compatibility seam: exhausting repair budgets never grants approval."""
+    return review
 
 
 def _retry_delay_seconds(retry_count: int) -> float:
@@ -333,6 +310,10 @@ def get_agent(
 
 
 def _emit(payload: dict[str, Any]) -> None:
+    writer = runtime_writer.get()
+    if writer is not None:
+        writer(payload)
+        return
     try:
         get_stream_writer()(payload)
     except RuntimeError:
@@ -514,26 +495,16 @@ def build_planned_state(
             plan,
             preserve_explicit_quiz_count=False,
         )
-        # Long plans produced before the parallel planner used one synthetic
-        # predecessor per task.  The exact full-chain shape is safe to migrate:
-        # calendar prerequisites remain intact while independent artifacts can
-        # finally generate concurrently on retry.
-        if len(plan.tasks) >= 3 and all(
-            task.depends_on == ([] if index == 0 else [plan.tasks[index - 1].task_id])
-            for index, task in enumerate(plan.tasks)
-        ):
-            for task in plan.tasks:
-                task.depends_on = []
     execution = execution_state or {}
     trace_run_id = str(execution.get("trace_run_id") or f"plan_{uuid.uuid4().hex[:12]}")
     retry_policy = {
         **DEFAULT_RETRY_POLICY,
+        **resolve_policy(
+            plan.collaboration.model_dump(), [t.model_dump() for t in plan.tasks]
+        )["retry_policy"],
         **dict(execution.get("retry_policy") or {}),
     }
-    retry_policy["max_task_retries"] = min(
-        1,
-        int(retry_policy.get("max_task_retries") or 1),
-    )
+    retry_policy["max_task_retries"] = min(3, max(0, int(retry_policy.get("max_task_retries", 1))))
     register_run(
         trace_run_id,
         parent_run_id=str(execution.get("parent_run_id") or "") or None,
@@ -558,6 +529,7 @@ def build_planned_state(
         "retry_policy": retry_policy,
         # 图跑在工作线程里，不能查库：``custom:<id>`` 的定义由管线入口预加载进来。
         "custom_agents": dict(execution.get("custom_agents") or {}),
+        "skill_review_history": dict(execution.get("skill_review_history") or {}),
         "knowledge_gate_enforced": bool(execution.get("knowledge_gate_enforced", False)),
     }
 
@@ -998,23 +970,26 @@ def run_planned_task(state: PlannedResourceState) -> dict[str, Any]:
                 "title": str(resource.get("title") or dependency_id),
                 "type": str(resource.get("type") or ""),
                 "summary": extract_resource_text(resource)[:1200],
+                "questions": resource.get("questions", [])[:30] if task.get("type") == "solution" else [],
             }
         )
     agent_state = {
         "topic": task["title"],
         "student_id": state["student_id"],
-        "requirements": task["outline"]["objective"],
+        "requirements": task["outline"]["objective"] + "\n" + str((state["plan"].get("request_contract") or {}).get("requirements") or ""),
         "profile": state.get("profile", {}),
         "kb_context": scoped_kb,
         "resource_outline": task["outline"],
         "quality_criteria": task["quality_criteria"],
         "chapter": {"id": task["day"], "title": task["title"]},
         "plan_task": task,
+        "collaboration_effort": (state["plan"].get("collaboration") or {}).get("effort"),
         "dependency_outputs": dependency_outputs,
         "quiz_config": _planned_quiz_config(task),
         "revise_note": str(task.get("_revise_note") or ""),
         "repair_instructions": repair_instructions,
         "repair_context": repair_context,
+        "procedure_skills": list((state.get("procedure_skills") or {}).get(task["task_id"], [])),
     }
     try:
         cancellation_checkpoint(state["trace_run_id"])
@@ -1413,7 +1388,6 @@ def review_tasks(
         review_payload["repair_history_fingerprints"] = list(
             dict.fromkeys([*repair_history, *current_fingerprints])
         )[:24]
-        review_payload = _auto_release_after_rework_limit(review_payload, resource)
         review_payload["terminal"] = not _review_can_retry(review_payload, state)
         failure_kind = str(review_payload.get("failure_kind") or "")
         reviewer_unavailable = failure_kind in {"reviewer", "budget"}
@@ -1851,4 +1825,7 @@ def build_graph():
     return graph.compile()
 
 
-planned_resource_app = build_graph()
+# The graph's single-task functions remain reusable. The scheduler releases
+# dependency tasks immediately, independently of LangGraph superstep barriers.
+from app.services.orchestration_runtime import OrchestrationRuntime  # noqa: E402
+planned_resource_app = OrchestrationRuntime()

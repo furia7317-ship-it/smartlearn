@@ -152,6 +152,7 @@ async def update_artifact(
             "status": plan.status,
             "artifact": plan.model_dump(mode="json"),
             "validation": plan.validation.model_dump(mode="json"),
+            "execution_state": PlanExecutionState().model_dump(mode="json"),
         },
     )
 

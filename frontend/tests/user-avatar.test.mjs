@@ -55,7 +55,7 @@ test("avatar storage rejects unsupported or malformed data", () => {
 test("personal profile owns avatar editing and the shell shares its avatar", () => {
   const settings = read("app/settings/page.tsx");
   const profile = read("app/desktop/profile/page.tsx");
-  const shell = read("components/layout/desktop-shell.tsx");
+  const shell = read("components/layout/desktop-shell.tsx") + read("components/layout/desktop-account.tsx");
   const market = read("components/desktop/desktop-market.tsx");
 
   assert.doesNotMatch(settings, /AvatarPicker/);

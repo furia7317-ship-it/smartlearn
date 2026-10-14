@@ -7,6 +7,15 @@ import json
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def mock_cloud_reranker(monkeypatch):
+    from app.services import rag
+    class Reranker:
+        def predict(self, pairs):
+            return [1.0 / (i + 1) for i in range(len(pairs))]
+    monkeypatch.setattr(rag, "_get_reranker", lambda: Reranker())
+
+
 def test_distance_to_similarity_is_bounded() -> None:
     from app.services.knowledge_gate import distance_to_similarity
 
@@ -14,6 +23,16 @@ def test_distance_to_similarity_is_bounded() -> None:
     assert distance_to_similarity(0.58) == 0.71
     assert distance_to_similarity(2) == 0.0
     assert distance_to_similarity("bad") == 0.0
+
+
+@pytest.mark.parametrize('vector, rerank, expected', [(0.9, 0.001, 'kb_miss'), (0.6, 0.2, 'matched')])
+def test_cloud_pair_relevance_replaces_legacy_vector_threshold(monkeypatch, vector, rerank, expected):
+    from app.services import knowledge_gate
+    monkeypatch.setattr('app.services.rag.retrieve_for_gate', lambda *args: [
+        {'content': '候选内容', 'vector_similarity': vector, 'reranker_score': rerank}])
+    result = knowledge_gate.check_knowledge_gate('问题')
+    assert result.status == expected
+    assert result.best_score == rerank
 
 
 def test_gate_distinguishes_match_miss_and_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -40,7 +59,7 @@ def test_gate_distinguishes_match_miss_and_unavailable(monkeypatch: pytest.Monke
     assert "internal detail" not in str(outage.error_payload())
 
 
-def test_gate_falls_back_when_vector_returns_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gate_does_not_fall_back_when_vector_returns_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.services import rag
 
     class Collection:
@@ -58,10 +77,13 @@ def test_gate_falls_back_when_vector_returns_empty(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(rag, "get_or_create_collection", lambda *args: Collection())
     monkeypatch.setattr(rag, "_get_embedder", lambda: Embedder())
-    monkeypatch.setattr(rag, "_markdown_chunks", lambda: [{"id": "kb-real", "content": "数据结构课程内容", "metadata": {"title": "数据结构"}}])
-    result = rag.retrieve_for_gate("帮我生成一份数据结构的学习路径")
-    assert result[0]["id"] == "kb-real"
-    assert result[0]["retrieval_source"] == "markdown"
+    monkeypatch.setattr(
+        rag,
+        "_markdown_chunks",
+        lambda: (_ for _ in ()).throw(AssertionError("keyword fallback must not run")),
+    )
+    with pytest.raises(rag.RetrievalUnavailable):
+        rag.retrieve_for_gate("帮我生成一份数据结构的学习路径")
 
 
 def test_gate_prioritizes_exact_local_evidence_over_stale_vector_hits(
@@ -123,6 +145,7 @@ def test_markdown_blocks_keep_adjacent_definition_and_operations_together() -> N
 @pytest.mark.asyncio
 async def test_create_plan_kb_miss_does_not_call_builder(monkeypatch: pytest.MonkeyPatch) -> None:
     from fastapi import HTTPException
+
     from app.routers import resource_plans
     from app.schemas.resource import ResourceRequest
     from app.services.knowledge_gate import KnowledgeGateResult
@@ -206,6 +229,7 @@ async def test_chat_kb_miss_falls_back_to_streamed_general_answer(monkeypatch: p
 @pytest.mark.asyncio
 async def test_assess_exam_kb_miss_short_circuits_before_graph(monkeypatch: pytest.MonkeyPatch) -> None:
     from fastapi import HTTPException
+
     from app.routers import assess
     from app.schemas.exam import ExamRequest
     from app.services.knowledge_gate import KnowledgeGateResult

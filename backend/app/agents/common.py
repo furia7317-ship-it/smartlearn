@@ -151,7 +151,17 @@ def _repair_prompt(state: dict[str, Any]) -> str:
 def prompt_extras(state: dict[str, Any]) -> str:
     parts = []
 
+    if state.get("procedure_skills"):
+        from app.services.procedure_skill_runtime import format_procedure_guidance
+        guidance = format_procedure_guidance(state["procedure_skills"])
+        if guidance:
+            parts.append(guidance)
+
     p = state.get("profile") or {}
+    if p.get("learning_data"):
+        from app.services.learning_data import context_text
+        from app.services.agent_memory import fit_untrusted_context
+        parts.append(fit_untrusted_context(context_text(p["learning_data"], str(state.get("topic") or state.get("requirements") or "")), 1800))
     style = p.get("cognitive_style") or {}
     hints = []
     if style.get("visual", 0) > 0.4:
@@ -172,7 +182,16 @@ def prompt_extras(state: dict[str, Any]) -> str:
     # 用户填写的知识点 / 具体要求（表单生成路径）
     requirements = (state.get("requirements") or "").strip()
     if requirements:
-        parts.append(f"需重点覆盖的知识点与要求：{requirements[:600]}")
+        parts.append(f"需重点覆盖的知识点与要求：{requirements[:4000]}")
+
+    task = state.get("plan_task") or {}
+    if task.get("type"):
+        parts.append(
+            f"当前只交付一份 {task['type']} 类型的资料；总需求中的其他资料由对应任务交付。"
+            "共享示例、受众、语言和结论必须遵守总需求，但不要在当前资料中重复生成整套材料。"
+            "若包含代码，复杂度说明必须对应实际实现，计入列表复制、拼接等操作成本；"
+            "若要求线性复杂度，选用实际满足该复杂度的实现。"
+        )
 
     # 导入的摸底分析（学情上下文）
     assessment = (state.get("assessment_context") or "").strip()
@@ -234,6 +253,11 @@ def prompt_extras(state: dict[str, Any]) -> str:
             title = str(dependency.get("title") or dependency.get("task_id") or "依赖资料")
             summary = str(dependency.get("summary") or "").strip()[:1200]
             dependency_lines.append(f"- {title}：{summary}")
+            if task.get("type") == "solution" and dependency.get("questions"):
+                dependency_lines.append(
+                    "本任务必须逐题解析以下已审核试题，保留题号、题干和选项，不另出新题：\n"
+                    + json.dumps(dependency["questions"], ensure_ascii=False, default=str)
+                )
     if dependency_lines:
         parts.append("已审核依赖资料（后续内容必须与这些结论衔接）：\n" + "\n".join(dependency_lines))
 

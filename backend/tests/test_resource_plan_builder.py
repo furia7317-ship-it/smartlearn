@@ -106,6 +106,77 @@ def test_execution_source_binding_uses_domain_hints_for_hash_and_graph_tasks():
     assert rebound.tasks[1].source_ids == ["kb-graph"]
 
 
+@pytest.mark.parametrize("focused_fails", [False, True])
+def test_source_binding_keeps_topic_details_inside_the_matched_chapter(focused_fails):
+    from app.schemas.resource_plan import PlanArtifact
+    from app.services.resource_plan_builder import bind_plan_task_sources
+
+    payload = sample_plan_dict()
+    for task in payload["tasks"]:
+        task["title"] = "二叉树遍历思维导图"
+        task["knowledge_points"] = ["前序遍历", "中序遍历", "后序遍历"]
+        for section in task["outline"]["sections"]:
+            section["title"] = "遍历顺序"
+    heading = {
+        "id": "tree-heading", "content": "第五章 树与二叉树",
+        "metadata": {"source": "05-树与二叉树.md"},
+        "retrieval_source": "markdown", "lexical_score": 130,
+    }
+    detail = {
+        "id": "tree-traversal", "content": "中序：左子树、根、右子树。",
+        "metadata": {"source": "05-树与二叉树.md"},
+        "retrieval_source": "hybrid", "lexical_score": 60,
+    }
+    unrelated = {
+        "id": "graph", "content": "最小生成树",
+        "metadata": {"source": "06-图.md"},
+        "retrieval_source": "markdown", "lexical_score": 150,
+    }
+
+    def retrieve(query, *_args):
+        if query == "树与二叉树":
+            return [heading]
+        if focused_fails:
+            raise RuntimeError("focused retrieval unavailable")
+        return [unrelated, detail, heading]
+
+    rebound, context = bind_plan_task_sources(
+        PlanArtifact.model_validate(payload), [], student_id="student-1", retriever=retrieve,
+    )
+    expected = ["tree-heading"] if focused_fails else ["tree-traversal", "tree-heading"]
+    assert all(task.source_ids == expected for task in rebound.tasks)
+    assert [item["id"] for item in context] == expected
+
+
+def test_source_binding_keeps_multiple_chapters_when_focused_hits_favor_one():
+    from app.schemas.resource_plan import PlanArtifact
+    from app.services.resource_plan_builder import bind_plan_task_sources
+
+    payload = sample_plan_dict()
+    for task in payload["tasks"]:
+        task["title"] = "二叉树与哈希表对比"
+        task["knowledge_points"] = ["二叉树", "哈希表"]
+        for section in task["outline"]["sections"]:
+            section["title"] = "对比"
+
+    def chunk(name, source):
+        return {"id": name, "content": name, "metadata": {"source": source},
+                "retrieval_source": "markdown", "lexical_score": 110}
+
+    def retrieve(query, *_args):
+        if query == "树与二叉树":
+            return [chunk("tree-heading", "trees.md")]
+        if query == "查找算法":
+            return [chunk("hash-detail", "search.md")]
+        return [chunk("tree-detail-1", "trees.md"), chunk("tree-detail-2", "trees.md")]
+
+    rebound, _ = bind_plan_task_sources(
+        PlanArtifact.model_validate(payload), [], student_id="student-1",
+        retriever=retrieve, sources_per_task=2,
+    )
+    assert all(task.source_ids == ["tree-detail-1", "hash-detail"] for task in rebound.tasks)
+
+
 def test_builder_uses_kb_profile_and_returns_validated_plan():
     from app.services.resource_plan_builder import build_resource_plan
 
@@ -315,6 +386,29 @@ def test_long_builder_expands_every_selected_type_per_day_without_redundant_outl
     assert quiz_tasks
     assert all(sum(task.quiz_config.values()) >= 5 for task in quiz_tasks)
     assert all(task.quality_criteria[0].startswith("必须生成 ") for task in quiz_tasks)
+
+
+def test_long_plan_keeps_chapter_knowledge_branches_and_prompts_for_relationships():
+    from app.services.resource_plan_builder import build_resource_plan
+
+    skeleton = _long_schedule_only(14)
+    skeleton["days"][0]["knowledge_nodes"] = [
+        {"id": "sequence", "title": "顺序存储"},
+        {"id": "linked", "title": "链式存储"},
+    ]
+    skeleton["days"][0]["knowledge_relations"] = [
+        {"from": "sequence", "to": "linked", "kind": "related", "label": "存储方式对比"}
+    ]
+    fake = FakeLLM(_long_plan_responses(skeleton))
+    plan = build_resource_plan(
+        request_text="数据结构长学习路径", student_id="s", profile={},
+        kb_context=[{"id": "kb-1", "content": "数据结构"}],
+        learning_path_preferences={"goal": "exam", "days": 14, "daily_minutes": 60, "material_types": ["explainer", "quiz"]},
+        llm=fake,
+    )
+    assert [node.id for node in plan.days[0].knowledge_nodes] == ["sequence", "linked"]
+    assert plan.days[0].knowledge_relations[0].from_id == "sequence"
+    assert "knowledge_relations" in fake.prompts[0][0]["content"]
 
 
 def test_long_schedule_schema_excludes_tasks_and_ignores_extra_model_tasks():

@@ -265,6 +265,7 @@ def test_planned_task_receives_approved_dependency_summaries(monkeypatch):
             "title": "数组与链表讲义",
             "type": "explainer",
             "summary": "数组与链表讲义\n数组连续存储，链表通过指针连接。",
+            "questions": [],
         }
     ]
 
@@ -531,7 +532,7 @@ def test_low_score_review_does_not_schedule_a_second_rework():
     assert routed == "coverage"
 
 
-def test_quality_candidate_is_auto_released_after_one_rework():
+def test_quality_candidate_stays_rejected_after_rework_limit():
     from app.graph.planned_resource_graph import _auto_release_after_rework_limit
 
     released = _auto_release_after_rework_limit(
@@ -547,14 +548,12 @@ def test_quality_candidate_is_auto_released_after_one_rework():
         {"task_id": "dp-d1", "type": "explainer"},
     )
 
-    assert released["approved"] is True
-    assert released["auto_released"] is True
-    assert released["gate_status"] == "approved_after_rework_limit"
-    assert released["blocking_issues"] == []
-    assert "缺少边界案例" in released["warnings"]
+    assert released["approved"] is False
+    assert not released.get("auto_released")
+    assert released["blocking_issues"] == ["缺少边界案例"]
 
 
-def test_compiled_graph_auto_releases_second_quality_rejection(monkeypatch):
+def test_scheduler_does_not_release_second_quality_rejection(monkeypatch):
     from app.graph import planned_resource_graph as graph
     from app.schemas.resource_plan import PlanArtifact
     from tests.test_resource_plan_models import sample_plan_dict
@@ -581,13 +580,10 @@ def test_compiled_graph_auto_releases_second_quality_rejection(monkeypatch):
     review = result["reviews"]["explainer-d1"]
     assert calls == 2
     assert review["retry_count"] == 1
-    assert review["approved"] is True
-    assert review["auto_released"] is True
-    assert review["gate_status"] == "approved_after_rework_limit"
-    assert review["warnings"]
-    assert result["coverage"]["complete"] is True
-    assert result["integration"]["coverage"]["complete"] is True
-    assert result["integration"]["resources"][0]["retry_count"] == 1
+    assert review["approved"] is False
+    assert not review.get("auto_released")
+    assert result["coverage"]["complete"] is False
+    assert result["delivery_status"] == "failed"
 
 
 def test_failed_dependency_retries_until_ready_before_downstream_starts(
@@ -605,7 +601,7 @@ def test_failed_dependency_retries_until_ready_before_downstream_starts(
             task_id = state["plan_task"]["task_id"]
             calls.append(task_id)
             if task_id == "explainer-d1":
-                return {"title": "Incomplete explainer", "overview": "too short"}
+                return {"title": "Incomplete explainer", "overview": "too short 随机访问 插入删除"}
             dependency_outputs.append(state["dependency_outputs"])
             return {
                 "title": "Dependency fallback quiz",
@@ -669,7 +665,7 @@ def test_one_agent_exception_retries_without_restarting_successful_other_tasks(
                 explainer_calls += 1
                 if explainer_calls < 2:
                     raise RuntimeError("provider timeout")
-                return {"title": "Recovered explainer", "overview": "complete"}
+                return {"title": "Recovered explainer", "overview": "complete 随机访问 插入删除"}
 
             return fail
         return lambda state: {
@@ -733,7 +729,7 @@ def test_agent_lookup_exception_retries_until_lookup_recovers(monkeypatch):
         calls[name] = calls.get(name, 0) + 1
         if calls[name] == 1:
             raise RuntimeError(f"{name} agent unavailable")
-        return lambda state: {"title": state["plan_task"]["title"], "overview": "recovered"}
+        return lambda state: {"title": state["plan_task"]["title"], "overview": "recovered 随机访问 插入删除 LIFO FIFO"}
 
     monkeypatch.setattr(graph, "get_agent", fail_lookup)
     monkeypatch.setattr(
@@ -750,7 +746,7 @@ def test_agent_lookup_exception_retries_until_lookup_recovers(monkeypatch):
     )
 
     assert set(result["reviews"]) == {"explainer-d1", "quiz-d2"}
-    assert all(review["approved"] is True for review in result["reviews"].values())
+    assert all(review["approved"] is True for review in result["reviews"].values()), result["reviews"]
     assert all(count == 2 for count in calls.values())
 
 
@@ -770,7 +766,7 @@ def test_parallel_agent_failures_retry_independently(monkeypatch):
             calls[name] = calls.get(name, 0) + 1
             if calls[name] == 1:
                 raise RuntimeError(f"{name} unavailable")
-            return {"title": state["plan_task"]["title"], "overview": "recovered"}
+            return {"title": state["plan_task"]["title"], "overview": "recovered 随机访问 插入删除 LIFO FIFO"}
 
         return fail
 
@@ -788,7 +784,7 @@ def test_parallel_agent_failures_retry_independently(monkeypatch):
     )
 
     assert set(result["reviews"]) == {"explainer-d1", "quiz-d2"}
-    assert all(review["approved"] is True for review in result["reviews"].values())
+    assert all(review["approved"] is True for review in result["reviews"].values()), result["reviews"]
     assert calls == {"explainer": 2, "quiz": 2}
 
 
@@ -1054,7 +1050,7 @@ def test_successful_coverage_repair_is_reviewed_as_a_new_attempt(monkeypatch):
                 raise RuntimeError("initial provider failure")
             return {
                 "title": "Recovered explainer",
-                "overview": "Coverage repair generated a complete explainer.",
+                "overview": "Coverage repair generated a complete explainer. 随机访问 插入删除",
             }
 
         return run
@@ -1114,7 +1110,7 @@ def test_transient_generation_failure_retries_with_the_exact_failure_ticket(monk
         repair_states.append(state)
         if len(repair_states) == 1:
             raise RuntimeError("provider timeout while requesting output")
-        return {"title": state["plan_task"]["title"], "overview": "recovered"}
+        return {"title": state["plan_task"]["title"], "overview": "recovered 随机访问 插入删除 LIFO FIFO"}
 
     monkeypatch.setattr(graph, "get_agent", lambda _name: agent)
     monkeypatch.setattr(graph, "_wait_before_retry", lambda _attempt, _run_id="": None)
@@ -1169,7 +1165,7 @@ def test_permanent_configuration_failure_does_not_retry(monkeypatch):
         repair_states.append(state)
         if calls < 3:
             raise NonRetryableProviderError("provider rejected this request")
-        return {"title": state["plan_task"]["title"], "overview": "recovered"}
+        return {"title": state["plan_task"]["title"], "overview": "recovered 随机访问 插入删除 LIFO FIFO"}
 
     monkeypatch.setattr(graph, "get_agent", lambda _name: unavailable)
     monkeypatch.setattr(
@@ -1235,7 +1231,7 @@ def test_review_budget_exhaustion_is_a_supported_terminal_gate_state(monkeypatch
     assert review["terminal"] is True
 
 
-def test_retry_migrates_legacy_long_plan_chain_and_time_sizes_quizzes():
+def test_retry_preserves_explicit_content_dependencies_and_time_sizes_quizzes():
     from copy import deepcopy
 
     from app.graph import planned_resource_graph as graph
@@ -1265,7 +1261,7 @@ def test_retry_migrates_legacy_long_plan_chain_and_time_sizes_quizzes():
 
     state = graph.build_planned_state(plan, {})
 
-    assert all(task["depends_on"] == [] for task in state["plan"]["tasks"])
+    assert [task["depends_on"] for task in state["plan"]["tasks"]] == [[], ["explainer-d1"], ["quiz-d2"]]
     quiz = next(task for task in state["plan"]["tasks"] if task["type"] == "quiz")
     assert sum(quiz["quiz_config"].values()) == 6
 
@@ -1342,18 +1338,17 @@ async def test_sse_bridge_can_finish_after_a_terminal_snapshot_even_if_worker_st
                 worker_finished.set()
 
     try:
-        chunks = [
-            chunk
-            async for chunk in astream_via_thread(
-                StuckAfterTerminalGraph(),
-                {},
-                ["custom", "values"],
-                stop_when=lambda chunk: chunk == terminal,
-                stop_grace_seconds=0.02,
-            )
-        ]
-        assert chunks == [terminal]
-        assert worker_waiting.is_set()
+        stream = astream_via_thread(
+            StuckAfterTerminalGraph(), {}, ["custom", "values"],
+            stop_when=lambda chunk: chunk == terminal,
+            stop_grace_seconds=0.02,
+        )
+        assert await anext(stream) == terminal
+        # Handshake before resuming the consumer: the producer really is stuck
+        # after its terminal yield, independently of OS thread scheduling.
+        assert await asyncio.to_thread(worker_waiting.wait, 1)
+        assert [chunk async for chunk in stream] == []
+        assert not worker_finished.is_set()
     finally:
         release_worker.set()
         assert await asyncio.to_thread(worker_finished.wait, 1)

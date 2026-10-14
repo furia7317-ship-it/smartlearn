@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
@@ -66,12 +65,14 @@ def percentile(values: list[float], fraction: float) -> float:
 def evaluate(cases: list[EvaluationCase], mode: str, top_k: int) -> dict[str, Any]:
     from app.core.config import settings
     from app.services.knowledge_gate import check_knowledge_gate
-    from app.services.rag import get_retrieval_health, retrieve
+    from app.services.rag import get_retrieval_health, retrieve_with_diagnostics
 
     positive_rows: list[dict[str, Any]] = []
     negative_rows: list[dict[str, Any]] = []
     timings: list[float] = []
     modes: dict[str, int] = {}
+    reranker_used_queries = 0
+    reranker_errors: list[str] = []
 
     for case in cases:
         started = time.perf_counter()
@@ -80,14 +81,23 @@ def evaluate(cases: list[EvaluationCase], mode: str, top_k: int) -> dict[str, An
             documents = gate.context if gate.matched or not case.relevant_sources else []
             strong_match = gate.matched
             retrieval_mode = gate.retrieval_mode
+            if any(document.get("reranker_score") is not None for document in documents):
+                reranker_used_queries += 1
         else:
-            documents = retrieve(case.query, n_results=top_k)
+            documents, _, retrieval = retrieve_with_diagnostics(case.query, n_results=top_k)
             strong_match = any(
                 document.get("authoritative_match") is True
                 or float(document.get("vector_similarity") or 0.0) >= settings.KB_RELEVANCE_THRESHOLD
                 for document in documents
             )
-            retrieval_mode = str(documents[0].get("retrieval_mode") or "empty") if documents else "empty"
+            reranker_scores = [float(d['reranker_score']) for d in documents if d.get('reranker_score') is not None]
+            if reranker_scores:
+                strong_match = max(reranker_scores) >= settings.KB_RERANK_RELEVANCE_THRESHOLD
+            retrieval_mode = str(retrieval.get("mode") or "empty")
+            if retrieval.get("reranker_used"):
+                reranker_used_queries += 1
+            if retrieval.get("reranker_error"):
+                reranker_errors.append(str(retrieval["reranker_error"]))
         timings.append((time.perf_counter() - started) * 1000)
         modes[retrieval_mode] = modes.get(retrieval_mode, 0) + 1
         sources = [str(document.get("metadata", {}).get("source") or "") for document in documents]
@@ -122,6 +132,8 @@ def evaluate(cases: list[EvaluationCase], mode: str, top_k: int) -> dict[str, An
         "negative_cases": len(negative_rows),
         "mode": mode,
         "retrieval_modes": modes,
+        "reranker_used_queries": reranker_used_queries,
+        "reranker_errors": sorted(set(reranker_errors)),
         "recall_at_1": sum(row["rank"] == 1 for row in positive_rows) / positive_count,
         "recall_at_3": sum(row["rank"] is not None and row["rank"] <= 3 for row in positive_rows) / positive_count,
         f"recall_at_{top_k}": sum(
@@ -160,10 +172,20 @@ def main() -> int:
     parser.add_argument("--max-negative-rate", type=float, default=1.0)
     parser.add_argument("--max-p95-ms", type=float, default=0.0)
     parser.add_argument("--require-vector", action="store_true")
+    parser.add_argument(
+        "--reranker-model",
+        help="temporary SiliconFlow reranker model ID for an evaluation run",
+    )
     args = parser.parse_args()
 
     if args.top_k < 3:
         parser.error("--top-k must be at least 3")
+    if args.reranker_model is not None:
+        from app.core.config import settings
+        from app.services.rag import reset_rag_runtime
+
+        settings.RAG_RERANKER_MODEL = args.reranker_model
+        reset_rag_runtime()
     result = evaluate(load_cases(args.dataset, args.split), args.mode, args.top_k)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

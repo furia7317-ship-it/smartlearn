@@ -1,0 +1,101 @@
+[
+  {
+    "file": "wood-tap.wav",
+    "source": "https://raw.githubusercontent.com/scopegate/octave/198251e306a52e7570905e295d18e001899d6bf0/Octave-Sounds/taps/tap-wooden.aif",
+    "sourceSha256": "3c1c8960de76ee1e517eaaca9efdc4c8c225097991e965558220832ec22fb4c3",
+    "sha256": "f10efaaa7a7d1931355e3dd47980262ce76a3397631c44c56c7ac70d5045f912",
+    "durationMs": 38.5,
+    "peak": 0.45,
+    "bytes": 2508
+  },
+  {
+    "file": "warm-tap.wav",
+    "source": "https://raw.githubusercontent.com/scopegate/octave/198251e306a52e7570905e295d18e001899d6bf0/Octave-Sounds/taps/tap-warm.aif",
+    "sourceSha256": "fa158060f103d16a8d15927e22d95728c0c8a23aea871dc0e70b9c469975b08e",
+    "sha256": "01f1730ab8ca483ccba0ed4609061466bbdebc4b12ace7b924d1d8853a652235",
+    "durationMs": 22.31,
+    "peak": 0.2563,
+    "bytes": 1472
+  },
+  {
+    "file": "muted-tap.wav",
+    "source": "https://raw.githubusercontent.com/scopegate/octave/198251e306a52e7570905e295d18e001899d6bf0/Octave-Sounds/taps/tap-muted.aif",
+    "sourceSha256": "dd7fef38dd202eee007fe7fe68d55e060da06f5e4e4c373d9ff7b0b9cbf456e0",
+    "sha256": "8eb9da382b19fad6457673ba446798ce2f2ff9500d366f06a0f47235beb6777c",
+    "durationMs": 25.62,
+    "peak": 0.10536,
+    "bytes": 1684
+  },
+  {
+    "file": "mellow-tap.wav",
+    "source": "https://raw.githubusercontent.com/scopegate/octave/198251e306a52e7570905e295d18e001899d6bf0/Octave-Sounds/taps/tap-mellow.aif",
+    "sourceSha256": "e6916e8a8eeffd267b718422cece2404ced7718fc3ddabedb06aa158836b09ed",
+    "sha256": "2757539005f3076bf3d168f695d06517b5aa807948249e1d1cc0e5aca8c04c5c",
+    "durationMs": 6.59,
+    "peak": 0.45,
+    "bytes": 466
+  },
+  {
+    "file": "paper-open.wav",
+    "source": "file:///D:/%E6%99%BA%E5%AD%A6%E4%BA%91%E6%9E%A2/ZXYS/src/assets/TcmBook/turn.wav",
+    "sourceSha256": "ded998b098a8144b3786d8497308b96306a8a127311f52777b77bd347011a358",
+    "sha256": "f99a3021f0f5c3d503e0ca00ccc3decce4d68b1656c45e90bfabe2cad3b131a9",
+    "durationMs": 622.78,
+    "peak": 0.45,
+    "bytes": 39902
+  },
+  {
+    "file": "paper-close.wav",
+    "source": "file:///D:/%E6%99%BA%E5%AD%A6%E4%BA%91%E6%9E%A2/ZXYS/src/assets/TcmBook/turn.wav",
+    "sourceSha256": "ded998b098a8144b3786d8497308b96306a8a127311f52777b77bd347011a358",
+    "sha256": "f99a3021f0f5c3d503e0ca00ccc3decce4d68b1656c45e90bfabe2cad3b131a9",
+    "durationMs": 622.78,
+    "peak": 0.45,
+    "bytes": 39902
+  },
+  {
+    "file": "paper-slide.wav",
+    "source": "https://raw.githubusercontent.com/kapishdima/soundcn/7cbfbb3f56e8548b81fb26410bdcea657447d087/assets/kenney_casino-audio/card-slide-1.ogg",
+    "sourceSha256": "006cf9822d15d7063f8899e56041f41646df30adb6fbd8b974ee5d5420012690",
+    "sha256": "8b6e568a09fce0fdb4e8fc7983c00e27a575f8a0b44d0a790dda34029f6ab6bd",
+    "durationMs": 180.72,
+    "peak": 0.45,
+    "bytes": 11610
+  },
+  {
+    "file": "start-timber.wav",
+    "source": "https://raw.githubusercontent.com/scopegate/octave/198251e306a52e7570905e295d18e001899d6bf0/Octave-Sounds/beeps/beep-timber.aif",
+    "sourceSha256": "8d76d4b68db156059d4c4ad4149b12bbf5356b07589fd315959f2044ee3b9a5e",
+    "sha256": "2d136202429a55f0b43a4943bcecdcb5c7afb12c76410c7fba02488a7eee6277",
+    "durationMs": 103.84,
+    "peak": 0.45,
+    "bytes": 6690
+  },
+  {
+    "file": "done-piano.wav",
+    "source": "https://raw.githubusercontent.com/scopegate/octave/198251e306a52e7570905e295d18e001899d6bf0/Octave-Sounds/beeps/beep-piano.aif",
+    "sourceSha256": "56480e76b24da5a113df78eed7566ff01de07d412a026fadc9d6cff75146c7cc",
+    "sha256": "d8f64a1d37b4c1ffe505632f25146bf93364153ead276fad6de2978ce760a409",
+    "durationMs": 251.59,
+    "peak": 0.45,
+    "bytes": 16146
+  },
+  {
+    "file": "success-guitar.wav",
+    "source": "https://raw.githubusercontent.com/scopegate/octave/198251e306a52e7570905e295d18e001899d6bf0/Octave-Sounds/beeps/beep-warmguitar.aif",
+    "sourceSha256": "4c6c76c55e81a0887615e2bbbeb079635024c4729eb8158ed2a2b4a8f3a4f9b6",
+    "sha256": "169a4e5b5138cce7138fb4c3e8717d1b0f91825f7c552a8c053b1d7614fd5ff2",
+    "durationMs": 253.44,
+    "peak": 0.45,
+    "bytes": 16264
+  },
+  {
+    "file": "soft-error.wav",
+    "source": "https://raw.githubusercontent.com/scopegate/octave/198251e306a52e7570905e295d18e001899d6bf0/Octave-Sounds/beeps/beep-rejected.aif",
+    "sourceSha256": "9cce82f12edabc8c2b38d8a012658e24c5b661ddc40e435f6bade12e2f6eac4a",
+    "sha256": "46724fd5d04705182ee35cff94be4d10818bee042423d22dd6a4171099f8b0e4",
+    "durationMs": 75.38,
+    "peak": 0.19652,
+    "bytes": 4868
+  }
+]

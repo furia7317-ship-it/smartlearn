@@ -9,7 +9,8 @@ from pydantic import BaseModel, Field
 
 class CodeExecuteRequest(BaseModel):
     code: str = Field(min_length=1, max_length=10000)
-    language: Literal["python"] = "python"
+    language: Literal["python", "java", "c", "cpp"] = "python"
+    stdin: str = Field(default="", max_length=10000)
     include_ai_review: bool = False
     context: str = Field(default="", max_length=2000)
 
@@ -25,6 +26,7 @@ class CodeExerciseSubmitRequest(BaseModel):
     student_id: str = Field(min_length=1, max_length=64)
     code: str = Field(min_length=1, max_length=10000)
     language: Literal["python"] = "python"
+    include_ai_review: bool = True
 
 
 class CodeEligibilityRequest(BaseModel):

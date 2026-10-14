@@ -2,6 +2,8 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { ViewportImage } from "@/components/viewport-image";
+import { DiscoverReturnLink } from "@/components/desktop/discover-return-link";
 import {
   Bookmark,
   BookOpen,
@@ -25,8 +27,13 @@ import {
 import { MarketPublishDialog } from "@/components/market-publish-dialog";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import { ShellLink as Link } from "@/components/shell-link";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import { importFromMarket, listMarket, type MarketFilter, type MarketListing } from "@/lib/learning-market";
-import { listMaterials, type StoredMaterial } from "@/lib/library";
+import {
+  invalidateLibraryListCache,
+  listMaterials,
+  type StoredMaterial,
+} from "@/lib/library";
 import { MATERIAL_TYPE_LABEL } from "@/lib/material-types";
 import type { ResourceItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -38,6 +45,8 @@ const FILTERS: Array<{ id: MarketFilter; label: string; icon: LucideIcon }> = [
   { id: "bundle", label: "资源包", icon: PackageOpen },
   { id: "agent", label: "工作流", icon: Bot },
 ];
+const MARKET_FILTER_IDS: MarketFilter[] = ["all", "learning_path", "material", "bundle", "agent"];
+const MARKET_SORT_OPTIONS = ["latest", "popular"] as const;
 
 const KIND_LABEL: Record<MarketListing["kind"], string> = {
   learning_path: "学习路径",
@@ -100,14 +109,41 @@ function importActionLabel(kind: MarketListing["kind"]) {
 }
 
 export default function DesktopMarket() {
-  const session = useOrchestratorContext();
+  const session = useOrchestratorContext((state) => ({
+    resources: state.resources,
+    mode: state.mode,
+    importMarketPath: state.importMarketPath,
+    appendResources: state.appendResources,
+  }));
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [library, setLibrary] = useState<StoredMaterial[]>([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [filter, setFilter] = useState<MarketFilter>("all");
-  const [sortBy, setSortBy] = useState<"latest" | "popular">("latest");
-  const [queryDraft, setQueryDraft] = useState("");
-  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useDesktopModuleStringState<string>(
+    "discover",
+    "market.selected",
+    ""
+  );
+  const [filter, setFilter] = useDesktopModuleStringState<MarketFilter>(
+    "discover",
+    "market.filter",
+    "all",
+    MARKET_FILTER_IDS
+  );
+  const [sortBy, setSortBy] = useDesktopModuleStringState<"latest" | "popular">(
+    "discover",
+    "market.sort",
+    "latest",
+    MARKET_SORT_OPTIONS
+  );
+  const [queryDraft, setQueryDraft] = useDesktopModuleStringState<string>(
+    "discover",
+    "market.queryDraft",
+    ""
+  );
+  const [query, setQuery] = useDesktopModuleStringState<string>(
+    "discover",
+    "market.query",
+    ""
+  );
   const [loading, setLoading] = useState(true);
   const [importingId, setImportingId] = useState("");
   const [publishOpen, setPublishOpen] = useState(false);
@@ -165,6 +201,7 @@ export default function DesktopMarket() {
       // agent 导入建的是一个自建智能体（custom_agents），不会产生 generated_materials：
       // 再去 listMaterials 重拉只会让 appendResources 收到空数组，用户得不到任何反馈。
       if (result.kind !== "agent") {
+        invalidateLibraryListCache("materials");
         const refreshedMaterials = await listMaterials(session.mode);
         setLibrary(refreshedMaterials);
         session.appendResources(refreshedMaterials.filter((item) => result.target_ids.includes(item.id)));
@@ -187,6 +224,7 @@ export default function DesktopMarket() {
   return (
     <main className="desktop-market-page thin-scroll h-full overflow-y-auto bg-[#f8f3e8] text-[#2c261f]">
       <div className="desktop-market-frame">
+        <nav aria-label="返回上级页面" className="mb-2"><DiscoverReturnLink /></nav>
         <header className="desktop-market-header">
           <div className="font-serif">
             <span>学习者社区</span>
@@ -268,12 +306,12 @@ export default function DesktopMarket() {
                 >
                   {active && <span className="absolute -right-2 -top-2 z-20 grid size-7 place-items-center rounded-full bg-[#b83b2d] text-white shadow"><CheckCircle2 className="size-[18px]" /></span>}
                   <div className="relative aspect-[1.64/1] overflow-hidden rounded-sm border border-[#d8cbb8] bg-[#ece2d2]">
-                    <Image src={MARKET_COVERS[listing.kind]} alt="" fill sizes="(min-width: 1536px) 290px, 42vw" className="object-cover transition duration-300 group-hover:scale-[1.02]" />
+                    <ViewportImage src={MARKET_COVERS[listing.kind]} alt="" fill sizes="(min-width: 1536px) 290px, 42vw" className="object-cover transition duration-300 group-hover:scale-[1.02]" />
                     <span className={cn("absolute left-2 top-2 rounded px-2.5 py-1 font-serif text-xs font-semibold tracking-[0.08em] text-white", listing.kind === "learning_path" ? "bg-[#476b4e]" : listing.kind === "agent" ? "bg-[#b83b2d]" : listing.kind === "bundle" ? "bg-[#a75325]" : "bg-[#b28731]")}>{KIND_LABEL[listing.kind]}</span>
                   </div>
                   <div className="px-1 pb-1 pt-3">
                     <div className="flex items-center gap-2 text-xs text-[#655a4d]">
-                      <Image src="/brand/xueshu-app-icon.png" alt="" width={28} height={28} className="size-7 rounded-full border border-[#d2c4af] object-cover" />
+                      <Image src="/brand/xueshu-app-icon-128.webp" alt="" width={28} height={28} className="size-7 rounded-full border border-[#d2c4af] object-cover" />
                       <span>{listing.author_name}</span><ShieldCheck className="size-3.5 fill-[#2f7047] text-[#2f7047]" /><span className="text-[#2f7047]">已验证</span>
                     </div>
                     <h3 className="mt-3 line-clamp-2 font-serif text-[19px] font-semibold leading-7 tracking-[0.03em] text-[#27231e]">{listing.title}</h3>
@@ -301,7 +339,7 @@ export default function DesktopMarket() {
             </div>
 
             <div className="mt-4 flex items-center gap-2 text-sm text-[#655a4d]">
-              <Image src="/brand/xueshu-app-icon.png" alt="" width={36} height={36} className="size-9 rounded-full border border-[#d2c4af] object-cover" />
+              <Image src="/brand/xueshu-app-icon-128.webp" alt="" width={36} height={36} className="size-9 rounded-full border border-[#d2c4af] object-cover" />
               <span>{selected.author_name}</span><ShieldCheck className="size-4 fill-[#2f7047] text-[#2f7047]" /><span className="text-xs text-[#2f7047]">已验证</span>
             </div>
             <div className="mt-4 flex items-center gap-6 text-sm text-[#665c50]"><span className="inline-flex items-center gap-2"><FileText className="size-4" />{listingCountLabel(selected)}</span><span className="inline-flex items-center gap-2"><Bookmark className="size-4" />{formatSaves(selected.saves)} 人保存</span></div>

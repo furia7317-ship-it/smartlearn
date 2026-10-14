@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
@@ -6,22 +7,69 @@ import { fileURLToPath } from "node:url";
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const remotionRoot = path.join(frontendRoot, "remotion-runtime");
-const rendererPackage = path.join(remotionRoot, "node_modules", "@remotion", "renderer");
+const manifestPath = path.join(remotionRoot, "package.json");
+const lockPath = path.join(remotionRoot, "package-lock.json");
+const nodeModules = path.join(remotionRoot, "node_modules");
+const preparedLockStamp = path.join(nodeModules, ".xueshu-remotion-lock-sha256");
 const runtimePython = path.join(frontendRoot, "runtime", "python", "python.exe");
 const runtimeArchive = path.join(remotionRoot, "runtime.zip");
 
-if (!fs.existsSync(rendererPackage)) {
+const parseJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+const manifest = parseJson(manifestPath);
+const lock = parseJson(lockPath);
+const declaredDependencies = manifest.dependencies ?? {};
+const lockedDeclarations = lock.packages?.[""]?.dependencies ?? {};
+const declaredNames = Object.keys(declaredDependencies).sort();
+const lockedNames = Object.keys(lockedDeclarations).sort();
+
+if (
+  JSON.stringify(declaredNames) !== JSON.stringify(lockedNames)
+  || declaredNames.some((name) => declaredDependencies[name] !== lockedDeclarations[name])
+) {
+  throw new Error("Remotion package-lock.json does not match package.json; run npm install in remotion-runtime");
+}
+
+const lockDigest = crypto
+  .createHash("sha256")
+  .update(fs.readFileSync(lockPath))
+  .digest("hex");
+
+const dependenciesAreReady = () => {
+  if (!fs.existsSync(preparedLockStamp)) return false;
+  if (fs.readFileSync(preparedLockStamp, "utf8").trim() !== lockDigest) return false;
+  return declaredNames.every((name) => {
+    const lockedVersion = lock.packages?.[`node_modules/${name}`]?.version;
+    const packageManifest = path.join(nodeModules, ...name.split("/"), "package.json");
+    if (!lockedVersion || !fs.existsSync(packageManifest)) return false;
+    try {
+      return parseJson(packageManifest).version === lockedVersion;
+    } catch {
+      return false;
+    }
+  });
+};
+
+if (!dependenciesAreReady()) {
   const npmCli = process.env.npm_execpath;
-  if (!npmCli || !fs.existsSync(npmCli)) {
-    throw new Error("Remotion dependencies are missing and npm could not be located");
-  }
-  const install = spawnSync(
-    process.execPath,
-    [npmCli, "ci", "--omit=dev", "--no-audit", "--no-fund"],
-    { cwd: remotionRoot, stdio: "inherit", windowsHide: true },
-  );
-  if (install.status !== 0 || !fs.existsSync(rendererPackage)) {
+  const installArgs = ["ci", "--omit=dev", "--no-audit", "--no-fund"];
+  const install = npmCli && fs.existsSync(npmCli)
+    ? spawnSync(process.execPath, [npmCli, ...installArgs], {
+      cwd: remotionRoot,
+      stdio: "inherit",
+      windowsHide: true,
+    })
+    : spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", installArgs, {
+      cwd: remotionRoot,
+      stdio: "inherit",
+      windowsHide: true,
+    });
+  if (install.status !== 0) {
     throw new Error("Failed to prepare the bundled Remotion runtime");
+  }
+  fs.mkdirSync(nodeModules, { recursive: true });
+  fs.writeFileSync(preparedLockStamp, `${lockDigest}\n`, "utf8");
+  if (!dependenciesAreReady()) {
+    throw new Error("The installed Remotion runtime does not match package-lock.json");
   }
 }
 
@@ -50,7 +98,7 @@ const pruneBuildCaches = (directory) => {
     }
   }
 };
-pruneBuildCaches(path.join(remotionRoot, "node_modules"));
+pruneBuildCaches(nodeModules);
 if (fs.existsSync(runtimeArchive)) fs.rmSync(runtimeArchive);
 const archive = spawnSync(
   runtimePython,

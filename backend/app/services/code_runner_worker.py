@@ -144,7 +144,7 @@ def _compile_user_code(code: str):
     return compile(transformed, FILENAME, "exec")
 
 
-def _run(code: str) -> dict[str, Any]:
+def _run(code: str, stdin: str = "") -> dict[str, Any]:
     output = io.StringIO()
     trace: list[dict[str, Any]] = []
     previous_locals: dict[int, dict[str, Any]] = {}
@@ -159,7 +159,18 @@ def _run(code: str) -> dict[str, Any]:
             raise RuntimeError("程序输出超过 12000 字符限制")
         output.write(rendered)
 
+    input_stream = io.StringIO(stdin)
+
+    def safe_input(prompt=""):
+        if prompt:
+            safe_print(prompt, end="")
+        line = input_stream.readline()
+        if not line:
+            raise EOFError("标准输入已用完，请在输入区补充数据")
+        return line.rstrip("\r\n")
+
     safe_builtins = {
+        "input": safe_input,
         "__build_class__": builtins.__build_class__,
         "__import__": _safe_import,
         "abs": abs,
@@ -282,7 +293,7 @@ def main() -> None:
     try:
         request = json.loads(sys.stdin.read())
         code = str(request.get("code") or "")
-        response = _run(code)
+        response = _run(code, str(request.get("stdin") or "")[:10000])
     except BaseException as exc:  # noqa: BLE001 - keep the worker protocol valid
         response = {
             "language": "python",

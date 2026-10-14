@@ -44,7 +44,7 @@ export function UserAvatar({
         />
       ) : fallback === "mascot" ? (
         <Image
-          src="/brand/xueshu-app-icon.png"
+          src="/brand/xueshu-app-icon-128.webp"
           alt=""
           width={size}
           height={size}

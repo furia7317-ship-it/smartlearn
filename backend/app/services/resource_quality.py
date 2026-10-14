@@ -819,7 +819,21 @@ def _repair_instructions(
     return instructions
 
 
-def review_resource(resource: dict[str, Any], task: dict[str, Any]) -> TaskReview:
+def semantic_coverage_requirements(task: dict[str, Any]) -> list[str]:
+    """Prose acceptance criteria need semantic review, not verbatim copying.
+
+    Atomic keywords and explicit equations still use deterministic coverage.
+    Returning a requirement here never approves it; the semantic reviewer must
+    also identify supporting text in the current candidate.
+    """
+    return [term for term in _must_cover_terms(task)
+            if len(term) >= 6 and not re.search(r"[=＝]|dp\s*\[", term, re.I)]
+
+
+def review_resource(
+    resource: dict[str, Any], task: dict[str, Any], *,
+    semantic_covered: set[str] | None = None,
+) -> TaskReview:
     """Apply outline coverage plus type-specific blocking checks."""
 
     blocking_issues: list[str] = []
@@ -863,7 +877,8 @@ def review_resource(resource: dict[str, Any], task: dict[str, Any]) -> TaskRevie
     missing = [
         term
         for term in must_cover
-        if not quiz_structure_covers(term) and not is_term_covered(term, normalized)
+        if term not in (semantic_covered or set())
+        and not quiz_structure_covers(term) and not is_term_covered(term, normalized)
     ]
     if missing:
         reject(

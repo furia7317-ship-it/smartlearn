@@ -1,0 +1,90 @@
+.page { --desk-ui: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; height: 100%; overflow-y: auto; color: #254039; background: #f7f3eb url('/brand/knowledge/knowledge-landscape-v1.webp') center top / cover fixed; font: 14px/1.6 var(--desk-ui); }
+.frame { width: 88%; max-width: 1500px; margin: auto; padding-bottom: 12px; }
+.page :is(button, a, input):focus-visible { outline: 2px solid #5d7957; outline-offset: 3px; }
+.pageHeader { position: relative; display: flex; align-items: flex-start; gap: 32px; min-height: 118px; padding-top: 20px; margin-inline: -30px; }
+.pageHeader > :first-child { margin-top: 4px; flex-shrink: 0; }
+.pageHeader h1 { display: flex; align-items: center; gap: 15px; color: #192f31; font: 700 clamp(36px, 3.9vw, 54px)/1.15 'KaiTi', 'STKaiti', var(--font-display); letter-spacing: .04em; }
+.pageHeader > div > p { margin-top: 8px; color: #4e5b56; font: 17px/1.6 'KaiTi', var(--font-display); }
+.verse { position: absolute; top: 25px; right: -48px; height: 184px; margin: 0; white-space: nowrap; writing-mode: vertical-rl; font: 21px/1.65 'KaiTi', var(--font-display); letter-spacing: .16em; }
+.panel { position: relative; min-width: 0; margin-bottom: 14px; padding: 15px 24px; border: 1px solid #e1d3bf; border-radius: 15px; background: #fffdf9e3; box-shadow: 0 3px 9px #73553615; }
+.sectionHeading { position: relative; z-index: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; min-height: 30px; }
+.sectionHeading > svg { width: 30px; height: 30px; color: #806040; flex-shrink: 0; }
+.sectionHeading h2 { color: #234135; font: 700 27px/1.35 'KaiTi', var(--font-display); white-space: nowrap; }
+.sectionHeading > p { color: #6c776f; font-size: 13px; }
+.count { margin-left: auto; white-space: nowrap; color: #647063; font-size: 13px; }
+.shelfSection { padding-bottom: 15px; }
+.shelfSection .count { position: absolute; top: 4px; right: 0; }
+.shelfContent { position: relative; display: grid; grid-template-columns: minmax(0, 62%) minmax(0, 1fr); gap: 18px; margin-top: 11px; min-height: 122px; }
+.shelfGrid { display: grid; align-content: start; gap: 10px; position: relative; z-index: 1; }
+.shelfCard { display: flex; min-width: 0; align-items: center; gap: 18px; padding: 8px 12px; border: 1px solid #e5d9c7; border-radius: 12px; background: #fffdfbc9; }
+.shelfCover { position: relative; width: 78px; height: 104px; flex-shrink: 0; border-radius: 5px; overflow: hidden; }
+.shelfCover img { object-fit: cover; }
+.bookMeta { min-width: 0; flex: 1; }
+.bookMeta h3 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 18px/1.5 var(--font-display); color: #294636; }
+.bookMeta > p { margin: 3px 0 10px; color: #7a8076; font-size: 12px; }
+.bookActions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.bookActions button { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; background: #e5eee2; color: #3e7251; font-size: 12px; font-weight: 600; }
+.bookActions button:hover { background: #d3e3cd; }
+.bookActions svg { width: 16px; height: 16px; }
+.removeBook { display: grid; flex-shrink: 0; place-items: center; width: 33px; height: 33px; border: 1px solid #e0d3c0; border-radius: 50%; color: #6c705d; align-self: end; margin-bottom: 4px; }
+.removeBook svg { width: 16px; height: 16px; } .removeBook:hover { color: #a34131; border-color: #cead94; background: #f8eee5; }
+.shelfArt { position: relative; min-height: 122px; margin: -35px -23px -14px 0; overflow: hidden; border-radius: 0 0 14px 0; pointer-events: none; }
+.shelfArt img { object-fit: cover; object-position: 68% bottom; opacity: .88; mask-image: linear-gradient(to right, transparent, black 24%), linear-gradient(to bottom, transparent, black 35%); mask-composite: intersect; }
+.shelfArt > p { position: relative; z-index: 1; padding: 43px 0 0 28px; font: 18px/1.65 'KaiTi', var(--font-display); letter-spacing: .05em; color: #899082; }
+.emptyShelf { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 4px; padding: 13px 22px; border: 1px solid #e4d6c0; border-radius: 12px; color: #6e7866; background: #fffcf5b8; }
+.emptyShelf > svg { display: none; } .emptyShelf strong { color: #465e43; font: 600 18px/1.5 var(--font-display); } .emptyShelf p { font-size: 13px; }
+.recommendation { padding-top: 14px; padding-bottom: 14px; }
+.recommendActions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 9px; }
+.profileChip { display: flex; align-items: center; gap: 9px; background: #f2ede2; padding: 6px 16px; border-radius: 9px; color: #56634d; font-size: 13px; }
+.settingsLink { display: flex; align-items: center; gap: 7px; margin-left: 5px; color: #80603d; font-size: 13px; }
+.generateBooks { display: flex; align-items: center; gap: 8px; min-height: 44px; height: auto; margin-left: auto; margin-top: -35px; padding: 10px 25px; background: #335d4d; color: #fffcf2; border-radius: 8px; font-size: 14px; }
+.generateBooks:hover { background: #406b59; }
+.recommendEmpty { margin-top: 12px; min-height: 53px; display: flex; align-items: center; justify-content: center; padding: 10px 16px; border: 1px dashed #d9c6a8; border-radius: 7px; color: #5b6851; font-size: 13px; text-align: center; }
+.webFind { padding-top: 13px; padding-bottom: 13px; }
+.scope { margin-left: auto; padding: 5px 10px; border: 1px solid #e0d8cb; border-radius: 7px; background: #fffdfa; color: #6e796d; font-size: 12px; white-space: nowrap; }
+.searchRow { display: flex; min-width: 0; gap: 10px; margin-top: 11px; }
+.searchInput { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; height: 43px; padding: 0 14px; border: 1px solid #dcd6cb; border-radius: 8px; background: #fffefd; }
+.searchInput > svg { width: 21px; height: 21px; color: #5c7063; flex-shrink: 0; }
+.searchInput input { width: 100%; min-width: 0; height: 100%; color: #344b3c; background: transparent; font-size: 15px; outline: none; }
+.searchInput:focus-within { outline: 2px solid #769071; outline-offset: 2px; }
+.searchInput input:focus-visible { outline: none; }
+.searchInput input::placeholder { color: #8a9188; }
+.searchButton { display: flex; align-items: center; justify-content: center; gap: 8px; height: 43px; min-width: 96px; padding: 0 20px; border: 1px solid #96754c; border-radius: 8px; background: #80613c; color: #fffaf0; font-size: 14px; }
+.searchButton svg { width: 20px; height: 20px; } .searchButton:hover:not(:disabled) { background: #6b4c2a; } .searchButton:disabled { opacity: .58; cursor: not-allowed; }
+.hotSearch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 11px; font-size: 12px; }
+.hotSearch > span { flex-shrink: 0; font-weight: 500; }
+.hotSearch button { background: #f0ece2; border: 1px solid transparent; border-radius: 18px; padding: 5px 16px; color: #626c5a; }
+.hotSearch button:hover:not(:disabled) { background: #e4eada; border-color: #9cae8c; } .hotSearch button:disabled { opacity: .5; cursor: wait; }
+.bottomGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.bottomGrid > .panel { min-height: 354px; margin: 0; padding: 13px 21px; }
+.documents { background: #fffdf9eb; }
+.documents .sectionHeading h2 { font-size: 24px; } .documents .sectionHeading { gap: 9px; }
+.documentList { margin-top: 10px; border: 1px solid #e7dfd2; border-radius: 7px; background: #fffdfbd9; overflow: hidden; }
+.documentList li { display: flex; align-items: center; gap: 13px; min-height: 25px; padding: 2px 12px; border-bottom: 1px solid #e5ded2; font-size: 13px; }
+.documentList li:last-child { border-bottom: 0; } .documentList svg { width: 15px; height: 15px; color: #a77649; flex-shrink: 0; }
+.documentList li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .documentList small { margin-left: auto; white-space: nowrap; color: #7c8474; font-size: 12px; }
+.catalogNote { display: flex; gap: 10px; align-items: center; color: #7c8274; margin-top: 12px; font-size: 11px; }
+.catalogNote svg { width: 18px; height: 18px; flex-shrink: 0; }
+.description { margin-top: 4px; color: #7d8478; font-size: 12px; }
+.retrieval .hotSearch { gap: 6px; font-size: 11px; } .retrieval .hotSearch button { padding: 4px 10px; }
+.searchResults { margin-top: 11px; }
+.retrievalEmpty { isolation: isolate; position: relative; min-height: 169px; border: 1px dashed #dac8ad; border-radius: 7px; overflow: hidden; display: flex; align-items: end; justify-content: center; text-align: center; padding: 18px 12px; }
+.retrievalEmpty img { object-fit: cover; object-position: center 42%; z-index: -1; opacity: .75; }
+.retrievalEmpty > div { position: relative; padding: 6px 10px; border-radius: 6px; background: #fffaf0e0; }
+.retrievalEmpty strong { color: #3b5544; font-weight: 500; font-size: 12px; } .retrievalEmpty p { margin-top: 4px; font-size: 11px; color: #7a8373; }
+.loading { min-height: 168px; display: flex; align-items: center; justify-content: center; gap: 12px; border: 1px dashed #d6c5a7; border-radius: 8px; color: #77806a; }
+.loading svg { width: 20px; height: 20px; }
+.hit { padding: 13px; background: #f7f5edde; border: 1px solid #e2d8c7; border-radius: 9px; margin-top: 8px; }
+.hit header { display: flex; gap: 8px; align-items: center; } .hit header svg { width: 16px; height: 16px; flex-shrink: 0; color: #8b7555; }
+.hit h3 { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; } .hit header span { margin-left: auto; font-size: 11px; white-space: nowrap; color: #6b835f; }
+.hit h4 { margin-top: 5px; font-size: 12px; color: #7c876b; } .hit > p { margin-top: 7px; font-size: 12px; line-height: 1.7; color: #747b6a; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.resultNote { margin-top: 13px; font-size: 11px; text-align: center; color: #818875; }
+.noResults { display: flex; flex-direction: column; gap: 12px; padding: 15px; border: 1px dashed #d4c2a6; border-radius: 8px; font-size: 13px; color: #757d67; }
+.noResults > button { align-self: start; border-radius: 7px; padding: 7px 12px; background: #e2ead8; color: #526d47; } .noResults > button:disabled { opacity: .5; }
+.error { display: flex; align-items: center; gap: 9px; padding: 15px; font-size: 13px; color: #a25535; background: #faeee2; border: 1px solid #e6c5a7; border-radius: 8px; overflow-wrap: anywhere; } .error svg { width: 18px; height: 18px; flex-shrink: 0; }
+.smallCover { position: relative; width: 76px; height: 106px; flex-shrink: 0; border-radius: 4px; overflow: hidden; }
+.smallCover img { object-fit: cover; } .smallCover span { position: absolute; top: 10px; right: 13px; max-height: 78px; overflow: hidden; writing-mode: vertical-rl; color: #4b4b38; font: 12px/1.3 'KaiTi', var(--font-display); }
+.pageFooter { display: flex; justify-content: space-between; margin-top: 11px; color: #7b806d; font: 15px/1.6 'KaiTi', var(--font-display); letter-spacing: .07em; }
+@media (max-width: 1300px) { .frame { width: 92%; } .pageHeader { margin-inline: 0; gap: 22px; } .verse { right: -12px; font-size: 17px; } .sectionHeading { gap: 9px; } .sectionHeading h2 { font-size: 24px; } .sectionHeading > p { font-size: 12px; } .sectionHeading > svg { width: 26px; height: 26px; } .panel { padding-inline: 18px; } .shelfContent { grid-template-columns: 67% minmax(0, 1fr); } .shelfArt { margin-right: -17px; } .shelfArt p { padding-left: 13px; font-size: 16px; } .scope { display: none; } .documents .sectionHeading h2 { font-size: 21px; } .bottomGrid > .panel { padding-inline: 16px; } .count { font-size: 11px; } .retrieval .hotSearch { gap: 4px; } .retrieval .hotSearch button { padding-inline: 8px; } .pageHeader > div > p { max-width: 450px; } }
+@media (max-width: 1050px) { .sectionHeading > p { flex-basis: 100%; padding-left: 35px; } .shelfContent { grid-template-columns: 1fr; } .shelfArt { display: none; } .generateBooks { margin-top: 0; } .bottomGrid { grid-template-columns: 1fr; } .documents .sectionHeading h2 { font-size: 25px; } .documentList li { min-height: 32px; } .retrievalEmpty { min-height: 245px; } .retrievalEmpty img { object-position: center 48%; } .pageHeader { min-height: 135px; } .verse { display: none; } .pageHeader h1 { font-size: 37px; } }
+@media (max-width: 650px) { .frame { width: auto; padding: 0 12px 20px; } .pageHeader { flex-wrap: wrap; gap: 12px; padding: 15px 0 18px; min-height: 0; } .pageHeader > :first-child { margin: 0; } .pageHeader > div { flex-basis: 100%; } .pageHeader h1 { font-size: 37px; } .pageHeader > div > p { margin-top: 6px; font-size: 14px; } .panel { border-radius: 12px; padding: 17px 14px; } .sectionHeading h2 { font-size: 24px; } .sectionHeading > p { padding-left: 0; line-height: 1.75; } .sectionHeading .count { font-size: 12px; } .shelfCard { gap: 11px; padding: 10px; flex-wrap: wrap; position: relative; } .shelfCover { width: 57px; height: 80px; } .bookMeta h3 { font-size: 15px; padding-right: 18px; } .bookMeta > p { font-size: 10px; } .bookActions { gap: 5px; } .bookActions button { padding: 5px 8px; font-size: 10px; } .bookActions svg { width: 13px; height: 13px; } .removeBook { position: absolute; top: 7px; right: 7px; width: 24px; height: 24px; } .removeBook svg { width: 13px; height: 13px; } .profileChip { padding-inline: 9px; font-size: 12px; } .generateBooks { min-height: 38px; padding: 7px 12px; font-size: 12px; } .recommendEmpty { font-size: 12px; padding: 12px; } .settingsLink { margin-left: 0; font-size: 12px; } .searchRow { gap: 7px; } .searchInput { padding-inline: 10px; gap: 7px; } .searchInput input { font-size: 12px; } .searchInput svg { width: 17px; height: 17px; } .searchButton { min-width: 68px; padding: 0 11px; font-size: 12px; gap: 5px; } .searchButton svg { width: 16px; height: 16px; } .hotSearch { gap: 6px; font-size: 11px; } .hotSearch button { padding: 5px 10px; } .bottomGrid > .panel { min-height: 0; padding: 16px 13px; } .documents .sectionHeading h2 { font-size: 20px; } .documents .sectionHeading .count { font-size: 10px; } .documentList li { gap: 8px; padding-inline: 8px; font-size: 12px; } .documentList small { font-size: 10px; } .catalogNote { font-size: 10px; } .retrievalEmpty { min-height: 212px; } .retrievalEmpty strong { font-size: 11px; } .pageFooter { font-size: 12px; } .pageFooter > span:last-child { display: none; } }

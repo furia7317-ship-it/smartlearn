@@ -1,5 +1,7 @@
 "use client";
 
+import { Switch } from "@/components/ui/switch";
+
 import {
   BellRing,
   BookOpenCheck,
@@ -156,17 +158,12 @@ export function LearningPreferencesSettings() {
               <h3 className="text-xs font-semibold">每日学习提醒</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">到点后在应用内提醒；关闭软件时不会在后台打扰。</p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={preferences.reminder_enabled}
+            <Switch
+              checked={preferences.reminder_enabled}
               disabled={disabled}
-              onClick={() => void updatePreferences({ reminder_enabled: !preferences.reminder_enabled })}
-              className={cn("relative h-7 w-12 rounded-full transition-colors disabled:opacity-60", preferences.reminder_enabled ? "bg-primary" : "bg-muted")}
-            >
-              <span className={cn("absolute top-1 size-5 rounded-full bg-white shadow-sm transition-transform", preferences.reminder_enabled ? "translate-x-6" : "translate-x-1")} />
-              <span className="sr-only">{preferences.reminder_enabled ? "关闭学习提醒" : "开启学习提醒"}</span>
-            </button>
+              onCheckedChange={(checked) => void updatePreferences({ reminder_enabled: checked })}
+              label={preferences.reminder_enabled ? "关闭学习提醒" : "开启学习提醒"}
+            />
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               提醒时间
               <input

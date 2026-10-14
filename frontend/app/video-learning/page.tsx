@@ -20,7 +20,12 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function VideoLearningPage() {
-  const session = useOrchestratorContext();
+  const session = useOrchestratorContext((state) => ({
+    mode: state.mode,
+    recordWatchedVideo: state.recordWatchedVideo,
+    appendResources: state.appendResources,
+    hydrated: state.hydrated,
+  }));
   const [query, setQuery] = useState("动态规划 数据结构");
   const [results, setResults] = useState<BilibiliVideoResult[]>([]);
   const [selected, setSelected] = useState<BilibiliVideoResult | null>(null);

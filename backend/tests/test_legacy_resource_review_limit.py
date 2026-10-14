@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-def test_second_round_content_rejection_is_released_with_warnings():
+def test_second_round_content_rejection_stays_rejected():
     from app.graph.resource_graph import _auto_release_legacy_reviews
 
     resources = _auto_release_legacy_reviews(
@@ -18,11 +18,9 @@ def test_second_round_content_rejection_is_released_with_warnings():
     )
 
     resource = resources[0]
-    assert resource["review_approved"] is True
-    assert resource["review_status"] == "approved_after_rework_limit"
-    assert resource["review_auto_released"] is True
-    assert resource["review_issues"] == []
-    assert "缺少边界案例" in resource["review_warnings"]
+    assert resource["review_approved"] is False
+    assert resource["review_status"] == "rejected"
+    assert resource["review_issues"] == ["缺少边界案例"]
 
 
 def test_reviewer_infrastructure_failure_is_never_auto_released():

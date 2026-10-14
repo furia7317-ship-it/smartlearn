@@ -54,7 +54,9 @@ test("public HTTPS web uses the same origin for API requests", async () => {
 
   assert.match(api, /window\.location\.protocol === "https:"/);
   assert.match(api, /window\.location\.origin/);
+  assert.match(api, /window\.location\.hostname/);
   assert.match(api, /`http:\/\/\$\{browserApiHost\}:8000`/);
+  assert.doesNotMatch(api, /window\.location\.hostname === "127\.0\.0\.1"/);
 });
 
 test("desktop microphone policy accepts the app origin without relying on a trailing slash", async () => {

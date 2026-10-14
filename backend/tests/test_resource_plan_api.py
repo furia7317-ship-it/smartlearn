@@ -22,19 +22,22 @@ def matched_knowledge_gate(monkeypatch):
     monkeypatch.setattr(
         resource_plans,
         "_require_knowledge",
-        lambda query, student_id: KnowledgeGateResult("matched", query, [{"id": "kb-1", "content": "测试知识"}], 1.0),
+        lambda query, student_id, policy=None: KnowledgeGateResult("matched", query, [{"id": "kb-1", "content": "测试知识"}], 1.0),
     )
 
 
 @pytest.fixture
-async def db_session():
+async def db_session(tmp_path, monkeypatch):
     from app.models import learning  # noqa: F401
     from app.models.base import Base
 
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'plans.sqlite'}")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    monkeypatch.setattr("app.services.execution_streams.async_session", session_factory)
+    monkeypatch.setattr("app.services.execution_streams.start_execution", lambda *_args: None)
+    monkeypatch.setattr("app.services.evidence.collect_evidence", lambda query, student_id, n_results=5, **kwargs: __import__("app.services.knowledge_gate", fromlist=["KnowledgeGateResult"]).KnowledgeGateResult("matched", query, [{"id": "kb-1", "content": "测试知识"}], 1.0))
     async with session_factory() as session:
         yield session
     await engine.dispose()
@@ -186,7 +189,7 @@ async def test_get_plan_terminalizes_an_orphaned_fully_ready_checkpoint(db_sessi
                 "issues": [],
                 "fixes": [],
                 "gate_status": (
-                    "approved_after_rework_limit" if index == 0 else "approved"
+                    "approved"
                 ),
             }
             for index, task in enumerate(plan.tasks)
@@ -409,12 +412,17 @@ async def test_inflight_cancel_stops_followup_calls_and_keeps_cancelled_terminal
 
     stream_task = asyncio.create_task(consume())
     assert await asyncio.to_thread(generator_started.wait, 3)
-    cancelled = await resource_plans.cancel_plan(
-        seeded_plan.plan_id,
-        PlanActionRequest(student_id=seeded_plan.student_id, version=1),
-        db_session,
-    )
-    allow_generator_return.set()
+    # Real HTTP requests get separate sessions. Sharing the streaming session
+    # here races its commit and can leave SQLAlchemy in PREPARED state.
+    try:
+        async with async_sessionmaker(db_session.bind, expire_on_commit=False)() as cancel_db:
+            cancelled = await resource_plans.cancel_plan(
+                seeded_plan.plan_id,
+                PlanActionRequest(student_id=seeded_plan.student_id, version=1),
+                cancel_db,
+            )
+    finally:
+        allow_generator_return.set()
     events = await asyncio.wait_for(stream_task, timeout=5)
 
     await db_session.refresh(row)
@@ -785,7 +793,7 @@ async def test_resumable_approved_checkpoint_drops_stale_failures_and_old_budget
     assert row.status == "running"
     assert row.execution_state["trace_run_id"] != "old-run"
     assert row.execution_state["run_started_at"] > 1.0
-    assert row.execution_state["retry_policy"]["max_model_calls"] >= 48
+    assert row.execution_state["retry_policy"]["max_model_calls"] >= len(plan.tasks) * 4
     assert list(row.execution_state["reviews"]) == ["explainer-d1"]
     assert [item["task_id"] for item in row.execution_state["resources"]] == [
         "explainer-d1"

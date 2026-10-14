@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 
 from fastapi import FastAPI, Request, Response
 from sqlalchemy import func, select
@@ -133,6 +134,37 @@ def test_local_portable_web_uses_http_compatible_session_cookie():
     assert "samesite=lax" in cookie
 
 
+def test_private_network_portable_web_uses_http_compatible_session_cookie():
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "scheme": "http",
+            "server": ("172.24.20.109", 8000),
+            "path": "/api/auth/login",
+            "headers": [(b"origin", b"http://172.24.20.109:3000")],
+        }
+    )
+    response = Response()
+
+    _set_session_cookie(response, "portable-lan-session-token", request)
+
+    cookie = response.headers["set-cookie"].lower()
+    assert "httponly" in cookie
+    assert "secure" not in cookie
+    assert "samesite=lax" in cookie
+
+
+def test_cors_regex_allows_only_known_private_frontend_origins():
+    from app.core.config import settings
+
+    assert re.fullmatch(settings.CORS_ORIGIN_REGEX, "http://172.24.20.109:3000")
+    assert re.fullmatch(settings.CORS_ORIGIN_REGEX, "http://192.168.1.25:5173")
+    assert not re.fullmatch(settings.CORS_ORIGIN_REGEX, "https://172.24.20.109:3000")
+    assert not re.fullmatch(settings.CORS_ORIGIN_REGEX, "http://172.24.20.109:8080")
+    assert not re.fullmatch(settings.CORS_ORIGIN_REGEX, "http://example.com:3000")
+
+
 def test_registration_onboarding_refresh_and_logout_use_one_cookie_session(tmp_path):
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'auth.db'}")
     sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -165,6 +197,8 @@ def test_registration_onboarding_refresh_and_logout_use_one_cookie_session(tmp_p
             },
         )
         assert registered.status_code == 201
+        assert registered.json()["guide_completed"] is False
+        assert client.put("/api/auth/guide").status_code == 409
         assert "httponly" in registered.headers["set-cookie"].lower()
         assert registered.json()["id"] == "local_11111111-1111-4111-8111-111111111111"
 
@@ -217,10 +251,15 @@ def test_registration_onboarding_refresh_and_logout_use_one_cookie_session(tmp_p
         )
         assert onboarded.status_code == 200
         assert onboarded.json()["onboarding_completed"] is True
+        assert onboarded.json()["guide_completed"] is False
+        assert client.put("/api/auth/guide").json()["guide_completed"] is True
+        assert client.put("/api/auth/guide").status_code == 200
+        assert client.get("/api/auth/session").json()["user"]["guide_completed"] is True
         assert client.get("/api/auth/me").json()["major"] == "计算机科学与技术"
 
         assert client.post("/api/auth/logout").status_code == 200
         assert client.get("/api/auth/me").status_code == 401
+        assert client.put("/api/auth/guide").status_code == 401
         assert client.get("/api/auth/session").json() == {"user": None}
 
     async def inspect_database():

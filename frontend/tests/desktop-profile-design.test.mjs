@@ -31,7 +31,7 @@ test("the personal profile uses the selected learning portfolio with working sec
   assert.match(page, /buildProfileInsights/);
   assert.match(page, /getProfileIdentity/);
   assert.match(page, /saveProfileIdentity/);
-  assert.match(page, /URLSearchParams\(window\.location\.search\)/);
+  assert.match(page, /new URL\(href, window\.location\.href\)\.searchParams/);
   assert.doesNotMatch(page, /24\.6/);
   assert.doesNotMatch(page, /市场版/);
   assert.doesNotMatch(page, /const evidenceRows/);

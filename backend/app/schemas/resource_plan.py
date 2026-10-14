@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from typing import Annotated, Any, Literal
+from app.schemas.orchestration import CollaborationOptions
 
 from pydantic import (
     AliasChoices,
     BaseModel,
+    ConfigDict,
     Field,
     StringConstraints,
     field_validator,
@@ -83,6 +85,12 @@ class RepairInstruction(BaseModel):
 
 
 class TaskReview(BaseModel):
+    content_hash: str = ""
+    artifact_version: int = 0
+    evidence_version: str = ""
+    review_policy_version: str = ""
+    plan_version: int = 0
+    independent_review: dict[str, Any] | None = None
     approved: bool
     score: float = Field(ge=0, le=1)
     # ``issues`` stays as the compatibility field used by persisted executions
@@ -103,6 +111,8 @@ class TaskReview(BaseModel):
     ] = "approved"
     evidence_ids: list[str] = Field(default_factory=list)
     claim_evidence: list[dict[str, str]] = Field(default_factory=list)
+    semantic_coverage: list[str] = Field(default_factory=list)
+    semantic_coverage_evidence: list[dict[str, Any]] = Field(default_factory=list)
     failure_kind: str | None = None
     error_code: str | None = None
     retryable: bool = True
@@ -133,6 +143,7 @@ class PlannedResourceTask(BaseModel):
     # 执行者可以是内置生成器，也可以是学生自建智能体；``type`` 保持 Literal 不变。
     agent: ResourceType | CustomAgentRef
     type: ResourceType
+    type_origin: Literal["planner", "user"] = "planner"
     title: str = Field(min_length=2, max_length=160)
     knowledge_points: list[str] = Field(min_length=1, max_length=12)
     difficulty: str = Field(min_length=2, max_length=32)
@@ -152,7 +163,36 @@ class PlannedResourceTask(BaseModel):
     retry_count: int = Field(default=0, ge=0)
 
 
-class PlannedDay(BaseModel):
+class KnowledgeNodeSpec(BaseModel):
+    id: str = Field(min_length=1, max_length=96)
+    title: str = Field(min_length=1, max_length=120)
+    objective: str = Field(default="", max_length=400)
+    task_keys: list[str] = Field(default_factory=list, max_length=24)
+
+
+class KnowledgeRelationSpec(BaseModel):
+    model_config = ConfigDict(serialize_by_alias=True)
+
+    from_id: str = Field(alias="from", validation_alias=AliasChoices("from", "from_id"), min_length=1, max_length=120)
+    to: str = Field(min_length=1, max_length=120)
+    kind: Literal["prerequisite", "related"]
+    label: str = Field(default="", max_length=40)
+
+
+class AbilityNodeSpec(BaseModel):
+    """Learning structure; daily scheduling must not erase these fields."""
+
+    module: str = Field(default="", max_length=120)
+    knowledge_nodes: list[KnowledgeNodeSpec] = Field(default_factory=list, max_length=16)
+    knowledge_relations: list[KnowledgeRelationSpec] = Field(default_factory=list, max_length=40)
+    node_kind: Literal["main", "reinforcement", "extension", "milestone"] = "main"
+    prerequisite_mode: Literal["all", "any"] = "all"
+    recommended_prerequisites: list[str] = Field(default_factory=list, max_length=30)
+    completion_criteria: str = Field(default="", max_length=500)
+    progress_weight: float | None = Field(default=None, gt=0, le=480)
+
+
+class PlannedDay(AbilityNodeSpec):
     day: str = Field(pattern=r"^D[1-9][0-9]*$")
     title: str = Field(min_length=1, max_length=160)
     knowledge_points: list[str] = Field(min_length=1, max_length=16)
@@ -170,6 +210,9 @@ class PlanValidation(BaseModel):
 
 
 class PlanArtifact(BaseModel):
+    collaboration: CollaborationOptions = Field(default_factory=CollaborationOptions)
+    delivery: Literal["resources", "learning_path"] = "learning_path"
+    request_contract: dict[str, Any] = Field(default_factory=dict)
     plan_id: str
     student_id: str
     version: int = Field(ge=1)
@@ -215,7 +258,7 @@ class PlanDraftTask(BaseModel):
     depends_on: list[str] = Field(default_factory=list)
 
 
-class PlanDraftDay(BaseModel):
+class PlanDraftDay(AbilityNodeSpec):
     day: str = Field(pattern=r"^D[1-9][0-9]*$")
     title: str = Field(min_length=2, max_length=160)
     knowledge_points: list[str] = Field(min_length=1, max_length=16)
@@ -267,7 +310,7 @@ class LongPlanTaskSkeleton(BaseModel):
     depends_on: list[str] = Field(default_factory=list, max_length=4)
 
 
-class LongPlanScheduleDay(BaseModel):
+class LongPlanScheduleDay(AbilityNodeSpec):
     day: str = Field(pattern=r"^D[1-9][0-9]*$")
     title: str = Field(min_length=1, max_length=80)
     knowledge_points: list[str] = Field(min_length=1, max_length=6)
@@ -323,6 +366,10 @@ class OutlineBatch(BaseModel):
 
 
 class PlanExecutionState(BaseModel):
+    orchestration: dict[str, Any] = Field(default_factory=dict)
+    delivery_status: str = ""
+    bindings: list[dict[str, Any]] = Field(default_factory=list)
+    consistency: dict[str, Any] = Field(default_factory=dict)
     resources: list[dict] = Field(default_factory=list)
     schedule: list[dict] = Field(default_factory=list)
     task_progress: dict[str, dict] = Field(default_factory=dict)

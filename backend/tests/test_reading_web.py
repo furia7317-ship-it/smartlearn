@@ -12,7 +12,7 @@ class _LLM:
         return _Response()
 
 
-def test_reading_agent_uses_optional_web_sources_without_replacing_course_evidence(monkeypatch):
+def test_reading_agent_uses_shared_web_evidence_without_independent_search(monkeypatch):
     from app.agents import reading
     from app.services import web_search
 
@@ -27,16 +27,16 @@ def test_reading_agent_uses_optional_web_sources_without_replacing_course_eviden
             "site": "示例站点",
         }]
 
-    monkeypatch.setattr(reading.settings, "BOCHA_API_KEY", "configured")
     monkeypatch.setattr(reading, "build_llm", lambda **kwargs: _LLM())
     monkeypatch.setattr(web_search, "bocha_search", fake_search)
 
     result = reading.generate({
         "topic": "数据结构",
-        "kb_context": [{"id": "kb-1", "content": "线性表与树"}],
+        "kb_context": [{"id": "kb-1", "content": "线性表与树"},
+                       {"id": "web-1", "content": "数据结构发展史", "metadata": {"source": "课外算法史", "url": "https://example.com/history"}}],
     })
 
-    assert queries == ["数据结构 延伸阅读"]
+    assert queries == []
     assert result["web_search_status"] == "used"
     assert result["web_sources"][0]["url"] == "https://example.com/history"
     assert any("课外算法史" in item for item in result["references"])

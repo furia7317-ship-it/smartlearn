@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import s from "./desktop-kb.module.css";
 import { ShellLink as Link } from "@/components/shell-link";
 import {
   AlertCircle,
-  BookText,
+  BookOpen,
+  Lightbulb,
+  Search,
+  Settings,
   Check,
   Database,
   Download,
@@ -13,12 +18,12 @@ import {
   GraduationCap,
   Loader2,
   Library,
-  ScanSearch,
   Sparkles,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import {
   autoImport,
   kbSearch,
@@ -35,6 +40,7 @@ import { getUserSettings, onUserSettingsChange } from "@/lib/user-settings";
 import { cn } from "@/lib/utils";
 import { KB_DOCS } from "@/lib/knowledge-catalog";
 import { DesktopBookshelf } from "@/components/desktop/desktop-bookshelf";
+import { ResourceCenterBackButton } from "@/components/desktop/resource-center-back-button";
 import { readBookshelf, shelfBookFromResult, writeBookshelf, type ShelfBook } from "@/lib/bookshelf";
 
 /**
@@ -43,35 +49,13 @@ import { readBookshelf, shelfBookFromResult, writeBookshelf, type ShelfBook } fr
  */
 
 function DocList() {
-  const total = KB_DOCS.reduce((s, d) => s + d.chunks, 0);
-  return (
-    <section className="rounded-2xl border bg-card p-5">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-[15px] font-semibold">《数据结构》文档集</h2>
-        <span className="font-mono text-xs tabular-nums text-muted-foreground">
-          {KB_DOCS.length} 篇 · {total} 片段
-        </span>
-      </div>
-      <div className="mt-2 divide-y divide-border/70">
-        {KB_DOCS.map((d) => (
-          <div key={d.name} className="flex items-center gap-2.5 py-2">
-            <FileText className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate font-mono text-xs">{d.name}</span>
-            <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-              {d.chunks} 片段
-            </span>
-          </div>
-        ))}
-      </div>
-      <p className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Database className="size-3" />
-        全部已向量化（ChromaDB）。生成内容必须引用本库片段。
-      </p>
-    </section>
-  );
+  const total = KB_DOCS.reduce((sum, doc) => sum + doc.chunks, 0);
+  return <section className={`${s.panel} ${s.documents}`} aria-labelledby="kb-documents-title">
+    <div className={s.sectionHeading}><BookOpen /><h2 id="kb-documents-title">《数据结构》文档集</h2><span className={s.count}>{KB_DOCS.length} 篇 · {total} 片段</span></div>
+    <ul className={s.documentList}>{KB_DOCS.map(doc => <li key={doc.name}><FileText /><span title={doc.name}>{doc.name}</span><small>{doc.chunks} 片段</small></li>)}</ul>
+    <p className={s.catalogNote}><Database />云模型嵌入 · 重排序检索，为学习资源提供相关知识片段</p>
+  </section>;
 }
-
-const KB_RELEVANCE = 0.71;
 
 function EditionCard({
   b,
@@ -165,7 +149,7 @@ function BookEditionAsk({ subject }: { subject: string }) {
       <div className="flex items-start gap-1.5 text-[12px] leading-relaxed">
         <Sparkles className="mt-0.5 size-3.5 shrink-0 text-warning" />
         <span>
-          知识库里还没有「<b>{subject}</b>」的教材。我帮你找了几个主流版本，
+          可以为「<b>{subject}</b>」补充相关教材，看看下面有哪些合适的版本。
           <b>要下载哪一版？</b>
         </span>
       </div>
@@ -202,151 +186,44 @@ function BookEditionAsk({ subject }: { subject: string }) {
 }
 
 function SearchDemo() {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useDesktopModuleStringState<string>("resources", "knowledge.search", "");
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
   const [hits, setHits] = useState<KbHit[]>([]);
-  const [notFound, setNotFound] = useState(false);
-  const [offline, setOffline] = useState(false);
+  const [error, setError] = useState("");
   const [subject, setSubject] = useState("");
-
-  const run = async () => {
-    const q = query.trim();
+  const [findEditions, setFindEditions] = useState(false);
+  const run = async (value = query) => {
+    const q = value.trim();
     if (!q || state === "loading") return;
-    setState("loading");
-    setHits([]);
-    setNotFound(false);
-    setOffline(false);
-    try {
-      const results = await kbSearch(q);
-      const best = results.reduce((m, h) => Math.max(m, h.score ?? 0), 0);
-      if (results.length && best >= KB_RELEVANCE) {
-        setHits(results);
-      } else {
-        setSubject(q);
-        setNotFound(true);
-      }
-    } catch {
-      setOffline(true);
-    }
+    setQuery(q); setState("loading"); setHits([]); setError(""); setSubject(q); setFindEditions(false);
+    try { setHits(await kbSearch(q)); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "检索暂时不可用，请稍后重试。"); }
     setState("done");
   };
-
-  return (
-    <section className="rounded-2xl border bg-card p-5">
-      <h2 className="text-[15px] font-semibold">检索示例</h2>
-      <p className="mt-0.5 text-[11px] text-muted-foreground">
-        智能体生成资源前的第一步：语义检索知识库；没有的科目会帮你找教材并询问下哪一版
-      </p>
-      <div className="mt-3 flex gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && run()}
-          placeholder="试试：动态规划 / 操作系统"
-          className="h-9 flex-1 rounded-lg border bg-transparent px-3 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
-        />
-        <Button size="sm" className="h-9 gap-1.5 px-3.5" onClick={run} disabled={state === "loading"}>
-          {state === "loading" ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <ScanSearch className="size-3.5" />
-          )}
-          检索
-        </Button>
-      </div>
-
-      <div className="mt-3 space-y-2">
-        {state === "idle" && (
-          <p className="rounded-lg border border-dashed px-3 py-5 text-center text-[11px] text-muted-foreground">
-            输入主题后回车，查看真实的 RAG 命中过程
-          </p>
-        )}
-        {state === "loading" && (
-          <p className="flex items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-5 font-mono text-[11px] text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" />
-            向量检索中 · top_k=5 · 阈值 0.75
-          </p>
-        )}
-
-        {state === "done" && notFound && <BookEditionAsk subject={subject} />}
-
-        {state === "done" && offline && (
-          <p className="flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-4 text-[11px] text-muted-foreground">
-            <AlertCircle className="size-3.5 shrink-0" />
-            后端未连接，无法实时检索。请确认后端已启动（在线模式）后重试。
-          </p>
-        )}
-
-        {state === "done" &&
-          !notFound &&
-          !offline &&
-          hits.map((h, i) => (
-            <motion.div
-              key={`${h.doc}-${h.section}-${i}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
-              className="rounded-lg border bg-surface-2/60 px-3.5 py-2.5"
-            >
-              <div className="flex items-baseline gap-2">
-                <span className="min-w-0 truncate font-mono text-xs font-medium">{h.doc}</span>
-                {h.section && (
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{h.section}</span>
-                )}
-                {h.score !== null && (
-                  <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-success">
-                    {h.score.toFixed(2)}
-                  </span>
-                )}
-              </div>
-              <p className="mt-1.5 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
-                {h.text}
-              </p>
-            </motion.div>
-          ))}
-        {state === "done" && !notFound && !offline && hits.length > 0 && (
-          <p className="text-center text-[11px] text-muted-foreground">
-            ChromaDB 实时命中 {hits.length} 个片段 → 注入生成上下文，正文以 [来源n] 角标引用
-          </p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-const COVERS: [string, string][] = [
-  ["#3b4252", "#262b36"],
-  ["#9a4b3f", "#7a3a30"],
-  ["#52614b", "#3d4a38"],
-  ["#8a6a3b", "#6a5029"],
-  ["#3f5a6b", "#2e4452"],
-  ["#574a6b", "#423854"],
-];
-
-function coverOf(s: string): [string, string] {
-  let h = 0;
-  for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return COVERS[h % COVERS.length];
+  return <section className={`${s.panel} ${s.retrieval}`} aria-labelledby="kb-retrieval-title">
+    <div className={s.sectionHeading}><Lightbulb /><h2 id="kb-retrieval-title">检索示例</h2></div>
+    <p className={s.description}>试着搜索一个知识点，看看知识库中有哪些内容可以帮助你。</p>
+    <form className={s.searchRow} onSubmit={event => { event.preventDefault(); void run(); }}>
+      <label className={s.searchInput}><Search /><input aria-label="检索知识库" value={query} onChange={event => setQuery(event.target.value)} placeholder="试试：动态规划 / 操作系统" /></label>
+      <button className={s.searchButton} disabled={!query.trim() || state === "loading"}>{state === "loading" ? <Loader2 className="animate-spin" /> : <Search />}搜索</button>
+    </form>
+    <div className={s.hotSearch}><span>示例：</span>{["时间复杂度", "二叉树遍历", "哈希表", "动态规划", "文件系统", "进程调度"].map(word => <button type="button" key={word} disabled={state === "loading"} onClick={() => void run(word)}>{word}</button>)}</div>
+    <div className={s.searchResults} aria-live="polite" aria-busy={state === "loading"}>
+      {state === "idle" && <div className={s.retrievalEmpty}><Image src="/brand/knowledge/retrieval-book-v1.webp" fill sizes="(max-width: 900px) 100vw, 50vw" alt="" /><div><strong>输入主题后回车，查看真实的 RAG 命中过程</strong><p>AI 将检索你的知识库，返回相关片段</p></div></div>}
+      {state === "loading" && <div className={s.loading}><Loader2 className="animate-spin" /><span>正在检索并重排序相关内容…</span></div>}
+      {error && <p className={s.error} role="alert"><AlertCircle />{error}</p>}
+      {state === "done" && !error && hits.length === 0 && <div className={s.noResults}><p>暂时没有找到“{subject}”的相关片段，可以补充教材后再试。</p><button type="button" onClick={() => setFindEditions(true)} disabled={findEditions}>帮我找相关教材</button>{findEditions && <BookEditionAsk subject={subject} />}</div>}
+      {state === "done" && !error && hits.map((hit, index) => <motion.article key={`${hit.doc}-${index}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .06 }} className={s.hit}>
+        <header><FileText /><h3>{hit.doc}</h3>{hit.score !== null && <span title="相关度分数，不表示回答正确率">相关度 {hit.score.toFixed(2)}</span>}</header>
+        {hit.section && <h4>{hit.section}</h4>}<p>{hit.text}</p>
+      </motion.article>)}
+      {state === "done" && !error && hits.length > 0 && <p className={s.resultNote}>找到 {hits.length} 个相关片段，可用于补充生成内容的知识依据</p>}
+    </div>
+  </section>;
 }
 
 function BookCover({ title }: { title: string }) {
-  const [c1, c2] = coverOf(title);
-  const short = title.replace(/[_\-—|·（(].*$/, "").trim().slice(0, 20) || title.slice(0, 20);
-  return (
-    <div
-      className="relative h-[106px] w-[76px] shrink-0 overflow-hidden rounded-l-[3px] rounded-r-md shadow-md"
-      style={{ background: `linear-gradient(140deg, ${c1}, ${c2})` }}
-    >
-      <span className="absolute inset-y-0 left-0 w-[5px] bg-black/25" />
-      <span className="absolute inset-y-0 left-[5px] w-px bg-white/15" />
-      <span
-        className="absolute inset-0 flex items-center justify-center px-2 text-center text-[10.5px] font-semibold leading-snug text-white/95"
-        style={{ fontFamily: "var(--font-display, serif)" }}
-      >
-        <span className="line-clamp-4">{short}</span>
-      </span>
-    </div>
-  );
+  return <div className={s.smallCover}><Image src="/brand/knowledge/textbook-cover-v1.webp" fill sizes="76px" alt="" /><span>{title.replace(/[_\-—|·（(].*$/, "").trim().slice(0, 12)}</span></div>;
 }
 
 type ImportState = "loading" | { imported: number } | { error: string } | undefined;
@@ -487,30 +364,24 @@ function SmartRecommend() {
   }).length;
 
   return (
-    <section className="rounded-2xl border bg-card p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <Sparkles className="size-4 text-primary" />
-        <h2 className="text-[15px] font-semibold">智能荐书</h2>
-        <span className="text-[11px] text-muted-foreground">
-          按你的学情自动判别核心教材，一键找资料入库，不用一本本搜
-        </span>
-      </div>
+    <section className={`${s.panel} ${s.recommendation}`} aria-label="智能荐书">
+      <div className={s.sectionHeading}><GraduationCap /><h2>智能荐书</h2><p>根据你的专业与年级推荐相关教材，一键找资料入库</p></div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className={s.recommendActions}>
         {major ? (
           <>
-            <span className="flex items-center gap-1.5 rounded-lg border bg-surface-2/60 px-3 py-1.5 text-[12px]">
+            <span className={s.profileChip}>
               <GraduationCap className="size-3.5 text-muted-foreground" />
               <span className="font-medium">{major}</span>
               <span className="text-muted-foreground">·</span>
               <span>{grade || "大二"}</span>
             </span>
-            <Link href="/settings" className="text-[11px] text-primary hover:underline">
-              去设置改
+            <Link href="/settings" className={s.settingsLink}>
+              <Settings size={18} />去设置 ›
             </Link>
             <Button
               size="sm"
-              className="ml-auto h-9 gap-1.5 px-3.5"
+              className={s.generateBooks}
               onClick={run}
               disabled={state === "loading"}
             >
@@ -587,9 +458,7 @@ function SmartRecommend() {
       )}
 
       {state === "idle" && major && (
-        <p className="mt-3 rounded-lg border border-dashed px-3 py-6 text-center text-[11px] text-muted-foreground">
-          点「生成书单」，AI 一键列出该阶段核心教材
-        </p>
+        <p className={s.recommendEmpty}>点击「生成书单」，AI 为你列出适合当前阶段的教材</p>
       )}
     </section>
   );
@@ -648,23 +517,30 @@ function WebResultCard({
 }
 
 function WebFind({ onAddBook, shelfUrls }: { onAddBook: (result: WebResult) => void; shelfUrls: Set<string> }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useDesktopModuleStringState<string>(
+    "resources",
+    "knowledge.webQuery",
+    ""
+  );
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
   const [results, setResults] = useState<WebResult[]>([]);
   const [status, setStatus] = useState<Record<string, ImportState>>({});
   const [err, setErr] = useState("");
 
-  const run = async () => {
-    if (!query.trim() || state === "loading") return;
+  const run = async (value = query) => {
+    const q = value.trim();
+    if (!q || state === "loading") return;
+    setQuery(q);
     setState("loading");
     setErr("");
     setResults([]);
     setStatus({});
     try {
-      const r = await webSearch(query.trim());
+      const r = await webSearch(q);
       setResults(r);
     } catch (error) {
-      setErr(error instanceof Error ? error.message : "联网搜索失败，请稍后重试。");
+      const message = error instanceof Error ? error.message : "联网搜索失败，请稍后重试。";
+      setErr(message.includes("BOCHA_API_KEY") ? "联网搜索暂未启用，请先配置联网搜索服务。" : message);
     }
     setState("done");
   };
@@ -683,35 +559,13 @@ function WebFind({ onAddBook, shelfUrls }: { onAddBook: (result: WebResult) => v
   };
 
   return (
-    <section className="rounded-2xl border bg-card p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <BookText className="size-4 text-primary" />
-        <h2 className="text-[15px] font-semibold">联网找教材</h2>
-        <span className="text-[11px] text-muted-foreground">
-          博查搜索（国内可达）→ 抓取正文 → 向量化进「我的资料」库
-        </span>
-        <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-          web_kb · 不进精编库
-        </span>
-      </div>
-
-      <div className="mt-3 flex gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && run()}
-          placeholder="搜教材 / 资料，如：红黑树 原理 详解"
-          className="h-9 flex-1 rounded-lg border bg-transparent px-3 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
-        />
-        <Button size="sm" className="h-9 gap-1.5 px-3.5" onClick={run} disabled={state === "loading"}>
-          {state === "loading" ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <ScanSearch className="size-3.5" />
-          )}
-          搜索
-        </Button>
-      </div>
+    <section className={`${s.panel} ${s.webFind}`} aria-label="联网找教材">
+      <div className={s.sectionHeading}><Database /><h2>联网找教材</h2><p>搜索教材与学习资料，保存书籍或将正文导入知识库</p><span className={s.scope}>网页与书籍 · 不限语言</span></div>
+      <form className={s.searchRow} onSubmit={event => { event.preventDefault(); void run(); }}>
+        <label className={s.searchInput}><Search /><input aria-label="搜索教材与资料" value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索教材 / 资料，如：红黑树 原理 详解" /></label>
+        <button className={s.searchButton} disabled={!query.trim() || state === "loading"}>{state === "loading" ? <Loader2 className="animate-spin" /> : <Search />}搜索</button>
+      </form>
+      <div className={s.hotSearch}><span>热门搜索：</span>{["数据结构", "操作系统", "计算机网络", "软件工程", "人工智能", "机器学习"].map(word => <button type="button" key={word} disabled={state === "loading"} onClick={() => void run(word)}>{word}</button>)}</div>
 
       {err && (
         <p className="mt-3 flex items-center gap-1.5 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2.5 text-[12px] text-danger">
@@ -741,11 +595,6 @@ function WebFind({ onAddBook, shelfUrls }: { onAddBook: (result: WebResult) => v
         </p>
       )}
 
-      {state === "idle" && (
-        <p className="mt-3 rounded-lg border border-dashed px-3 py-6 text-center text-[11px] text-muted-foreground">
-          输入教材/资料关键词，搜索结果以书目卡片呈现，点「下载嵌入」即并入你的知识库
-        </p>
-      )}
     </section>
   );
 }
@@ -766,21 +615,18 @@ export default function DesktopKb() {
   };
 
   return (
-    <div className="thin-scroll h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1440px] space-y-6 px-8 py-7">
-        <header>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">课程知识库</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            系统输入的初始知识库 · 所有生成内容的事实校验依据
-          </p>
+    <div className={`${s.page} thin-scroll`}>
+      <div className={s.frame}>
+        <header className={s.pageHeader}>
+          <ResourceCenterBackButton />
+          <div><h1>课程知识库</h1><p>整合课程相关知识，让学习资源的生成有据可循</p></div>
+          <p className={s.verse}>博学而笃志<br />切问而近思</p>
         </header>
         <DesktopBookshelf books={books} onChange={updateBooks} />
         <SmartRecommend />
         <WebFind onAddBook={addBook} shelfUrls={new Set(books.map((book) => book.url))} />
-        <div className="grid min-w-0 gap-6 lg:grid-cols-2">
-          <DocList />
-          <SearchDemo />
-        </div>
+        <div className={s.bottomGrid}><DocList /><SearchDemo /></div>
+        <footer className={s.pageFooter}><span>格物致知 · 知行合一</span><span>以知识为舟，赴求索之旅</span></footer>
       </div>
     </div>
   );

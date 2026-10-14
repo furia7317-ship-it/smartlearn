@@ -86,9 +86,17 @@ export interface PlannedDay {
   day: string;
   title: string;
   knowledge_points: string[];
+  knowledge_nodes?: import("./types").PathKnowledgeNode[];
+  knowledge_relations?: import("./types").PathKnowledgeRelation[];
   objective: string;
   minutes: number;
   prerequisites: string[];
+  module?: string;
+  node_kind?: "main" | "reinforcement" | "extension" | "milestone";
+  prerequisite_mode?: "all" | "any";
+  recommended_prerequisites?: string[];
+  completion_criteria?: string;
+  progress_weight?: number;
   task_ids: string[];
   actions: string[];
 }
@@ -100,6 +108,7 @@ export interface PlanValidation {
 }
 
 export interface ResourcePlan {
+  collaboration?: { effort: string; sources: { course: boolean; personal: boolean; web: boolean } };
   plan_id: string;
   student_id: string;
   version: number;
@@ -114,6 +123,8 @@ export interface ResourcePlan {
 }
 
 export interface ResourcePlanExecution {
+  orchestration?: { summary?: string; effective_effort?: string; strategy?: string };
+  delivery_status?: "completed" | "partial" | "failed" | "";
   resources: Record<string, unknown>[];
   schedule: Record<string, unknown>[];
   task_progress: Record<string, Record<string, unknown>>;

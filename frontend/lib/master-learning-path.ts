@@ -29,6 +29,8 @@ export interface SubjectLearningPath {
   activationDate?: string;
   dailyMinutes: number;
   path: PathStep[];
+  /** Original ability nodes, before daily time budgets split or merge tasks. */
+  capabilityPath?: PathStep[];
   sourcePlanIds: string[];
   completedTasks: number;
   totalTasks: number;
@@ -258,7 +260,7 @@ export function applyResourcePathAttachments(
     }
 
     let changed = false;
-    const path = subject.path.map((step) => {
+    const attach = (source: PathStep[]) => source.map((step) => {
       let stepChanged = false;
       const steps = step.steps?.map((task) => {
         const taskKey = task.completion_key ?? "";
@@ -292,7 +294,9 @@ export function applyResourcePathAttachments(
         steps,
       };
     });
-    return changed ? { ...subject, path } : subject;
+    const path = attach(subject.path);
+    const capabilityPath = subject.capabilityPath ? attach(subject.capabilityPath) : undefined;
+    return changed ? { ...subject, path, capabilityPath } : subject;
   });
 }
 
@@ -417,6 +421,7 @@ export function buildSubjectLearningPaths(options: {
       activationDate: control.activationDate,
       dailyMinutes,
       path: scheduledPath,
+      capabilityPath: annotatedPath,
       sourcePlanIds: [...sourcePlanIds, ...supplementalCandidates.map((candidate) => candidate.record.plan.plan_id)],
       completedTasks,
       totalTasks,
@@ -464,6 +469,7 @@ export function buildSubjectLearningPaths(options: {
       activationDate: control.activationDate,
       dailyMinutes,
       path,
+      capabilityPath: annotatedPath,
       sourcePlanIds: [id, ...supplementalCandidates.map((candidate) => candidate.record.plan.plan_id)],
       completedTasks,
       totalTasks,
@@ -482,23 +488,28 @@ function mergeMasterStep(
   contributions: Array<{ subject: SubjectLearningPath; step: PathStep }>,
   dayIndex: number,
 ): PathStep {
+  const isSingleSubject = contributions.length === 1;
   const subjectTitles = contributions.map(({ subject }) => subject.title);
   const tasks = contributions.flatMap(({ subject, step }) =>
     (step.steps ?? []).map((task) => ({
       ...task,
-      title: `${subject.title} · ${task.title}`,
+      title: isSingleSubject ? task.title : `${subject.title} · ${task.title}`,
     })),
   );
-  const title = contributions.length === 1
-    ? `${contributions[0].subject.title} · ${contributions[0].step.title}`
+  const title = isSingleSubject
+    ? contributions[0].step.title
     : `${contributions.length} 个科目协同学习`;
   return {
     day: `D${dayIndex + 1}`,
     title,
-    desc: contributions
-      .map(({ subject, step }) => `${subject.title}：${step.objective || step.desc}`)
-      .join("；"),
-    objective: contributions.map(({ subject, step }) => `${subject.title}：${step.objective || step.title}`).join("；"),
+    desc: isSingleSubject
+      ? contributions[0].step.desc
+      : contributions
+          .map(({ subject, step }) => `${subject.title}：${step.objective || step.desc}`)
+          .join("；"),
+    objective: isSingleSubject
+      ? contributions[0].step.objective
+      : contributions.map(({ subject, step }) => `${subject.title}：${step.objective || step.title}`).join("；"),
     minutes: contributions.reduce((total, { step }) => total + (step.minutes ?? 0), 0),
     types: Array.from(new Set(contributions.flatMap(({ step }) => step.types))),
     state: dayIndex === 0 ? "current" : "todo",

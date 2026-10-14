@@ -150,6 +150,8 @@ test("ready and future scheduled subject paths do not enter the master schedule"
   assert.equal(master.path.length, 2);
   assert.ok(master.path.every((step) => step.subject_titles?.includes("数据结构与算法")));
   assert.ok(master.path.every((step) => !step.subject_titles?.includes("高等数学")));
+  assert.deepEqual(master.path.map((step) => step.title), ["数据结构与算法基础", "数据结构与算法进阶"]);
+  assert.deepEqual(master.path.map((step) => step.steps[0].title), ["学习数据结构与算法1", "学习数据结构与算法2"]);
 });
 
 test("a scheduled subject becomes active on its activation date", () => {

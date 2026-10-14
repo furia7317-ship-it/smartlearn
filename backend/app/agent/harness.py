@@ -116,6 +116,7 @@ class AgentHarness:
         """执行多轮循环。messages 会被就地追加。"""
         tool_calls_made: list[str] = []
         last_content = ""
+        terminal_generation_failure: str | None = None
         previous_response_id: str | None = None
         response_input: list[dict[str, Any]] = list(messages)
 
@@ -224,14 +225,19 @@ class AgentHarness:
                     if parsed_args is not None:
                         try:
                             self._check_cancelled()
-                            result = await self.dispatch(
-                                name,
-                                parsed_args,
-                                student_id=self.student_id,
-                                emit=self.emit,
-                                run_id=self.trace_run_id,
-                                parent_span_id=tool_span_id,
-                            )
+                            if name == "generate_learning_material" and terminal_generation_failure:
+                                result = terminal_generation_failure
+                            else:
+                                result = await self.dispatch(
+                                    name,
+                                    parsed_args,
+                                    student_id=self.student_id,
+                                    emit=self.emit,
+                                    run_id=self.trace_run_id,
+                                    parent_span_id=tool_span_id,
+                                )
+                            if name == "generate_learning_material" and _requires_user_retry(result):
+                                terminal_generation_failure = result
                         except Exception as e:  # noqa: BLE001 —— 工具异常不应中断循环
                             logger.exception("工具 %s 执行失败", name)
                             result = json.dumps(
@@ -263,7 +269,7 @@ class AgentHarness:
                     attempt=turn + 1,
                     action_type="tool_call",
                     error_code="tool_execution_failed" if status == "failed" else None,
-                    retryable=status == "failed",
+                    retryable=status == "failed" and not _requires_user_retry(result),
                     tool_policy=tool_policy(name),
                 )
                 messages.append(
@@ -322,8 +328,26 @@ class AgentHarness:
         }
         if self.tool_schemas:
             kwargs["tools"] = self.tool_schemas
+        if self.provider_id == "mimo":
+            # MiMo thinking output must be replayed on later tool turns. The harness
+            # intentionally does not retain private reasoning, so disable it and keep
+            # the tool loop stateless and protocol-compliant.
+            kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
 
-        stream = await self.client.chat.completions.create(**kwargs)
+        # Retry only opening the stream: no output or tool call has been
+        # consumed yet, so a transient TLS/connect failure cannot duplicate work.
+        from openai import APIConnectionError
+        for attempt in range(3):
+            self._check_cancelled()
+            try:
+                stream = await self.client.chat.completions.create(**kwargs)
+                break
+            except APIConnectionError:
+                if attempt == 2:
+                    raise
+                await self.emit("progress", {"agent": "tutor", "status": "started",
+                                            "detail": "模型连接暂时中断，正在重新连接"})
+                await asyncio.sleep(2 ** attempt)
 
         raw_content = ""
         content = ""
@@ -749,6 +773,15 @@ def _to_openai_tc(tc: dict) -> dict:
     }
 
 
+def _requires_user_retry(result: str) -> bool:
+    try:
+        payload = json.loads(result)
+    except (TypeError, ValueError):
+        return False
+    error = payload.get("error") if isinstance(payload, dict) else None
+    return isinstance(error, dict) and error.get("retry_requires_user") is True
+
+
 def _tool_result_failed(result: str) -> bool:
     """Read the tool result contract instead of substring-matching arbitrary text."""
 
@@ -826,6 +859,12 @@ def _external_input_narrative(input_items: list[dict[str, Any]]) -> str:
             raw_user = item.get("content")
             if isinstance(raw_user, str):
                 compact = " ".join(raw_user.split())
+            elif isinstance(raw_user, list):
+                compact = " ".join(
+                    str(part.get("text") or "").strip()
+                    for part in raw_user
+                    if isinstance(part, dict) and part.get("type") == "text"
+                ).strip()
             else:
                 compact = ""
             if compact:

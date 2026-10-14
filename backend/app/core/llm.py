@@ -39,6 +39,7 @@ def build_llm(
     streaming: bool = True,
     response_format: dict[str, Any] | None = None,
     max_tokens: int | None = None,
+    max_retries: int | None = None,
 ) -> BaseChatModel:
     """根据 provider 构建 LLM 实例；未指定时读取 SQLite 中的当前选择。"""
     cfg = get_llm_provider_config_sync(provider)
@@ -55,7 +56,7 @@ def build_llm(
         model_kwargs=model_kwargs,
         max_tokens=max_tokens,
         timeout=settings.LLM_REQUEST_TIMEOUT_SECONDS,
-        max_retries=settings.LLM_MAX_RETRIES,
+        max_retries=settings.LLM_MAX_RETRIES if max_retries is None else max(0, max_retries),
     )
 
 

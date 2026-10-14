@@ -17,6 +17,39 @@ export interface IdentityDependencies {
   randomUUID?: () => string;
 }
 
+interface RuntimeCrypto {
+  randomUUID?: () => string;
+  getRandomValues?: (values: Uint8Array) => Uint8Array;
+}
+
+/** Generate a UUID even when randomUUID is hidden on non-secure HTTP origins. */
+export function createAnonymousUuid(
+  cryptoSource: RuntimeCrypto | undefined = globalThis.crypto,
+): string {
+  if (cryptoSource?.randomUUID) return cryptoSource.randomUUID();
+
+  const bytes = new Uint8Array(16);
+  if (cryptoSource?.getRandomValues) {
+    cryptoSource.getRandomValues(bytes);
+  } else {
+    // This ID only separates anonymous local data; it is not an auth credential.
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, "0"));
+  return [
+    hex.slice(0, 4).join(""),
+    hex.slice(4, 6).join(""),
+    hex.slice(6, 8).join(""),
+    hex.slice(8, 10).join(""),
+    hex.slice(10).join(""),
+  ].join("-");
+}
+
 export function isLocalStudentId(value: string | null | undefined): value is string {
   return typeof value === "string" && LOCAL_ID_PATTERN.test(value);
 }
@@ -42,7 +75,7 @@ export function getStudentId(deps: IdentityDependencies = {}): string {
   const stored = storage.getItem(STORAGE_KEY);
   if (isLocalStudentId(stored)) return stored;
 
-  const randomUUID = deps.randomUUID ?? (() => globalThis.crypto.randomUUID());
+  const randomUUID = deps.randomUUID ?? createAnonymousUuid;
   const studentId = `local_${randomUUID()}`;
   if (!isLocalStudentId(studentId)) {
     throw new Error("student identity generator returned an invalid UUID");

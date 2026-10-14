@@ -49,7 +49,7 @@ _DENIED_NODES = (
 )
 _DENIED_NAMES = {
     "breakpoint", "compile", "delattr", "dir", "eval", "exec", "exit",
-    "getattr", "globals", "help", "input", "locals", "memoryview", "open",
+    "getattr", "globals", "help", "locals", "memoryview", "open",
     "quit", "setattr", "type", "vars", "__builtins__", "__import__",
 }
 _DENIED_ATTRIBUTES = {
@@ -209,7 +209,7 @@ def _error_result(error_type: str, message: str, line: int | None = None) -> dic
     }
 
 
-def execute_python(code: str) -> dict[str, Any]:
+def execute_python(code: str, stdin: str = "") -> dict[str, Any]:
     """Execute validated source in an isolated child process and return a trace."""
 
     try:
@@ -223,7 +223,7 @@ def execute_python(code: str) -> dict[str, Any]:
         try:
             completed = subprocess.run(
                 [sys.executable, "-I", "-S", str(worker)],
-                input=json.dumps({"code": code}, ensure_ascii=False),
+                input=json.dumps({"code": code, "stdin": stdin[:10000]}, ensure_ascii=False),
                 capture_output=True,
                 text=True,
                 encoding="utf-8",

@@ -18,6 +18,8 @@ class UserAccount(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     login: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(Text)
+    # Retained for database compatibility; the application only exposes student accounts.
+    role: Mapped[str] = mapped_column(String(16), default="student")
     grade: Mapped[str] = mapped_column(String(32), default="")
     major: Mapped[str] = mapped_column(String(128), default="")
     preferences: Mapped[list] = mapped_column(JSON, default=list)
@@ -25,6 +27,7 @@ class UserAccount(Base):
     mid_term_goal: Mapped[str] = mapped_column(Text, default="")
     short_term_goal: Mapped[str] = mapped_column(Text, default="")
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    guide_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 

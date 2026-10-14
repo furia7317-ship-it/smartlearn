@@ -10,6 +10,9 @@ SCORE_MAP = {
     "blank": 10,
     "short": 20,
     "code": 25,
+    "boolean": 10,
+    "essay": 25,
+    "practical": 25,
 }
 
 # ── 完成度阈值 ──
@@ -46,16 +49,16 @@ def grade_mcq_questions(
     """选择题规则判分：比 answer_index。"""
     results = []
     for q in questions:
-        if q.get("type") != "mcq":
+        if q.get("type") not in ("mcq", "boolean"):
             continue
         qid = q["id"]
         student_answer = answers.get(qid, "")
         correct_answer = str(q.get("answer", ""))
-        is_correct = student_answer.strip() == correct_answer.strip()
+        is_correct = student_answer.strip().lower() == correct_answer.strip().lower()
         score = q.get("score", SCORE_MAP["mcq"]) if is_correct else 0
         results.append({
             "question_id": qid,
-            "type": "mcq",
+            "type": q["type"],
             "score": score,
             "max_score": q.get("score", SCORE_MAP["mcq"]),
             "correct": is_correct,

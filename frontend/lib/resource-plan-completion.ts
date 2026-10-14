@@ -44,7 +44,7 @@ function taskFailureCause(task: ResourcePlanRecord["plan"]["tasks"][number]): Fa
     return { reason: "资料生成服务暂时异常", retryable: true };
   }
   if (review?.failure_kind === "quality" || review?.gate_status === "rejected") {
-    return { reason: "一次定向返工后仍未通过质量审核", retryable: true };
+    return { reason: "自动返工后仍未通过质量审核", retryable: true };
   }
   return {
     reason: "资料生成或审核异常",

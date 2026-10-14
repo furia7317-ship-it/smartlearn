@@ -1,0 +1,30 @@
+.frame {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.frame[data-transition="running"][data-motion="move"] {
+  will-change: transform, opacity;
+}
+
+/* will-change: transform also creates a containing block even when y stays zero. */
+.frame[data-transition="running"][data-motion="still"] {
+  will-change: opacity;
+}
+
+.frame[data-motion="still"] {
+  transform: none !important;
+}
+
+.frame[data-transition="idle"] {
+  will-change: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame {
+    opacity: 1 !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+}

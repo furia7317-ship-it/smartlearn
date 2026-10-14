@@ -28,26 +28,52 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "app://local",
     ]
+    # Portable Web may be opened through the machine/WSL private-network IP.
+    # Limit the dynamic allowance to RFC1918/loopback hosts and known frontend
+    # development ports instead of accepting arbitrary credentialed origins.
+    CORS_ORIGIN_REGEX: str = (
+        r"^http://(?:"
+        r"localhost|127\.0\.0\.1|\[::1\]|"
+        r"10(?:\.\d{1,3}){3}|"
+        r"192\.168(?:\.\d{1,3}){2}|"
+        r"172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}"
+        r"):(?:3000|3001|5173)$"
+    )
 
     # ── 数据库 ──
     DATABASE_URL: str = "sqlite+aiosqlite:///./smartlearn.db"
+    # SQL 逐句输出会在 Windows/WSL 桌面开发环境制造大量同步终端 I/O。
+    # 与 DEBUG 解耦，按需诊断时再通过环境变量显式开启。
+    SQL_ECHO: bool = False
 
     # ── Chroma 向量库 ──
     CHROMA_PERSIST_DIR: str = "./chroma"
-    EMBEDDING_MODEL: str = "BAAI/bge-small-zh-v1.5"  # 中文检索嵌入（512 维）
-    # Calibrated on evals/rag_recall_v1.jsonl: all 24 out-of-domain cases stay
-    # below this boundary while deterministic lexical anchors preserve known topics.
+    SILICONFLOW_BASE_URL: str = "https://api.siliconflow.cn/v1"
+    SILICONFLOW_API_KEY: str = ""
+    EMBEDDING_MODEL: str = "Qwen/Qwen3-VL-Embedding-8B"
+    EMBEDDING_DIMENSIONS: int = 4096
+    RAG_CLOUD_TIMEOUT_SECONDS: float = 45.0
+    RAG_CLOUD_MAX_RETRIES: int = 2
+    RAG_EMBEDDING_BATCH_SIZE: int = 8
+    # Re-evaluate against evals/rag_recall_v1.jsonl whenever the model changes.
     KB_RELEVANCE_THRESHOLD: float = 0.75
-    RAG_EMBEDDER_RETRY_SECONDS: float = 60.0
+    # SiliconFlow reranker scores are already normalized; do not apply sigmoid.
+    KB_RERANK_RELEVANCE_THRESHOLD: float = 0.01
     RAG_VECTOR_CANDIDATES: int = 20
     RAG_LEXICAL_CANDIDATES: int = 20
     RAG_RRF_K: int = 60
     RAG_MAX_RESULTS_PER_SOURCE: int = 2
     RAG_INDEX_BATCH_SIZE: int = 64
+    RAG_ADJACENT_CHUNK_DEDUP: bool = True
+    # Both models are served by SiliconFlow; no local inference fallback.
+    RAG_RERANKER_MODEL: str = "Qwen/Qwen3-VL-Reranker-8B"
+    RAG_RERANKER_CANDIDATES: int = 12
     PLAN_MAX_OUTPUT_TOKENS: int = 5000
     # Agent runtime safety bounds. Keep retries low because graph nodes already
     # own the business-level retry policy.
@@ -57,6 +83,11 @@ class Settings(BaseSettings):
     # 30 so deployments can tune downward without accidentally exceeding the
     # product-level parallelism ceiling.
     AGENT_MAX_CONCURRENCY: int = 30
+    # Procedural knowledge is evaluated independently and never bypasses the
+    # resource contract, account scope or generation/review budgets.
+    PROCEDURE_SKILLS_ENABLED: bool = True
+    PROCEDURE_SKILL_REFLECTION_ENABLED: bool = True
+    PROCEDURE_SKILL_MODEL_TIMEOUT_SECONDS: float = 40.0
     SSE_QUEUE_MAXSIZE: int = 128
     SSE_CANCEL_GRACE_SECONDS: float = 5.0
     # ── 全局智能教师上下文预算 ──
@@ -70,6 +101,13 @@ class Settings(BaseSettings):
     CHAT_ATTACHMENT_TOKEN_BUDGET: int = 5000
     CHAT_HISTORY_TOKEN_BUDGET: int = 4500
     CHAT_QUESTION_TOKEN_BUDGET: int = 1500
+    # Episodic memory owns a separate best-effort vector collection. Course
+    # knowledge retrieval remains authoritative and is never mixed into it.
+    MEMORY_EPISODE_VECTOR_ENABLED: bool = True
+    MEMORY_EPISODE_VECTOR_COLLECTION: str = "memory_episodes_v1"
+    MEMORY_EPISODE_VECTOR_TIMEOUT_SECONDS: float = 5.0
+    MEMORY_EPISODE_RECALL_CANDIDATES: int = 12
+    MEMORY_EPISODE_CROSS_SESSION_MIN_SCORE: float = 0.72
     # Optional stable HMAC key for short-lived server-issued material approval
     # markers. A random per-process key is used for local single-worker runs.
     MATERIAL_APPROVAL_SECRET: str = ""
@@ -107,7 +145,12 @@ class Settings(BaseSettings):
     IFLYTEK_PDF_OCR_STATUS_URL: str = "https://iocr.xfyun.cn/ocrzdq/v1/pdfOcr/status"
     IFLYTEK_PDF_OCR_TIMEOUT_SECONDS: int = 120
 
-    # ── Xiaomi MiMo 语音合成（可选，视频配音首选） ──
+    # ── Xiaomi MiMo 语音识别 / 合成 ──
+    MIMO_ASR_ENABLED: bool = False
+    MIMO_ASR_BASE_URL: str = "https://api.xiaomimimo.com/v1"
+    MIMO_ASR_MODEL: str = "mimo-v2.5-asr"
+    MIMO_ASR_LANGUAGE: str = "auto"
+    MIMO_ASR_MAX_SECONDS: int = 120
     MIMO_TTS_ENABLED: bool = False
     MIMO_API_KEY: str = ""
     MIMO_TTS_BASE_URL: str = "https://api.xiaomimimo.com/v1"
@@ -120,9 +163,12 @@ class Settings(BaseSettings):
     MINIMAX_API_KEY: str = ""
     MINIMAX_GROUP_ID: str = ""
     MINIMAX_TTS_URL: str = "https://api.minimaxi.com/v1/t2a_v2"
-    MINIMAX_TTS_MODEL: str = "speech-02-hd"
+    MINIMAX_TTS_MODEL: str = "speech-2.8-turbo"
     MINIMAX_TTS_VOICE_ID: str = "male-qn-qingse"
     MINIMAX_TTS_SPEED: float = 1.0
+    MINIMAX_VOICE_CLONE_UPLOAD_URL: str = "https://api.minimaxi.com/v1/files/upload"
+    MINIMAX_VOICE_CLONE_URL: str = "https://api.minimaxi.com/v1/voice_clone"
+    MINIMAX_VOICE_CLONE_SOURCE: str = ""
 
     # ── 讯飞 2D 虚拟人（数字人）—— 独立 App，与上面的智文/TTS 不是同一套凭证 ──
     IFLYTEK_AVATAR_APPID: str = ""
@@ -188,7 +234,7 @@ _ensure_sqlite_parent(settings.DATABASE_URL)
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.DEBUG,
+    echo=settings.SQL_ECHO,
     future=True,
 )
 
@@ -207,3 +253,19 @@ from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
 sync_engine = create_engine(settings.DATABASE_URL.replace("+aiosqlite", ""), future=True)
 sync_session = sessionmaker(sync_engine, class_=Session, expire_on_commit=False)
+
+
+def _configure_sqlite_connection(connection, _record) -> None:
+    """Readers must not block the short writes made by concurrent chat runs."""
+    cursor = connection.cursor()
+    try:
+        cursor.execute("PRAGMA busy_timeout=15000")
+        cursor.execute("PRAGMA journal_mode=WAL")
+    finally:
+        cursor.close()
+
+
+if settings.DATABASE_URL.startswith("sqlite"):
+    from sqlalchemy import event
+    event.listen(engine.sync_engine, "connect", _configure_sqlite_connection)
+    event.listen(sync_engine, "connect", _configure_sqlite_connection)

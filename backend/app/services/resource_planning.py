@@ -37,6 +37,16 @@ def normalize_task_type(task: PlannedResourceTask) -> bool:
     reading task that merely extends a topic keeps its planned type.
     """
 
+    if task.type_origin == "user":
+        # Shared requirements can mention questions alongside a lecture. An
+        # explicit form selection must survive every normalization boundary.
+        expected = "quiz" if task.type == "solution" else task.type
+        if not str(task.agent or "").startswith(CUSTOM_AGENT_PREFIX):
+            changed = task.agent != expected
+            task.agent = expected
+            return changed
+        return False
+
     if str(task.agent or "").startswith(CUSTOM_AGENT_PREFIX):
         # 用户自建智能体只自定义执行者：输出类型是学生显式挑的，不能被
         # solution→quiz 的改写静默夺走。豁免必须写在这里，因为 build_planned_state、

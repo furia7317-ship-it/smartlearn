@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
+import s from "./desktop-kb.module.css";
 import {
   BookOpen,
   ExternalLink,
@@ -255,23 +257,18 @@ export function DesktopBookshelf({ books, onChange }: { books: ShelfBook[]; onCh
 
   return (
     <>
-      <section className={styles.shelfSection}>
-        <div className={styles.shelfHeading}><Library className="size-4" /><h2>我的书架</h2><p>保存教材、预览正文，并生成覆盖全书的章节知识图谱</p><code>{books.length} 本</code></div>
-        {books.length === 0 ? <p className={styles.emptyShelf}>书架还是空的。先在下方搜索教材，再点击“加入书架”。</p> : (
-          <div className={styles.shelfGrid}>{books.map((book) => (
-            <article key={book.id} className={styles.shelfCard}>
-              <div className={styles.bookCover}><BookOpen className="size-6" /></div>
-              <div className={styles.bookMeta}>
-                <h3 title={book.title}>{book.title}</h3><p>{book.site || "网络教材"}</p>
-                <div className={styles.bookActions}>
-                  <button type="button" onClick={() => showPreview(book)}><BookOpen className="size-3" />预览</button>
-                  <button type="button" onClick={() => showGraph(book)}><Network className="size-3" />{book.graph && book.graphVersion === 2 ? "查看全书图谱" : "生成全书图谱"}</button>
-                  <button type="button" aria-label={`从书架移除 ${book.title}`} onClick={() => onChange(books.filter((item) => item.id !== book.id))}><Trash2 className="size-3" /></button>
-                </div>
-              </div>
-            </article>
-          ))}</div>
-        )}
+      <section className={`${s.panel} ${s.shelfSection}`} aria-label="我的书库">
+        <div className={s.sectionHeading}><Library /><h2>我的书库</h2><p>保存教材、预览正文，并生成覆盖全书的章节知识图谱</p><span className={s.count}>{books.length} 本</span></div>
+        <div className={s.shelfContent}>
+          {books.length === 0 ? <div className={s.emptyShelf}><BookOpen /><strong>把好书，收入自己的书库</strong><p>在下方搜索教材，点击“加入书架”即可收藏阅读。</p></div> : <div className={s.shelfGrid}>{books.map(book => <article key={book.id} className={s.shelfCard}>
+            <div className={s.shelfCover}><Image src="/brand/knowledge/textbook-cover-v1.webp" fill sizes="88px" alt="" /></div>
+            <div className={s.bookMeta}><h3 title={book.title}>{book.title}</h3><p>收录于 {new Date(book.addedAt).toLocaleDateString("zh-CN")} · {book.site || "网络教材"}</p>
+              <div className={s.bookActions}><button type="button" onClick={() => showPreview(book)}><BookOpen />预览</button><button type="button" onClick={() => showGraph(book)}><Network />{book.graph && book.graphVersion === 2 ? "查看全书图谱" : "生成全书图谱"}</button></div>
+            </div>
+            <button type="button" className={s.removeBook} aria-label={`从书架移除 ${book.title}`} onClick={() => onChange(books.filter(item => item.id !== book.id))}><Trash2 /></button>
+          </article>)}</div>}
+          <div className={s.shelfArt} aria-hidden="true"><Image src="/brand/knowledge/library-books-v1.webp" fill sizes="(max-width: 900px) 0px, 40vw" alt="" /><p>书山有路勤为径<br />学海无涯苦作舟</p></div>
+        </div>
       </section>
 
       {activeBook && (

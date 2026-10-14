@@ -500,30 +500,7 @@ def reviewer_node(state: ResourceState) -> dict[str, Any]:
 def _auto_release_legacy_reviews(
     resources: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Promote second-round content rejections while retaining audit warnings.
-
-    The compatibility graph already routes to integration after one repair,
-    but previously left the repaired artifacts marked as rejected.
-    Infrastructure failures remain closed: only an explicit content rejection
-    is eligible for this bounded release.
-    """
-
-    for resource in resources:
-        if (
-            resource.get("review_approved") is True
-            or resource.get("review_status") != "rejected"
-        ):
-            continue
-        warnings = [
-            *[str(item) for item in resource.get("review_warnings") or [] if str(item)],
-            *[str(item) for item in resource.get("review_issues") or [] if str(item)],
-            "已完成一次自动返工；达到返工上限后携带审核告警自动放行。",
-        ]
-        resource["review_approved"] = True
-        resource["review_status"] = "approved_after_rework_limit"
-        resource["review_auto_released"] = True
-        resource["review_warnings"] = list(dict.fromkeys(warnings))
-        resource["review_issues"] = []
+    """Compatibility path: exhausted repairs do not approve rejected content."""
     return resources
 
 

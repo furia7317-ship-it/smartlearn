@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { SiteFiling } from "@/components/site-filing";
 import {
   ArrowRight,
   BookCheck,
@@ -45,7 +46,7 @@ const SECTION_LABELS = ["认识学枢", "智能体协作", "学习材料", "学�
 const FREE_TRIAL_HREF = "/login?next=/app";
 const DESKTOP_DOWNLOAD_HREF =
   process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL ||
-  "/downloads/学枢-一体安装版-0.1.13.exe";
+  "/downloads/学枢-一体安装版-0.1.14.exe";
 
 const AGENTS = [
   { label: "学习画像", detail: "汇总测验与代码评分", icon: UserRoundSearch, position: "agentTopLeft" },
@@ -61,7 +62,7 @@ const RESOURCES = [
   { label: "导图", detail: "结构化知识网络", icon: Map },
   { label: "题库", detail: "针对性训练与评分", icon: ClipboardCheck },
   { label: "题目解析", detail: "题目、答案与逐题讲解", icon: FileQuestion },
-  { label: "代码挑战", detail: "AI 出题、运行与画像联动", icon: Code2 },
+  { label: "编程实训", detail: "AI 出题、运行与画像联动", icon: Code2 },
   { label: "视频", detail: "动画分镜与讲解", icon: Video },
   { label: "课件", detail: "可复用课程大纲", icon: FileStack },
 ] as const;
@@ -69,7 +70,7 @@ const RESOURCES = [
 const LOOP_STAGES = [
   { label: "诊断", detail: "评估现状与薄弱点", icon: BrainCircuit, note: "画像已更新", position: "loopOne" },
   { label: "学习", detail: "精讲内容与资源", icon: BookOpen, note: "6 份资料", position: "loopTwo" },
-  { label: "练习", detail: "测验与代码挑战反馈", icon: BookCheck, note: "评分写入画像", position: "loopThree" },
+  { label: "练习", detail: "测验与编程实训反馈", icon: BookCheck, note: "评分写入画像", position: "loopThree" },
   { label: "复习", detail: "按遗忘曲线回顾", icon: RotateCcw, note: "明日复习", position: "loopFour" },
 ] as const;
 
@@ -77,7 +78,7 @@ function Brand() {
   return (
     <button className={styles.brand} type="button" aria-label="回到首页第一屏">
       <span className={styles.brandMark}>
-        <Image src="/brand/xueshu-app-icon.png" alt="" width={36} height={36} priority />
+        <Image src="/brand/xueshu-app-icon-128.webp" alt="" width={36} height={36} priority />
       </span>
       <span><strong>学枢</strong><small>XUESHU</small></span>
     </button>
@@ -278,7 +279,7 @@ export function MarketingHome() {
           <div className={styles.heroProof}>
             <span><CheckCircle2 aria-hidden />SQLite 三重记忆</span>
             <span><CheckCircle2 aria-hidden />图片 / PDF / 文档答疑</span>
-            <span><CheckCircle2 aria-hidden />代码挑战联动画像</span>
+            <span><CheckCircle2 aria-hidden />编程实训联动画像</span>
           </div>
         </motion.div>
         <motion.aside
@@ -376,7 +377,7 @@ export function MarketingHome() {
             <SectionHeading
               eyebrow="多模态学习材料"
               title="不只回答，直接交付学习材料"
-              copy="图片、PDF 和文档可以直接拖入智能教师；讲义负责讲懂，整书图谱负责串联，题目与逐题解析成组保存，代码挑战负责把练习结果写回画像。"
+              copy="图片、PDF 和文档可以直接拖入智能教师；讲义负责讲懂，整书图谱负责串联，题目与逐题解析成组保存，编程实训负责把练习结果写回画像。"
             />
             <div className={styles.resourceProof}><CheckCircle2 aria-hidden /><span><strong>8 类学习资料</strong><small>统一审核 · 自动归档 · 可持续追问</small></span></div>
             <div className={styles.latestCapabilities}>
@@ -482,7 +483,7 @@ export function MarketingHome() {
             <div><span>连续学习</span><strong>30 天</strong></div>
             <div><span>已审核资料</span><strong>8 类</strong></div>
             <div><span>路径完成度</span><strong>86%</strong></div>
-            <div><span>代码挑战</span><strong>最高 100 分</strong></div>
+            <div><span>编程实训</span><strong>最高 100 分</strong></div>
           </motion.div>
         </div>
       </motion.section>
@@ -508,7 +509,7 @@ export function MarketingHome() {
         >
           <span className={styles.eyebrow}><Goal aria-hidden />你的学习，从此开始</span>
           <h2>现在，开始你的学习路径</h2>
-          <p>登录后体验附件答疑、整书知识图谱、题目解析与代码挑战；学习结果会写入 SQLite 画像与三重记忆，长期路径由桌面端持续承载。</p>
+          <p>登录后体验附件答疑、整书知识图谱、题目解析与编程实训；学习结果会写入 SQLite 画像与三重记忆，长期路径由桌面端持续承载。</p>
           <div className={styles.startActions}>
             <Link href={FREE_TRIAL_HREF} className={styles.primaryAction}>免费体验<ArrowRight aria-hidden /></Link>
             <a href={DESKTOP_DOWNLOAD_HREF} className={styles.secondaryAction} download><MonitorDown aria-hidden />下载桌面端</a>
@@ -519,6 +520,7 @@ export function MarketingHome() {
           <span><ShieldCheck aria-hidden />安全可信</span>
           <span><CheckCircle2 aria-hidden />内容经过审核</span>
           <span>© 2026 学枢 Xueshu</span>
+          <SiteFiling />
         </footer>
       </motion.section>
 

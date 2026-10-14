@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useAppFeatureNavigation } from "@/hooks/use-app-feature-navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,6 +9,7 @@ import {
   BrainCircuit,
   BookOpenCheck,
   Check,
+  ClipboardCheck,
   Cpu,
   GraduationCap,
   Monitor,
@@ -23,10 +25,12 @@ import {
 import { useTheme } from "next-themes";
 
 import { AgentMemorySettings } from "@/components/agent-memory-settings";
+import { ProcedureSkillSettings } from "@/components/procedure-skill-settings";
 import { CustomAgentWorkspace } from "@/components/custom-agent-workspace";
 import { LearningGoalsSettings } from "@/components/learning-goals-settings";
 import { LearningPreferencesSettings } from "@/components/learning-preferences-settings";
 import { PageHeader } from "@/components/layout/page-header";
+import { ViewTransition } from "@/components/layout/view-transition";
 import { ServiceDependencyCard } from "@/components/service-dependency-card";
 import { ShellLink as Link } from "@/components/shell-link";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
@@ -50,6 +54,7 @@ type SettingsSection =
   | "preferences"
   | "goals"
   | "memory"
+  | "methods"
   | "services"
   | "advanced";
 
@@ -60,11 +65,13 @@ const SETTINGS_SECTIONS = [
   { id: "preferences", label: "学习与 AI", description: "教学方式和学习默认值", Icon: BookOpenCheck },
   { id: "goals", label: "目标管理", description: "长期、中期与短期目标", Icon: Target },
   { id: "memory", label: "记忆与隐私", description: "查看和管理三重记忆", Icon: BrainCircuit },
+  { id: "methods", label: "教学方法", description: "检查和管理积累的方法", Icon: ClipboardCheck },
   { id: "services", label: "模型与服务", description: "AI 能力和连接状态", Icon: Cpu },
 ] as const;
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SettingsSection>("profile");
+  useAppFeatureNavigation("/desktop/settings/", "section", ["profile", "preferences", "goals", "memory", "methods", "services"], setActiveSection);
   const [advancedView, setAdvancedView] = useState<AdvancedView>("overview");
   const [workflows, setWorkflows] = useState<CustomWorkflow[]>([DEFAULT_WORKFLOW]);
   const [activeWorkflow, setActiveWorkflow] = useState<CustomWorkflow>(DEFAULT_WORKFLOW);
@@ -75,7 +82,9 @@ export default function SettingsPage() {
   const timer = useRef<number | undefined>(undefined);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const { mode } = useOrchestratorContext();
+  const { mode } = useOrchestratorContext((state) => ({
+    mode: state.mode,
+  }));
 
   useEffect(() => {
     setMounted(true);
@@ -136,7 +145,7 @@ export default function SettingsPage() {
           )}
         </PageHeader>
 
-        <nav className="grid gap-2 rounded-xl border bg-card p-2 md:grid-cols-3 xl:grid-cols-5" aria-label="设置分类">
+        <nav className="grid gap-2 rounded-xl border bg-card p-2 md:grid-cols-3 xl:grid-cols-6" aria-label="设置分类">
           {SETTINGS_SECTIONS.map(({ id, label, description, Icon }) => {
             const active = activeSection === id;
             return (
@@ -166,6 +175,7 @@ export default function SettingsPage() {
           })}
         </nav>
 
+        <ViewTransition viewKey={`${activeSection}:${advancedView}`}>
         {activeSection === "profile" && (
           <div className="settings-page-grid">
             <section className="space-y-4 rounded-xl border bg-card">
@@ -273,6 +283,7 @@ export default function SettingsPage() {
         {activeSection === "goals" && <LearningGoalsSettings mode={mode} />}
         {activeSection === "preferences" && <LearningPreferencesSettings />}
         {activeSection === "memory" && <AgentMemorySettings mode={mode} />}
+        {activeSection === "methods" && <ProcedureSkillSettings mode={mode} />}
         {activeSection === "services" && <ServiceDependencyCard />}
         {activeSection === "advanced" && advancedView === "overview" && (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
@@ -389,6 +400,7 @@ export default function SettingsPage() {
             </section>
           </div>
         )}
+        </ViewTransition>
       </div>
     </div>
   );

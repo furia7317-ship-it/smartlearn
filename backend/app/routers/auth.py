@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import time
 from datetime import datetime, timezone
+from ipaddress import ip_address
 from typing import Annotated, Literal
 from uuid import uuid4
 
@@ -52,6 +53,7 @@ class Credentials(BaseModel):
 
 class RegisterRequest(Credentials):
     anonymous_student_id: str | None = None
+    role: Literal["student"] = "student"
 
 
 class OnboardingRequest(BaseModel):
@@ -101,6 +103,7 @@ class OnboardingRequest(BaseModel):
 class AccountResponse(BaseModel):
     id: str
     login: str
+    role: Literal["student"] = "student"
     display_name: str
     grade: str
     major: str
@@ -109,6 +112,7 @@ class AccountResponse(BaseModel):
     mid_term_goal: str
     short_term_goal: str
     onboarding_completed: bool
+    guide_completed: bool
 
 
 class SessionResponse(BaseModel):
@@ -126,6 +130,7 @@ def _serialize_account(account: UserAccount) -> AccountResponse:
     return AccountResponse(
         id=account.id,
         login=account.login,
+        role="student",
         display_name=display_name,
         grade=account.grade or "",
         major=account.major or "",
@@ -134,6 +139,7 @@ def _serialize_account(account: UserAccount) -> AccountResponse:
         mid_term_goal=account.mid_term_goal or "",
         short_term_goal=account.short_term_goal or "",
         onboarding_completed=bool(account.onboarding_completed),
+        guide_completed=bool(account.guide_completed),
     )
 
 
@@ -143,7 +149,16 @@ def _desktop_cookie_request(request: Request) -> bool:
 
 def _local_http_cookie_request(request: Request) -> bool:
     """Local portable Web runs on HTTP, where browsers reject Secure cookies."""
-    return request.url.scheme == "http" and request.url.hostname in {"127.0.0.1", "localhost"}
+    if request.url.scheme != "http":
+        return False
+    hostname = request.url.hostname or ""
+    if hostname == "localhost":
+        return True
+    try:
+        address = ip_address(hostname)
+    except ValueError:
+        return False
+    return address.is_loopback or address.is_private
 
 
 def _session_cookie_options(request: Request) -> dict[str, bool | str]:
@@ -276,6 +291,9 @@ async def register(
         id=account_id,
         login=req.login,
         password_hash=hash_password(req.password),
+        role="student",
+        onboarding_completed=False,
+        guide_completed=False,
     )
     db.add(account)
     await db.flush()
@@ -346,6 +364,18 @@ async def logout(
         samesite=str(cookie_options["samesite"]),
     )
     return {"ok": True}
+
+
+@router.put("/guide", response_model=AccountResponse)
+async def complete_guide(
+    account: UserAccount = Depends(get_current_account),
+    db: AsyncSession = Depends(get_db),
+):
+    if not account.onboarding_completed:
+        raise HTTPException(status_code=409, detail="请先建立学习档案")
+    account.guide_completed = True
+    await db.commit()
+    return _serialize_account(account)
 
 
 @router.put("/onboarding", response_model=AccountResponse)

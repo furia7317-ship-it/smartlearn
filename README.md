@@ -1,195 +1,143 @@
-# 学枢 · AI 个性化学习平台
+# 学枢：AI 个性化学习平台
 
-> 面向高等教育的 AI 个性化学习系统 —— 以 **LangGraph 多智能体协同** 为核心，把"难学的"讲成"你能学的"。
-> 内置《数据结构》等计算机专业课程知识库。
+学枢是一个面向大学课程学习的 AI 应用。你可以先告诉它要学什么、目前的基础和目标，再沿着学习路径阅读资料、练习和做项目。遇到不懂的地方，可以打开智能教师继续提问。
 
-学枢不是一个"问答机器人"，而是一支**分工明确的 AI 教研团队**：你用一句话说出专业、目标和卡点，十多个智能体会检索课程知识库、构建你的学习画像、并行生成多模态学习资料（讲义 / 导图 / 题库 / 代码 / 动画 / 课件），经质检官逐条与知识库比对、标注引用来源后交付，再编排出一条随学习数据动态调整的个性化路径。
+前端、后端和 Windows 桌面端的打包代码都在这个仓库里。
 
----
+[在线体验](https://furia7317.art/) · [报告问题](https://github.com/furia7317-ship-it/smartlearn/issues) · [MIT 协议](LICENSE)
 
-## ✨ 核心亮点
+## 能做什么
 
-- **多智能体协同生成**：总控调度官分诊 → 7 个生成智能体并行扇出 → 质检审核官逐项审核（可驳回重做），全过程经 SSE 实时回传到前端。
-- **云端 LLM + 本地 RAG**：用云端大模型（DeepSeek）负责"想"，本地向量库（bge 中文嵌入 + ChromaDB）负责"查"。知识库提前准备，生成内容必须引用库内片段。
-- **真·防幻觉**：审核环节用**嵌入相似度**把每条事实性陈述与知识库溯源比对（而非字符串匹配），未对齐的内容驳回重做并标注。
-- **一份学习会话，全站联动**：对话产出的画像、资源、路径、练习成绩共用同一份会话，**跨页面切换 / 刷新都不丢**（Provider 提升到路由之上 + localStorage 持久化）。
-- **资源点开即用**：讲义（Markdown）、思维导图（可折叠 + 点节点跳章节）、题库（在线作答 + 即时评分 + 解析）、代码、拓展阅读、**应用内动画讲解播放器**（无需 ffmpeg）、课件大纲，七类资源各有专属查看器。
-- **缺什么补什么**：知识库没有的科目 → 联网找教材（博查，国内可达）/ 按专业年级智能荐书 / **未命中自动询问"下载哪一版"教材**（类 Claude 单选），下载即向量化入库。
-- **桌面端零安装依赖启动**：Electron 一体安装包自带 Python 后端 + 中文嵌入模型 + 知识库种子；需要模型生成或联网检索时仍须配置相应服务凭据并联网。
+**安排学习路径。** 把学习目标整理成课程和知识点，按实际的前置关系显示分支。节点里有学习目标、资料、练习和核验；每日可用时间用于安排任务。旧课程也可以从目录生成新的知识树。
 
----
+**生成和管理学习资料。** 根据课程内容准备讲义、思维导图、练习题、代码示例、视频和课件。生成任务由不同智能体分工完成，审核时会结合知识库检查内容和引用。资料会保存在资源中心，方便以后继续看。
 
-## 🧠 系统架构
+**把抽象知识讲具体。** 代码可视化用于观察程序过程；实训中心支持编写、运行和提交代码；情景剧场用角色对话展示知识。可以根据需要选择讲解方式，再回到课程里继续学习。
 
-```
-┌──────────────────────────── 前端 (Next.js / React) ────────────────────────────┐
-│  AI 工坊  学习总览  学习画像  学习路径  资源中心  练习与错题  课程知识库  设置        │
-│        └──────────── 共用一份「学习会话」(OrchestratorProvider) ───────────┘        │
-└───────────────────────────────────┬────────────────────────────────────────────┘
-                                     │  POST + SSE (plan / progress / content / review / done)
-                                     │  REST (检索 / 荐书 / 入库 / 题库 / 画像 …)
-┌────────────────────────────────────▼───────────────────────────────────────────┐
-│                         后端 (FastAPI + LangGraph)                               │
-│                                                                                 │
-│   资源生成图：  Supervisor 分诊 ──► [explainer mindmap quiz reading              │
-│                                      code video courseware] 并行扇出             │
-│                                          └──► Reviewer 审核 ──(驳回)──► 重做      │
-│                                                                                 │
-│   云端 LLM (DeepSeek)         本地 RAG (bge-small-zh + ChromaDB)                 │
-│   讯飞 TTS/IAT/OCR · Manim 视频 · 防幻觉服务 · 画像/路径/题库/错题/记忆          │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
+**随时向教师提问。** 智能教师可以结合当前页面和学习记录答疑，也支持语音通话。语音识别和语音合成使用单独配置的服务，回答会分段送去合成和播放。
 
-**交付形态**
+**记住学习情况。** 应用会保存用户设置、学习记录和相关对话信息。长期记忆可以在设置中关闭，也可以管理已有内容，减少跨会话反复说明背景的麻烦。
 
-| 形态 | 说明 |
-| --- | --- |
-| 桌面一体安装版 | Electron 壳 + 自带 Python 后端/模型/知识库种子，`app://` 协议离线加载，双击即用 |
-| 离线状态 | 后端不可达时明确显示服务未连接；保留已缓存的本地学习记录，不伪造生成结果或答疑内容 |
+**积累可复用的教学方法。** 系统可以从资料审核和返工记录中提出新的方法，也就是过程 Skill。候选方法需要检查并启用后才参与后续生成，可以查看版本、停用或回退。这部分改进的是工作步骤，不是重新训练模型。
 
----
+AI 生成的资料和学习安排仍需要检查。知识库检索和审核能提供依据，但不能保证每个回答都正确；节点上的概念题核验也不能替代实际编程或项目验收。
 
-## 🤝 多智能体团队
+## 本地运行
 
-围绕「画像 → 分诊 → 生成 → 审核 → 规划 → 辅导」的教研闭环：
+需要 Node.js 24、Python 3.11.15 和 uv。版本分别写在 `.node-version` 和 `backend/.python-version` 中，后端提供带哈希的 Windows、Linux 依赖锁文件。
 
-| 智能体 | 角色 | 职责 |
-| --- | --- | --- |
-| 学情画像师 `profiler` | 画像 | 从对话语义抽取 6 维学习特征、定位易错点 |
-| 总控调度官 `supervisor` | 分诊 | 检索知识库 + 结合画像，决定本轮生成哪些模块 |
-| 概念讲解官 `explainer` | 生成 | 通俗讲解 + 生活类比 + 引用角标 |
-| 导图架构师 `mindmap` | 生成 | 知识结构树（中心主题 → 分支 → 子节点） |
-| 题库命题官 `quiz` | 生成 | 按薄弱点定向命题（选择 / 填空 + 解析） |
-| 拓展阅读官 `reading` | 生成 | 延伸材料 + 关键术语 + 思考题 |
-| 代码教练 `code` | 生成 | 可运行代码示例 + 逐行解释 + 变体 |
-| 动画导演 `video` | 生成 | Manim 分镜脚本 + 旁白（前端可直接播） |
-| 课件设计师 `courseware` | 生成 | PPT 大纲（标题页 → 内容 → 总结） |
-| 质检审核官 `reviewer` | 审核 | 防幻觉：逐项与知识库嵌入相似度溯源，不达标驳回 |
-| 路径规划师 `planner` | 规划 | 综合画像 × 资源 × 考期编排个性化路径 |
-| 答疑辅导师 `tutor` | 辅导 | 实时检索 + 流式答疑，带 `[来源n]` 角标 |
+### 1. 获取源码
 
-> 另含 `classifier / analyst / grader / examiner` 等辅助智能体，支撑分类、分析、判分与组卷。
-
-**资源生成图（LangGraph）**：`Supervisor` 自适应分诊（如冲刺题选 6 模块、概念题选 4 模块）→ `Send` 并行扇出 → `Reviewer` 审核，首轮有驳回则 `Send` 回对应生成器重做一轮 → `done`。事件流见 `backend/app/core/sse.py`。
-
----
-
-## 📚 功能模块
-
-| 页面 | 路由 | 能力 |
-| --- | --- | --- |
-| **AI 工坊** | `/studio` | 对话式多智能体协同生成，SSE 实时事件流，等待首响应时显示「思考中…」，右侧「协同 / 画像 / 路径」面板同步 |
-| **学习总览** | `/` | 从当前会话派生：画像均值、已过审资料、知识库引用数、路径阶段、当前主线与薄弱点 |
-| **学习画像** | `/profile` | 6 维画像雷达，随对话与测验实时更新（无需填表） |
-| **学习路径** | `/path` · `/path/study` | 直接读取路径智能体生成的阶段、任务与资料；支持完成状态、资料查看和**框选文字 → AI 解释** |
-| **资源中心** | `/resources` | 七类资源汇总，按**类型 / 质检状态**筛选；点开即用的专属查看器；驳回重做的版本自动隐藏 |
-| **练习与错题** | `/practice` | 会话题库在线作答 + 即时评分 + 解析；错题按结果**自动归档错题本**，联动路径复盘 |
-| **课程知识库** | `/kb` | RAG 语义检索；联网找教材；按专业 + 年级智能荐书；**未命中自动询问下哪一版教材**；课程文档清单 |
-| **设置** | `/settings` | 全局学情（专业 / 年级），驱动智能荐书与个性化生成 |
-
-**七类资源查看器**：讲义→Markdown 渲染（概述 / 详解 / 类比 / 要点 / 来源）；导图→可折叠节点树 + 点击跳转该知识点资源；题库→可交互答题器（评分 + 逐题解析 + 掌握度 + 再做一遍）；代码→代码块 + 解释 + 输出 + 变体；阅读→正文 + 术语 + 思考题；视频→**应用内动画讲解播放器**（分镜自动推进 + 字幕 + 播放控制）；课件→幻灯片大纲。
-
----
-
-## 🛡️ 知识库与防幻觉
-
-- **嵌入模型**：`BAAI/bge-small-zh-v1.5`（中文检索，512 维），余弦空间 + 向量归一化 + bge 查询指令前缀。
-- **向量库**：ChromaDB 持久化；课程精编库由 `knowledge/` 下 10 章 Markdown 智能分块导入。
-- **防幻觉**：`anti_hallucination.verify_factual_claims` 抽取陈述 → 与知识库片段计算嵌入相似度 → 低于阈值即判为未溯源（可注入 embedder 便于单测）。
-- **联网资料隔离**：博查搜索/下载的教材进**独立 `web_kb` 集合**，不污染精编库、不参与防幻觉裁判。
-- **未命中即荐版**：检索按**相关度**（非条数）判断"没这门科目"，触发 LLM 列出该科目主流教材版本供选择下载。
-
----
-
-## 🧰 技术栈
-
-**前端** `frontend/`
-- Next.js 16（App Router · Turbopack · `output: "export"` · `trailingSlash`）、React 19、TypeScript 5
-- Tailwind CSS v4、framer-motion（动效）、recharts（画像雷达，懒加载）、react-markdown + remark-gfm、lucide-react、next-themes
-- 设计系统「墨与朱批」：冷墨中性底 + 朱红只承载批改语义；宋体标题、楷体批注声线；朱印「智」字章为品牌标识
-
-**后端** `backend/`
-- FastAPI、LangGraph（多智能体编排）、Pydantic、Uvicorn
-- ChromaDB + sentence-transformers（bge 中文嵌入）、async SQLAlchemy + SQLite
-- DeepSeek（云端 LLM）、讯飞 IAT/OCR/TTS、Manim + ffmpeg（视频）、httpx + BeautifulSoup（联网抓取）
-
-**桌面端** `frontend/electron/`
-- Electron 42 + electron-builder（NSIS），自包含 Python 运行时（base CPython 核心 + venv site-packages 覆盖）+ 离线中文嵌入模型 + ChromaDB 种子
-- 主进程监管后端（spawn uvicorn、健康轮询、退出杀进程树），渲染进程经 `app://` 协议加载静态前端
-
----
-
-## 🗂️ 目录结构
-
-```
-smartlearn/
-├─ frontend/                 # Next.js 前端 + Electron 桌面壳
-│  ├─ app/                   # 路由页面（/ studio profile path practice resources kb settings）
-│  ├─ components/            # UI 组件（资源查看器 / 答题器 / 视频播放器 / 思考中指示器 …）
-│  ├─ hooks/                 # use-orchestrator（协同编排引擎，真实 SSE + 会话持久化）
-│  ├─ lib/                   # api(SSE 解析) / types / identity / study-plan / session-insights
-│  ├─ electron/              # 主进程、启动页、打包配置
-│  └─ runtime/              # 打包期自包含 Python 运行时 + 模型 + 种子（不进 git）
-├─ backend/                  # FastAPI + LangGraph 后端
-│  └─ app/
-│     ├─ agents/             # 15 个智能体（profiler/supervisor/explainer/.../tutor）
-│     ├─ graph/              # LangGraph 状态图（资源 / 画像 / 辅导 / 测评 / 组卷）
-│     ├─ routers/            # 16 个路由（agents/chat/kb/papers/profile/path/…）
-│     ├─ services/           # rag / anti_hallucination / web_search / media / memory …
-│     └─ core/               # config / llm / sse 协议
-└─ knowledge/                # 计算机专业课程知识库（18 章 Markdown，向量化源）
-```
-
----
-
-## 🚀 运行方式
-
-> 前置：Node 24、Python 3.10+。后端服务凭据写入 `backend/.env`；桌面安装版也可在用户数据目录的 `backend.env` 中配置。仓库和安装包不内置服务密钥。
-
-**① 开发预览**
 ```bash
-# 后端
+git clone https://github.com/furia7317-ship-it/smartlearn.git
+cd smartlearn
+```
+
+### 2. 配置并启动后端
+
+Windows 使用 PowerShell 7：
+
+```powershell
 cd backend
-source .venv/bin/activate
-uvicorn app.main:app --port 8000
-# 前端（另开一个终端）
-cd frontend
-npm install
-npm run dev                                    # http://localhost:3000/desktop/
+uv python install 3.11.15
+uv venv --python 3.11.15
+uv pip sync --python .venv/Scripts/python.exe --require-hashes requirements-windows.lock
+Copy-Item .env.example .env
 ```
 
-首次使用请在登录页自行注册账户；仓库和安装包均不包含预置账号、数据库或服务密钥。
+打开 `backend/.env`，按需填写服务配置：
 
-**② 打桌面安装包**
-```bash
-cd frontend && npm run app:dist                # next build + electron-builder
-# 产物：frontend/dist-electron/学枢-一体安装版-0.1.14.exe
+- 学习资料生成和答疑需要可用的模型。可以填写 DeepSeek 等预设的密钥，也可以启动后在“设置 → 模型与服务”中添加 OpenAI 兼容接口。
+- 知识库检索需要 `SILICONFLOW_API_KEY`。嵌入和重排序调用云端服务，向量索引由本地 ChromaDB 保存。
+- 语音、OCR 和联网搜索按需要配置，对应项目在 `.env.example` 中有说明。
+
+填好后启动：
+
+```powershell
+.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-> **模式说明**：前端启动时自动探测后端。后端在线时提供真实生成、检索、荐书与答疑；后端不可达时明确显示连接问题，不自动填充示例资源或虚构结果。
+后端地址是 `http://127.0.0.1:8000`，接口文档在 `http://127.0.0.1:8000/docs`。首次使用知识库时需要建立索引，所用服务必须能联网。
 
-**提交前检查**
+Linux 对应的安装和启动命令：
+
+```bash
+cd backend
+uv python install 3.11.15
+uv venv --python 3.11.15
+uv pip sync --python .venv/bin/python --require-hashes requirements-linux.lock
+cp .env.example .env
+# 编辑 .env 后再启动
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+### 3. 启动前端
+
+在项目根目录另开一个终端：
+
 ```bash
 cd frontend
+npm ci
+npm run dev
+```
+
+打开 `http://127.0.0.1:3000/desktop/`，注册自己的账号后使用。后端没有连接时，界面会提示连接问题；生成、检索和语音功能需要相应的云服务配置。
+
+Windows 装好依赖后，也可以双击根目录的 `启动学枢.cmd` 启动前后端。用法见 [一键启动说明](docs/一键启动.md)。
+
+登录页保留了公开演示账号的入口，方便体验已部署的演示服务。源码仓库不包含该账号的数据库；自己运行的空数据库需要自行注册，演示入口不会自动创建账号。
+
+## Windows 桌面端
+
+桌面端使用 Electron，前端静态文件和 Python 后端会一起打包：
+
+```powershell
+cd frontend
+npm ci
+npm run app:dist
+```
+
+脚本会准备 Python、Node 和媒体运行资源，再构建前端和安装包。这个过程需要联网，也会比网页构建花更多时间。生成的安装包在 `frontend/dist-electron/`。
+
+普通安装包不带用户数据库或模型服务密钥。首次启动创建本地数据，服务配置可以放在 `%APPDATA%/学枢/backend.env`。单独的私有演示打包流程见 [演示发行说明](docs/desktop-demo-build.md)；它的产物不适合公开分发。
+
+## 代码放在哪里
+
+```text
+frontend/              Next.js 页面、React 组件和 Electron 桌面壳
+backend/app/           FastAPI 接口、智能体、数据模型和业务服务
+backend/tests/         后端测试
+frontend/tests/        前端逻辑和页面约定检查
+knowledge/             随项目提供的课程知识资料
+scripts/               本地启动工具
+docs/                  配置、功能和打包说明
+```
+
+界面使用 Next.js、React 和 TypeScript；后端使用 FastAPI、LangGraph 和 SQLAlchemy；学习数据保存在 SQLite，知识向量保存在 ChromaDB。知识树画布使用 React Flow 和 ELK。
+
+进一步的实现说明：
+
+- [学习路径知识树](docs/focus-curriculum.md)
+- [教学方法和过程 Skill](docs/procedure-skills.md)
+- [云端检索配置](docs/cloud-retrieval.md)
+- [静态前端部署](frontend/deploy/README.md)
+
+## 开发与检查
+
+```powershell
+# 在 backend 目录
+.venv/Scripts/python.exe -m pytest
+
+# 在 frontend 目录
 npm test
-npx tsc --noEmit
-npx eslint app components hooks lib electron --max-warnings=0
+npm run lint
 npm run build
-
-cd ../backend
-python -m pytest
-python -m ruff check app tests
 ```
 
----
+`npm run build` 生成静态前端。需要本地查看构建结果时，再运行 `npm start`。模型和语音的真实效果取决于所用服务，模拟接口的测试不能代替实际使用检查。
 
-## 🌐 国内化适配
+欢迎提交问题和改进。报告问题时，写清操作步骤、预期结果和实际结果；附上日志前，请先去掉密钥和个人信息。
 
-- **嵌入模型**走 `hf-mirror.com` 逐文件下载（避开被墙的 HuggingFace），运行时离线加载。
-- **联网找教材**用博查（`api.bochaai.com`）Web Search，国内不翻墙可达。
-- **字体**用系统字体栈（Google Fonts 不可达），shadcn 注册表不可达的组件均手写。
-- **Electron / 构建二进制**走 npmmirror 镜像。
+## 协议
 
----
-
-<sub>学枢 · AI 个性化学习平台</sub>
+仓库自身的代码采用 [MIT 协议](LICENSE)，可以学习、修改和商用，使用时保留版权与协议声明。第三方依赖、字体、图标和音效按各自附带的协议使用。

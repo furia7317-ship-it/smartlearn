@@ -30,8 +30,8 @@ test("learning path requests route into the resource pipeline", async () => {
 
   assert.match(intent, /"学习路径"/);
   assert.match(intent, /"学习计划"/);
-  assert.match(source, /const generate = wantsResource\(question\);/);
-  assert.match(source, /if \(generate\) void createPlanForRequest\(question\);/);
+  assert.match(source, /void runTutorLive\(question, question, undefined, \[\], pageContext\);/);
+  assert.match(source, /event === "resource_plan"/);
 });
 
 test("orchestrator consumes task review, integration trace, and schedule events", async () => {
@@ -115,7 +115,7 @@ test("confirmed learning paths leave the questionnaire and use explicit bounded 
   assert.match(source, /if \(pendingLearningPath\.planId\)/);
   assert.match(source, /const record = await getResourcePlan\(planId\)/);
   assert.match(source, /!pendingPlanIds\.has\(record\.plan\.plan_id\)/);
-  assert.match(source, /Boolean\(message\.runId \|\| message\.planId\)/);
+  assert.match(await read("../lib/conversation-state.ts"), /Boolean\(message\.runId \|\| message\.planId\)/);
   assert.doesNotMatch(source, /appendTraceStep/);
   for (const surface of [desktop, web]) {
     assert.match(surface, /pendingLearningPath\?\.stage === "planning"/);
@@ -368,24 +368,24 @@ test("path panel focuses one selectable day instead of noisy summary copy", asyn
   assert.match(pathPanel, /aria-label=\{`查看 \$\{step\.day\} 学习内容`\}/);
 });
 
-test("desktop studio renders real dependency health and recovery instead of fake online state", async () => {
+test("desktop studio consumes real dependency health without duplicating it in the rail account", async () => {
   const desktopStudio = await read("../components/desktop/desktop-studio.tsx");
-  const desktopShell = await read("../components/layout/desktop-shell.tsx");
+  const desktopShell = await read("../components/layout/desktop-shell.tsx").then(async (shell) => shell + await read("../components/layout/desktop-account.tsx"));
   const studioPage = await read("../app/studio/page.tsx");
 
   assert.match(desktopStudio, /getMaterialData\(o\.mode/);
   assert.doesNotMatch(desktopStudio, /真实后端已连接/);
-  assert.match(desktopShell, /checkBackend\(\)/);
-  assert.match(desktopShell, /SERVICE_POLL_INTERVAL_MS/);
-  assert.match(desktopShell, /"online"/);
-  assert.match(desktopShell, /"focus"/);
-  assert.match(desktopShell, /"服务异常"/);
+  assert.match(desktopShell, /desktop-rail-account/);
+  assert.doesNotMatch(desktopShell, /desktop-topbar/);
+  assert.doesNotMatch(desktopShell, /checkBackend\(\)/);
+  assert.doesNotMatch(desktopShell, /SERVICE_POLL_INTERVAL_MS/);
+  assert.doesNotMatch(desktopShell, /desktop-service-state/);
   assert.doesNotMatch(desktopStudio, /在线 14/);
   assert.doesNotMatch(studioPage, /后端已连接/);
   assert.doesNotMatch(studioPage, /后端未连接/);
 });
 
-test("resource center can clear persisted and current-session resources", async () => {
+test("resource center keeps whole-library deletion out of its simplified header", async () => {
   const library = await read("../lib/library.ts");
   const orchestrator = await read("../hooks/use-orchestrator.ts");
   const desktopResources = await read("../components/desktop/desktop-resources.tsx");
@@ -394,9 +394,9 @@ test("resource center can clear persisted and current-session resources", async 
   assert.match(library, /method:\s*"DELETE"/);
   assert.match(orchestrator, /const clearResources = useCallback/);
   assert.match(orchestrator, /setResources\(\[\]\)/);
-  assert.match(desktopResources, /clearMaterials\(session\.mode\)/);
-  assert.match(desktopResources, /session\.clearResources\(\)/);
-  assert.match(desktopResources, /data-testid="clear-resource-center"/);
+  assert.doesNotMatch(desktopResources, /clearMaterials\(session\.mode\)/);
+  assert.doesNotMatch(desktopResources, /session\.clearResources\(\)/);
+  assert.doesNotMatch(desktopResources, /data-testid="clear-resource-center"|更多操作|desktop-resource-more/);
 });
 
 test("learning path resource actions use the shared exact resolver on both surfaces", async () => {
@@ -418,7 +418,10 @@ test("learning path resource actions use the shared exact resolver on both surfa
   assert.match(pathPanel, /onOpenResource/);
   assert.match(desktopStudio, /ResourceViewer/);
   assert.match(desktopStudio, /resources=\{o\.resources\}/);
-  assert.match(desktopStudio, /onOpenResource=\{\(item, taskKey\) => setOpenResource\(\{ item, taskKey \}\)\}/);
+  assert.match(
+    desktopStudio,
+    /onOpenResource=\{\(item, taskKey\) => \{[\s\S]{0,120}?setResourceViewerActivated\(true\);[\s\S]{0,120}?setOpenResource\(\{ item, taskKey \}\)/,
+  );
   assert.match(desktopStudio, /taskKey=\{openResource\?\.taskKey\}/);
   assert.match(desktopPath, /ResourceViewer/);
 });
@@ -468,7 +471,10 @@ test("resource center renders one de-duplicated collection that opens original i
   assert.match(desktopResources, /pathCollectionOpen/);
   assert.match(desktopResources, /pathResourceIds/);
   assert.match(desktopResources, /stage\.resources\.map\(\(\{ item \}\)/);
-  assert.match(desktopResources, /onClick=\{\(\) => selectResource\(item\)\}/);
+  assert.match(
+    desktopResources,
+    /onClick=\{\(\) => void selectEntry\(\{ kind: "resource", key: `resource:\$\{item\.id\}`, resource: item \}\)\}/,
+  );
   assert.match(desktopResources, /<ResourceViewer item=\{openItem\}/);
   assert.doesNotMatch(desktopResources, /pathCollections\.map/);
 });
@@ -568,7 +574,7 @@ test("resource generation survives route changes and exposes streamed trace and 
     read("../app/layout.tsx"),
     read("../components/layout/shell-switch.tsx"),
     read("../hooks/use-material-generator.ts"),
-    read("../components/layout/desktop-shell.tsx"),
+    read("../components/layout/desktop-shell.tsx").then(async (shell) => shell + await read("../components/layout/desktop-account.tsx")),
     read("../components/desktop/desktop-create.tsx"),
   ]);
 
@@ -576,15 +582,10 @@ test("resource generation survives route changes and exposes streamed trace and 
   assert.match(controller, /event === "trace"/);
   assert.match(controller, /event === "content_delta"/);
   assert.match(controller, /normalizeAgentRunEvent/);
-  assert.match(shell, /materialGenerator\.running/);
+  assert.match(controller, /const \[running, setRunning\] = useState\(false\)/);
+  assert.doesNotMatch(shell, /materialGenerator\.running/);
   assert.match(desktopCreate, /AgentRunInspector/);
-  assert.match(desktopCreate, /已过审内容流/);
-});
-
-test("diagnostic page does not render backend status badge", async () => {
-  const diagnosticPage = await read("../app/diagnostic/page.tsx");
-
-  assert.doesNotMatch(diagnosticPage, /在线后端/);
+  assert.match(desktopCreate, /生成中的内容/);
 });
 
 test("persisted path titles are normalized when old prompts polluted the schedule", () => {

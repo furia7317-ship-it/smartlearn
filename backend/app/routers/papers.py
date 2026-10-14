@@ -5,13 +5,14 @@ from __future__ import annotations
 import copy
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_db
 from app.models.learning import ExamPaper
+from app.schemas.exam import SubmitRequest
 
 router = APIRouter()
 
@@ -44,7 +45,23 @@ def paper_summary(paper: ExamPaper) -> dict:
         "overall_score": paper.overall_score,
         "question_count": len(paper.questions or []),
         "created_at": str(paper.created_at),
+        "updated_at": str(paper.updated_at),
+        "answered_count": sum(bool(str((paper.answers or {}).get(q.get("id"), "")).strip()) for q in (paper.questions or []) if isinstance(q, dict)),
     }
+
+
+def _paper_questions_for_student(paper: ExamPaper) -> list[dict]:
+    questions = [dict(question) for question in (paper.questions or []) if isinstance(question, dict)]
+    if paper.category != "课程测评" or paper.status == "graded":
+        return questions
+    return [
+        {
+            key: value
+            for key, value in question.items()
+            if key not in {"answer", "explanation"}
+        }
+        for question in questions
+    ]
 
 
 @router.get("/{student_id}")
@@ -81,18 +98,25 @@ async def list_papers(
 
 
 @router.get("/detail/{paper_id}")
-async def get_paper_detail(paper_id: str, db: AsyncSession = Depends(get_db)):
+async def get_paper_detail(
+    paper_id: str,
+    student_id: str = Query(min_length=1, max_length=64),
+    db: AsyncSession = Depends(get_db),
+):
     paper = await db.get(ExamPaper, paper_id)
     if paper is None:
         paper = (await db.execute(
-            select(ExamPaper).where(ExamPaper.exam_id == paper_id)
+            select(ExamPaper).where(
+                ExamPaper.exam_id == paper_id,
+                ExamPaper.student_id == student_id,
+            )
         )).scalar_one_or_none()
-    if paper is None:
+    if paper is None or paper.student_id != student_id:
         raise HTTPException(status_code=404, detail="试卷不存在")
     return {
         **paper_summary(paper),
         "paper_type": paper.paper_type,
-        "questions": paper.questions or [],
+        "questions": _paper_questions_for_student(paper),
         "answers": paper.answers or {},
         "results": paper.results or [],
         "mastery": paper.mastery or {},
@@ -110,6 +134,33 @@ async def update_paper(
         raise HTTPException(status_code=404, detail="试卷不存在")
     for key, value in req.model_dump(exclude_none=True).items():
         setattr(paper, key, value)
+    await db.commit()
+    await db.refresh(paper)
+    return paper_summary(paper)
+
+
+@router.patch("/{paper_id}/draft")
+async def save_paper_draft(
+    paper_id: str,
+    req: SubmitRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    paper = await db.get(ExamPaper, paper_id)
+    if paper is None or paper.student_id != req.student_id:
+        raise HTTPException(status_code=404, detail="试卷不存在")
+    question_ids = {str(q.get("id")) for q in (paper.questions or []) if isinstance(q, dict)}
+    if set(req.answers) - question_ids:
+        raise HTTPException(status_code=422, detail="答卷包含不属于本试卷的题目")
+    # The status predicate prevents a late autosave from overwriting a graded paper.
+    result = await db.execute(
+        update(ExamPaper).where(
+            ExamPaper.id == paper_id,
+            ExamPaper.student_id == req.student_id,
+            ExamPaper.status.in_(["created", "in_progress"]),
+        ).values(answers=req.answers, status="in_progress")
+    )
+    if not result.rowcount:
+        raise HTTPException(status_code=409, detail="试卷已提交，无法修改答题记录")
     await db.commit()
     await db.refresh(paper)
     return paper_summary(paper)
@@ -162,9 +213,13 @@ async def rename_category(
 
 
 @router.post("/{paper_id}/redo")
-async def redo_paper(paper_id: str, db: AsyncSession = Depends(get_db)):
+async def redo_paper(
+    paper_id: str,
+    student_id: str = Query(min_length=1, max_length=64),
+    db: AsyncSession = Depends(get_db),
+):
     source = await db.get(ExamPaper, paper_id)
-    if source is None:
+    if source is None or source.student_id != student_id:
         raise HTTPException(status_code=404, detail="试卷不存在")
 
     paper = ExamPaper(
@@ -183,4 +238,4 @@ async def redo_paper(paper_id: str, db: AsyncSession = Depends(get_db)):
     )
     db.add(paper)
     await db.commit()
-    return {"exam_id": paper.exam_id, "questions": paper.questions}
+    return {"exam_id": paper.exam_id, "questions": _paper_questions_for_student(paper)}

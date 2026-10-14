@@ -1,4 +1,4 @@
-"""启动引导：验证并按版本更新内置知识索引（仅 DEBUG）。"""
+"""启动引导：验证并按云端模型版本更新内置知识索引。"""
 from __future__ import annotations
 
 import asyncio
@@ -15,7 +15,11 @@ async def ensure_kb_imported():
             return health
         return build_knowledge_index()
 
-    result = await asyncio.to_thread(_run)
+    try:
+        result = await asyncio.to_thread(_run)
+    except Exception as exc:  # noqa: BLE001 - background initialization must leave the app usable.
+        print(f"[bootstrap] 云端知识索引初始化失败：{type(exc).__name__}；请检查服务配置后重试")
+        return {"status": "unavailable", "error": type(exc).__name__}
     if result.get("status") == "ready":
         action = "重建" if result.get("rebuilt") else "验证"
         print(
@@ -24,7 +28,7 @@ async def ensure_kb_imported():
         )
     else:
         print(
-            "[bootstrap] 知识索引降级为关键词检索："
+            "[bootstrap] 知识索引不可用："
             f"{result.get('model_error') or '索引尚未完成'}"
         )
     return result

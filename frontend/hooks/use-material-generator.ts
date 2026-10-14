@@ -1,5 +1,7 @@
 "use client";
 
+import { readCollaboration } from "@/lib/collaboration";
+import { generationOutcome } from "@/lib/generation-outcome";
 import {
   createContext,
   createElement,
@@ -77,7 +79,7 @@ function placeholder(type: ResourceType): ResourceItem {
  * 由 web `/create` 与桌面 `/desktop/create` 两套布局共用，二者只是视图不同。
  */
 function useMaterialGeneratorController() {
-  const { mode } = useOrchestratorContext();
+  const { mode } = useOrchestratorContext((state) => ({ mode: state.mode }));
 
   const [topic, setTopic] = useState("");
   const [knowledge, setKnowledge] = useState("");
@@ -162,6 +164,7 @@ function useMaterialGeneratorController() {
         {
           topic: topic.trim(),
           student_id: getStudentId(),
+          collaboration: readCollaboration(),
           material_types: types,
           knowledge_points: knowledge.trim(),
           assessment_context: assessmentContext,
@@ -220,14 +223,16 @@ function useMaterialGeneratorController() {
               data: d,
             });
           } else if (event === "done") {
-            setStatus("生成完成");
+            const outcome = generationOutcome(data);
+            streamFailed = outcome.failed;
+            setStatus(outcome.message);
           } else if (event === "saved") {
             setStatus(
               `已保存 ${data.count ?? ""} 份资料到资源中心${
                 types.includes("quiz") ? "（题目已入试题库）" : ""
               }`
             );
-          } else if (event === "error") {
+          } else if (event === "error" || event === "blocked") {
             streamFailed = true;
             setStatus(`生成失败：${(data.message as string) ?? "未知错误"}`);
           }

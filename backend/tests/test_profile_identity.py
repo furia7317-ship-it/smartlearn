@@ -31,9 +31,14 @@ def test_profile_identity_is_authenticated_scoped_and_persisted(tmp_path):
     app.dependency_overrides[get_db] = override_db
 
     with TestClient(app) as client:
+        retired_role = client.post(
+            "/api/auth/register",
+            json={"login": "retired-role", "password": "password-123", "role": "teacher"},
+        )
+        assert retired_role.status_code == 422
         registered = client.post(
             "/api/auth/register",
-            json={"login": "portfolio@example.com", "password": "password-123"},
+            json={"login": "portfolio@example.com", "password": "password-123", "role": "student"},
         )
         assert registered.status_code == 201
         student_id = registered.json()["id"]

@@ -5,17 +5,34 @@ import test from "node:test";
 const read = (relativePath) =>
   readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
-test("stage cards reveal only the selected stage resources on the opposite side", () => {
+test("ability overview routes long learning content to a separate study page", () => {
+  const source = read("components/desktop/ability-path-tree.tsx");
+  const study = read("components/desktop/ability-study.tsx");
+  assert.match(source, /drawerOpen && selected/);
+  assert.match(source, /abilityStudyHref/);
+  assert.doesNotMatch(source, /<ResourceViewer/);
+  assert.match(study, /<ResourceViewer/);
+  assert.match(source, /aria-expanded=\{todayOpen\}/);
+  assert.match(source, /aria-current/);
+});
+
+test("learning path top navigation opens real persisted workspaces", () => {
   const source = read("components/desktop/desktop-path.tsx");
   const styles = read("components/desktop/desktop-path.module.css");
+  const api = read("lib/learning-path-api.ts");
 
-  assert.match(source, /selectedStageIndex/);
-  assert.match(source, /aria-expanded=\{isSelected\}/);
-  assert.match(source, /buildDailyTaskPlan\(pathSteps\[selectedStageIndex\]/);
-  assert.match(source, /side === "left" \? styles\.branchSlotRight : styles\.branchSlotLeft/);
-  assert.match(source, /value === stage\.index \? null : stage\.index/);
-  assert.match(styles, /\.branchSlotLeft/);
-  assert.match(styles, /\.branchSlotRight/);
+  assert.match(source, /type PathWorkspaceTab = "overview" \| "courses" \| "plan"/);
+  assert.match(source, /useDesktopModuleStringState<PathWorkspaceTab>/);
+  assert.match(source, /"workspace\.tab"/);
+  assert.match(source, /<CourseManagementWorkspace/);
+  assert.match(source, /<LearningPlanWorkspace/);
+  assert.doesNotMatch(source, /path-today-tasks.*scrollIntoView/);
+  assert.match(source, /getLearningPathWorkspaceSummary\(\)/);
+  assert.match(source, /replanSubjectPath/);
+  assert.match(source, /recordTaskEvidence\(key, content, "written_response"\)/);
+  assert.match(styles, /\.courseWorkspace/);
+  assert.match(styles, /\.planWorkspace/);
+  assert.match(api, /\/api\/path\/workspace\/\$\{encodeURIComponent\(studentId\)\}\/summary/);
 });
 
 test("desktop task steps switch the detail copy and exact linked material", () => {

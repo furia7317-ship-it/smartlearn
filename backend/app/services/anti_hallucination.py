@@ -82,7 +82,7 @@ def verify_source_citations(
     return cleaned, valid_sources
 
 
-# 事实校验：声明与知识库片段的最小语义相似度阈值（归一化余弦，bge 标定）
+# 事实校验：声明与知识库片段的最小语义相似度阈值（归一化余弦）
 GROUNDING_THRESHOLD = 0.5
 
 
@@ -100,7 +100,7 @@ def verify_factual_claims(
 ) -> tuple[bool, list[str]]:
     """事实核查：逐句算声明与知识库片段的语义相似度，低于阈值即视为缺乏依据。
 
-    用嵌入相似度做真实溯源校验（取代旧的子串匹配）。嵌入器不可用时（离线无模型）
+    用云端嵌入相似度做溯源校验。嵌入接口不可用时
     降级为不阻断，避免误杀；其余规则审核环节仍生效。
 
     Returns:

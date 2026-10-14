@@ -21,6 +21,7 @@ test("streamed assistant text becomes non-duplicated speakable chunks", () => {
   const second = extractSpeakableChunks("**结论**：数组支持随机访问。后面还有链表", first[0].endOffset, true);
   assert.deepEqual(second.map((item) => item.text), ["后面还有链表"]);
   assert.equal(cleanSpeechText("[打开资料](https://example.com)"), "打开资料");
+  assert.equal(cleanSpeechText("【按要求展示】回答里有 😊"), "回答里有 😊");
 });
 
 test("voice commands are explicit, bounded, and shell-aware", () => {
@@ -51,6 +52,36 @@ test("voice call serializes MiMo speech prefetches instead of bursting requests"
   assert.match(hook, /speechRequestTailRef/);
   assert.match(hook, /speechRequestTailRef\.current\.then/);
   assert.match(hook, /speechRequestTailRef\.current = request\.then/);
+});
+
+test("voice call preserves a second utterance spoken while MiMo finalizes the first", () => {
+  const hook = readFileSync(new URL("../hooks/use-realtime-voice.ts", import.meta.url), "utf8");
+
+  assert.match(hook, /commitInFlightRef/);
+  assert.match(hook, /deferredSpeechRef/);
+  assert.match(hook, /deferredAudioRef/);
+  assert.match(hook, /submitCompleteUtterance/);
+  assert.match(hook, /handleSpeechEnd = useCallback\(\(audio: Float32Array\)/);
+  assert.match(hook, /handleFinalTranscript[\s\S]*submitCompleteUtterance\(deferredAudio\)/);
+});
+
+test("voice call rearms a stalled VAD after playback and watches microphone frames", () => {
+  const hook = readFileSync(new URL("../hooks/use-realtime-voice.ts", import.meta.url), "utf8");
+
+  assert.match(hook, /const rearmVad = useCallback/);
+  assert.match(hook, /await vad\.pause\(\)/);
+  assert.match(hook, /vad\.start\(\)/);
+  assert.match(hook, /lastVadFrameAtRef\.current = Date\.now\(\)/);
+  assert.match(hook, /Date\.now\(\) - lastVadFrameAtRef\.current > 2_500/);
+  assert.match(hook, /speechDrainingRef\.current = false;[\s\S]*void rearmVad\(\)/);
+});
+
+test("voice tutor hides reasoning events and removes artificial presentation delay", () => {
+  const orchestrator = readFileSync(new URL("../hooks/use-orchestrator.ts", import.meta.url), "utf8");
+
+  assert.match(orchestrator, /responseMode === "voice"[\s\S]*\["trace", "run_event", "progress", "context_budget", "sources"\]/);
+  assert.match(orchestrator, /responseMode === "voice" \? 0 : 8/);
+  assert.match(orchestrator, /responseMode === "voice" \? "正在快速回复"/);
 });
 
 test("text software actions inherit a prior explicit resource target", () => {

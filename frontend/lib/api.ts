@@ -3,10 +3,15 @@
 import type { AgentResourceAction, AgentResourceCandidate } from "@/lib/agent-action";
 import type { AgentTraceProtocolV2 } from "@/lib/generated/agent-run-protocol";
 import type { TutorAttachment } from "@/lib/types";
+import { mapKbResults, type KbHit, type KbSearchResult } from "./kb-results.ts";
+export type { KbHit } from "./kb-results.ts";
 
+// Keep browser and API on the same hostname.  A page opened through a WSL/LAN
+// address must not silently send credentials to `localhost`, which is a
+// different browser site and also fails the backend CORS policy.
 const browserApiHost =
-  typeof window !== "undefined" && window.location.hostname === "127.0.0.1"
-    ? "127.0.0.1"
+  typeof window !== "undefined" && window.location.hostname
+    ? window.location.hostname
     : "localhost";
 const browserApiBase =
   typeof window !== "undefined" && window.location.protocol === "https:"
@@ -15,8 +20,25 @@ const browserApiBase =
 const desktopApiBase =
   typeof window !== "undefined" ? window.desktop?.apiBase?.trim() : undefined;
 
+function normalizeBrowserApiBase(value: string | undefined): string | undefined {
+  if (typeof window === "undefined" || !value) return value;
+  try {
+    const configured = new URL(value);
+    const pageHost = window.location.hostname;
+    const isConfiguredLoopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(configured.hostname);
+    const isPageLoopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(pageHost);
+    if (isConfiguredLoopback && isPageLoopback && configured.hostname !== pageHost) {
+      configured.hostname = pageHost;
+      return configured.toString().replace(/\/$/, "");
+    }
+  } catch {
+    return value;
+  }
+  return value;
+}
+
 export const API_BASE =
-  desktopApiBase || process.env.NEXT_PUBLIC_API_BASE || browserApiBase;
+  normalizeBrowserApiBase(desktopApiBase || process.env.NEXT_PUBLIC_API_BASE) || browserApiBase;
 
 const BACKEND_STATUS_CACHE_MS = 5_000;
 let backendStatusCache: { online: boolean; checkedAt: number } | null = null;
@@ -125,10 +147,12 @@ async function consumeSSE(
 export async function streamSSEGet(
   path: string,
   onEvent: (event: SSEEvent) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
     credentials: "include",
+    signal,
   });
   if (!res.ok) throw new Error(`后端响应异常 HTTP ${res.status}`);
   await consumeSSE(res, onEvent);
@@ -277,13 +301,6 @@ export async function streamSSE(
 
 /* ── 知识库 ── */
 
-export interface KbHit {
-  doc: string;
-  section: string;
-  score: number | null;
-  text: string;
-}
-
 export async function kbSearch(query: string, n = 5): Promise<KbHit[]> {
   const res = await fetch(
     `${API_BASE}/api/kb/search?query=${encodeURIComponent(query)}&n_results=${n}`,
@@ -291,22 +308,9 @@ export async function kbSearch(query: string, n = 5): Promise<KbHit[]> {
   );
   if (!res.ok) throw new Error(`检索失败 HTTP ${res.status}`);
   const json = (await res.json()) as {
-    results?: {
-      content?: string;
-      distance?: number;
-      metadata?: { source?: string; title?: string };
-    }[];
+    results?: KbSearchResult[];
   };
-  return (json.results ?? []).map((r) => ({
-    doc: r.metadata?.source ?? "未知来源",
-    section: r.metadata?.title ?? "",
-    // Chroma 余弦距离取值 [0,2] → 相似度 1 - d/2
-    score:
-      typeof r.distance === "number"
-        ? Math.max(0, Math.min(1, 1 - r.distance / 2))
-        : null,
-    text: r.content ?? "",
-  }));
+  return mapKbResults(json.results ?? []);
 }
 
 /* ── 联网找教材（博查搜索 → 抓取 → 导入 web_kb） ── */
@@ -352,6 +356,7 @@ export interface WebImportResult {
 
 export async function webImport(url: string, title = ""): Promise<WebImportResult> {
   const res = await fetch(`${API_BASE}/api/kb/webimport`, {
+    credentials: "include",
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url, title }),
@@ -456,7 +461,7 @@ export interface WebDoc {
 
 export async function webDocs(): Promise<WebDoc[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/kb/webdocs`, { cache: "no-store" });
+    const res = await fetch(`${API_BASE}/api/kb/webdocs`, { cache: "no-store", credentials: "include" });
     if (!res.ok) return [];
     const json = (await res.json()) as { docs?: WebDoc[] };
     return json.docs ?? [];
@@ -509,6 +514,7 @@ export async function autoImport(
   title = ""
 ): Promise<WebImportResult & { site?: string }> {
   const res = await fetch(`${API_BASE}/api/kb/autoimport`, {
+    credentials: "include",
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, title }),

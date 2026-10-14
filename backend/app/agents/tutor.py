@@ -66,6 +66,10 @@ def generate_answer(
         style_hint = "（学生偏实践型，多用实际例子）"
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if profile.get("learning_data"):
+        from app.services.learning_data import context_text
+        from app.services.agent_memory import fit_untrusted_context
+        messages.append({"role": "user", "content": fit_untrusted_context(context_text(profile["learning_data"], question), 1800)})
     for message in history[-10:]:
         role = message.get("role")
         content = message.get("content", "").strip()

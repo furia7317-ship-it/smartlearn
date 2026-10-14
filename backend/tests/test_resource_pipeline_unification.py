@@ -160,7 +160,9 @@ def test_explicit_single_type_projects_to_exactly_one_task_and_final_candidate()
 
 
 @pytest.mark.asyncio
-async def test_adapter_runs_planned_graph_and_persists_only_approved_final(monkeypatch):
+@pytest.mark.parametrize("source", ["form", "studio"])
+@pytest.mark.parametrize("effort", ["fast", "standard", "deep", "rigorous"])
+async def test_adapter_runs_planned_graph_and_persists_only_approved_final(monkeypatch, source, effort):
     from app.schemas.resource import ResourceRequest
     from app.services import planned_resource_pipeline as pipeline
 
@@ -168,7 +170,8 @@ async def test_adapter_runs_planned_graph_and_persists_only_approved_final(monke
         matched = True
         context = [{"id": "kb-1", "content": "动态规划使用状态转移复用子问题。"}]
 
-    monkeypatch.setattr(pipeline, "check_knowledge_gate", lambda *args: Gate())
+    monkeypatch.setattr(pipeline, "collect_evidence", lambda *args, **kwargs: Gate())
+    monkeypatch.setattr("app.services.evidence.collect_evidence", lambda *args, **kwargs: Gate())
     monkeypatch.setattr("app.agents.profiler.get_profile", lambda *_args: {})
     monkeypatch.setattr(
         pipeline,
@@ -195,10 +198,20 @@ async def test_adapter_runs_planned_graph_and_persists_only_approved_final(monke
                 {"task_id": task_id, "type": "explainer", "title": "批准版", "retry_count": 1},
             ],
             "reviews": {task_id: {"approved": True, "retry_count": 1}},
+            "coverage": {"complete": True}, "delivery_status": "completed",
         }
 
     monkeypatch.setattr(pipeline, "astream_via_thread", fake_stream)
     persisted: list[dict[str, Any]] = []
+    from app.services import pipeline_records
+    original_checkpoint = pipeline_records.checkpoint
+
+    async def checkpoint_after_save(plan_id, state, *, terminal=False):
+        if terminal:
+            assert persisted, "The plan must not report completion before approved materials are saved"
+        await original_checkpoint(plan_id, state, terminal=terminal)
+
+    monkeypatch.setattr(pipeline_records, "checkpoint", checkpoint_after_save)
 
     async def persist(resources):
         persisted.extend(resources)
@@ -211,10 +224,11 @@ async def test_adapter_runs_planned_graph_and_persists_only_approved_final(monke
                 topic="动态规划",
                 student_id="student-1",
                 material_types=["explainer"],
+                collaboration={"effort": effort},
             ),
             persist=persist,
-            source="form",
-            run_id="resource-adapter-test",
+            source=source,
+            run_id=f"resource-adapter-test-{source}-{effort}",
         )
     ]
     assert seen_graph == [planned_graph]
@@ -243,6 +257,28 @@ def test_explicit_request_plan_is_valid_and_uses_exact_selected_types() -> None:
     assert plan.days[0].task_ids == [plan.tasks[0].task_id]
     assert plan.tasks[0].source_ids == ["kb-1"]
     assert plan.tasks[0].knowledge_points == ["状态定义", "状态转移", "滚动数组"]
+
+
+def test_explicit_mixed_materials_keep_types_when_requirements_mention_questions() -> None:
+    from app.schemas.resource import ResourceRequest
+    from app.schemas.resource_plan import PlanArtifact
+    from app.services.planned_resource_pipeline import build_explicit_request_plan
+    from app.services.resource_planning import validate_plan
+
+    plan = build_explicit_request_plan(
+        ResourceRequest(
+            topic="单链表反转",
+            student_id="student-1",
+            material_types=["explainer", "quiz"],
+            knowledge_points="制作一份讲义和3道练习题，讲清空链表边界",
+        ),
+        [{"id": "kb-1", "content": "单链表反转。"}],
+    )
+    # The same type policy runs again after persistence and graph dispatch.
+    restored = PlanArtifact.model_validate(plan.model_dump())
+    assert validate_plan(restored).valid
+    assert [task.type for task in restored.tasks] == ["explainer", "quiz"]
+    assert [task.agent for task in restored.tasks] == ["explainer", "quiz"]
 
 
 def test_parent_cancel_propagates_to_child_run() -> None:

@@ -1,0 +1,34 @@
+.account .profile {
+  grid-template-columns: 34px minmax(0, 1fr);
+  padding-right: 32px;
+}
+.controls { position: static; }
+.toggle {
+  position: absolute;
+  z-index: 4;
+  right: 4px;
+  top: 8px;
+  bottom: 8px;
+  display: grid;
+  width: 24px;
+  place-items: center;
+  border-radius: 3px;
+  color: #c6ae86;
+  cursor: pointer;
+  list-style: none;
+}
+.toggle::-webkit-details-marker { display: none; }
+.toggle:hover { background: #efe2c817; }
+.toggle:focus-visible { outline: 2px solid #c6ae86; outline-offset: 1px; }
+.controls[open] .toggle svg { transform: rotate(180deg); }
+@media (min-width: 768px) {
+  :global(.desktop-rail.is-collapsed) .account .profile {
+    grid-template-columns: 1fr;
+    padding: 5px 4px 26px;
+  }
+  :global(.desktop-rail.is-collapsed) .toggle { top: auto; bottom: 2px; right: 0; width: 100%; height: 24px; }
+}
+@media (max-width: 767px) {
+  :global(.desktop-rail) .account { width: 72px; flex-basis: 72px; }
+  :global(.desktop-rail) .account .profile { grid-template-columns: 1fr; padding: 4px 30px 4px 4px; }
+}

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useLearnerPreferences } from "@/hooks/use-learner-preferences";
 import type { OrchestratorMode } from "@/hooks/use-orchestrator";
 import {
@@ -26,7 +27,6 @@ import {
   type MemoryEpisode,
   type SemanticMemoryFact,
 } from "@/lib/agent-memory";
-import { cn } from "@/lib/utils";
 
 const CATEGORY_LABELS: Record<string, string> = {
   identity: "学习身份",
@@ -194,31 +194,20 @@ export function AgentMemorySettings({ mode }: { mode: OrchestratorMode }) {
         <div className="min-w-0 flex-1">
           <h3 className="text-xs font-semibold">启用长期记忆</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            关闭后停止写入和召回情景、语义记忆；已有内容会保留，仍可导出或清空。
+            关闭后停止写入和召回情景、语义记忆，并暂停自动提炼教学方法；已有内容保留，仍可导出或清空。
           </p>
         </div>
         <span className="text-xs font-medium text-muted-foreground">
           {preferences.long_term_memory_enabled ? "正在使用" : "已暂停"}
         </span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={preferences.long_term_memory_enabled}
+        <Switch
+          checked={preferences.long_term_memory_enabled}
           disabled={preferencesLoading || preferencesSaving || mode !== "live"}
-          onClick={() => void updatePreferences({
-            long_term_memory_enabled: !preferences.long_term_memory_enabled,
+          onCheckedChange={(checked) => void updatePreferences({
+            long_term_memory_enabled: checked,
           })}
-          className={cn(
-            "relative h-7 w-12 rounded-full transition-colors disabled:opacity-50",
-            preferences.long_term_memory_enabled ? "bg-primary" : "bg-muted",
-          )}
-        >
-          <span className={cn(
-            "absolute top-1 size-5 rounded-full bg-white shadow-sm transition-transform",
-            preferences.long_term_memory_enabled ? "translate-x-6" : "translate-x-1",
-          )} />
-          <span className="sr-only">{preferences.long_term_memory_enabled ? "暂停长期记忆" : "启用长期记忆"}</span>
-        </button>
+          label={preferences.long_term_memory_enabled ? "暂停长期记忆" : "启用长期记忆"}
+        />
       </div>
 
       {preferencesError && (

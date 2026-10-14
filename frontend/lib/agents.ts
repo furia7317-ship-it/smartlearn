@@ -10,6 +10,7 @@ const VERMILION = "#c25d49"; // 朱
 const INK_GREEN = "#5f8472"; // 墨绿
 
 export const AGENTS: AgentMeta[] = [
+  { id: "learning_data", name: "学习数据管家", duty: "整理学习证据 · 加权批量更新画像与掌握度", color: INK_BLUE },
   { id: "profiler", name: "学情画像师", duty: "对话中抽取 6 维学习特征", color: INK_BLUE },
   { id: "outliner", name: "大纲规划师", duty: "确认学习安排 · 拆分章节大纲", color: INK_BLUE },
   { id: "supervisor", name: "总控调度官", duty: "任务分诊 · 编排生成管线", color: INK_BLUE },
@@ -19,7 +20,7 @@ export const AGENTS: AgentMeta[] = [
   { id: "solution", name: "题目解析官", duty: "题目、答案与逐题讲解", color: OCHRE },
   { id: "reading", name: "拓展阅读官", duty: "延伸材料精选", color: OCHRE },
   { id: "code", name: "代码教练", duty: "可运行实操案例", color: OCHRE },
-  { id: "video", name: "动画导演", duty: "Manim 教学短片", color: OCHRE },
+  { id: "video", name: "动画导演", duty: "白板教学短片", color: OCHRE },
   { id: "courseware", name: "课件设计师", duty: "结构化 PPT 课件", color: OCHRE },
   { id: "interactive", name: "交互演示官", duty: "可操作的三维/公式/算法演示", color: OCHRE },
   { id: "reviewer", name: "质检审核官", duty: "防幻觉 · 知识库比对", color: VERMILION },

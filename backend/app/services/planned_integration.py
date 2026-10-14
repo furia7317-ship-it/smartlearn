@@ -147,31 +147,25 @@ def integrate_approved_plan(
     coverage = audit_plan_coverage(plan, resources, reviews)
     ready_ids = set(coverage["ready_task_ids"])
     task_by_id = {task.task_id: task for task in plan.tasks}
-    quiz_deliverables = [
-        (task, selected[task.task_id])
-        for task in plan.tasks
-        if task.type == "quiz"
-        and task.task_id in ready_ids
-        and task.task_id in selected
-        and _question_count(selected[task.task_id]) > 0
-    ]
     schedule: list[dict[str, Any]] = []
     composite_resources: list[dict[str, Any]] = []
 
-    for day_index, day in enumerate(plan.days):
+    for day in plan.days:
         task_ids = [task_id for task_id in day.task_ids if task_id in task_by_id]
         approved_day_resources = [
             (task_by_id[task_id], selected[task_id])
             for task_id in task_ids
             if task_id in ready_ids and task_id in selected
         ]
-        handout = _composite_handout(day, approved_day_resources)
+        # Binding is a view operation. Approved bodies are immutable and keep
+        # their original task/type/hash instead of becoming a rewritten handout.
+        handout = None
         if handout is not None:
             composite_resources.append(handout)
         study_task_ids = [
             task_id
             for task_id in task_ids
-            if task_by_id[task_id].type not in {"quiz", "reading", "code"}
+            if task_by_id[task_id].type != "quiz"
         ]
         quiz_task_ids = [task_id for task_id in task_ids if task_by_id[task_id].type == "quiz"]
         minute_allocations = _allocate_minutes(day.minutes, [0.55, 0.25, 0.20])
@@ -241,8 +235,6 @@ def integrate_approved_plan(
         quiz_task, quiz_resource = (
             same_day_quizzes[0]
             if same_day_quizzes
-            else quiz_deliverables[day_index % len(quiz_deliverables)]
-            if quiz_deliverables
             else (None, None)
         )
         if quiz_task is not None and quiz_resource is not None:
@@ -302,6 +294,15 @@ def integrate_approved_plan(
                 "title": day.title,
                 "objective": day.objective,
                 "knowledge_points": list(day.knowledge_points),
+                "knowledge_nodes": [node.model_dump(mode="json") for node in day.knowledge_nodes],
+                "knowledge_relations": [relation.model_dump(mode="json", by_alias=True) for relation in day.knowledge_relations],
+                "prerequisites": list(day.prerequisites),
+                "module": day.module,
+                "node_kind": day.node_kind,
+                "prerequisite_mode": day.prerequisite_mode,
+                "recommended_prerequisites": list(day.recommended_prerequisites),
+                "completion_criteria": day.completion_criteria,
+                "progress_weight": day.progress_weight,
                 "minutes": day.minutes,
                 "actions": list(day.actions),
                 "steps": steps,

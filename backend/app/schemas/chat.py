@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+from app.schemas.orchestration import CollaborationOptions
 
 
 class ChatHistoryMessage(BaseModel):
@@ -24,9 +25,18 @@ class ChatAttachment(BaseModel):
     size: int = Field(ge=1, le=20 * 1024 * 1024)
     extracted_text: str = Field(default="", max_length=18000)
     image_data: str = Field(default="", max_length=8 * 1024 * 1024)
-    recognition_status: Literal["recognized", "parsed", "fallback"] = "parsed"
+    recognition_status: Literal["native", "recognized", "parsed", "fallback"] = "parsed"
     recognition_provider: str = Field(default="", max_length=80)
     recognition_notice: str = Field(default="", max_length=300)
+
+
+class ChatPageContext(BaseModel):
+    """A bounded, explicitly untrusted snapshot of the UI surface asking for help."""
+
+    module: str = Field(default="", max_length=80)
+    title: str = Field(default="", max_length=180)
+    detail: str = Field(default="", max_length=1200)
+    entity_id: str = Field(default="", max_length=120)
 
 
 class ChatRequest(BaseModel):
@@ -34,10 +44,13 @@ class ChatRequest(BaseModel):
     student_id: str
     conversation_id: str = Field(default="", max_length=96)
     message: str
+    collaboration: CollaborationOptions = Field(default_factory=CollaborationOptions)
     history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=100)
-    image_data: str | None = None  # base64 图片
+    image_data: str | None = Field(default=None, max_length=8 * 1024 * 1024)
     attachments: list[ChatAttachment] = Field(default_factory=list, max_length=5)
+    page_context: ChatPageContext | None = None
     teacher_persona: Literal["alligator", "raccoon"] = "raccoon"
+    response_mode: Literal["text", "voice"] = "text"
 
 
 class ChatResponse(BaseModel):

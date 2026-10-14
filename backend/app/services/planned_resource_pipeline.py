@@ -9,6 +9,7 @@ production entry follows the same plan -> generate -> review -> bounded repair
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import time
 import uuid
@@ -48,6 +49,9 @@ from app.schemas.resource_plan import (
     ResourceOutline,
 )
 from app.services.knowledge_gate import check_knowledge_gate
+from app.services.evidence import collect_evidence, evidence_retriever
+from app.services.orchestration_profiles import resolve_policy
+from app.services.artifact_versions import review_matches
 from app.services.media.task import ensure_video_render_tasks
 from app.services.resource_plan_builder import PlanBuildError, build_resource_plan
 from app.services.resource_planning import normalize_plan_task_types, validate_plan
@@ -65,9 +69,8 @@ RESOURCE_TYPES: tuple[str, ...] = (
 )
 
 PIPELINE_RETRY_POLICY: dict[str, int | float] = {
-    # One initial candidate plus one targeted regeneration. If the regenerated
-    # candidate still misses a quality gate, the graph publishes it with
-    # explicit warnings instead of starting another repair cycle.
+    # Default bounded repair. Candidates that still fail remain unpublished;
+    # the selected collaboration profile can raise the repair budget.
     "max_task_retries": 1,
     "max_reviewer_attempts": 2,
     "max_run_seconds": 300.0,
@@ -77,6 +80,7 @@ PIPELINE_RETRY_POLICY: dict[str, int | float] = {
 }
 
 PersistApproved = Callable[[list[dict[str, Any]]], Awaitable[int]]
+logger = logging.getLogger(__name__)
 
 
 def public_resource_stream_text(resource: dict[str, Any]) -> str:
@@ -97,7 +101,7 @@ def public_resource_stream_text(resource: dict[str, Any]) -> str:
     parts = [f"### {title}\n"]
 
     if resource_type in {"reading", "code"}:
-        parts.append("内容已审核通过，并将插入当天讲义的对应知识点位置。")
+        parts.append("内容已审核通过，可单独打开；学习路径会保留对应的资料位置。")
     elif resource_type in {"quiz", "solution"}:
         questions = normalized.get("questions")
         count = len(questions) if isinstance(questions, list) else 0
@@ -180,6 +184,42 @@ def _forced_types(req: ResourceRequest) -> list[str]:
     )
 
 
+def _can_compile_fast_lecture(req: ResourceRequest) -> bool:
+    """A short, explicitly single lecture needs no separate scheduling model."""
+    contract = req.requirements.strip()
+    words = re.search(r"(\d{2,4})\s*[字词]", contract)
+    return (
+        req.collaboration.effort == "fast"
+        and req.planning_mode == "resource"
+        and _forced_types(req) == ["explainer"]
+        and 0 < len(contract) <= 440
+        and bool(re.search(r"(?:一|1|单)份.{0,12}(?:讲义|讲解|资料)|一篇.{0,12}(?:讲义|讲解)", contract))
+        and not re.search(r"(?:[2-9]\d*|[二两三四五六七八九十])\s*(?:份|篇)|分别|每天|每日|学习周期|学习路径.*(?:计划|安排)", contract)
+        and (words is None or 300 <= int(words.group(1)) <= 1000)
+    )
+
+
+def _build_fast_lecture_plan(req: ResourceRequest, kb_context: list[dict[str, Any]]) -> PlanArtifact:
+    plan = build_explicit_request_plan(req, kb_context)
+    contract = req.requirements.strip()
+    task = plan.tasks[0]
+    words = re.search(r"(\d{2,4})\s*[字词]", contract)
+    content_clauses = [
+        part.strip() for part in re.split(r"[，,。；;\n]+", contract)
+        if re.match(r"(?:说明|解释|介绍|对比|比较|区分|用.{0,8}表|各举|举例|提醒|并提醒|包含|包括)", part.strip())
+        and not re.search(r"不需要|不要|无需|不包含", part)
+    ]
+    task.outline = ResourceOutline(
+        objective=f"完整满足这份单篇讲义的用户合同（包括数量、内容、排除项）：{contract}",
+        sections=[OutlineSection(
+            title="学习讲义", goal="按用户指定的概念、形式与范围讲解，不额外扩展任务",
+            must_cover=list(dict.fromkeys([*task.knowledge_points, *content_clauses]))[:12],
+            target_words=int(words.group(1)) if words else 600,
+        )],
+    )
+    return plan
+
+
 def _fallback_task(
     *,
     resource_type: str,
@@ -192,14 +232,14 @@ def _fallback_task(
     requirements = (req.requirements or req.assessment_context or "").strip()
     objective = f"围绕{topic}生成一份可直接学习、可审核的{label}。"
     if requirements:
-        objective += f"同时满足：{requirements[:240]}"
+        objective += f"整套需求中仅落实本资料相关的内容和共享约束，其他资料由对应任务生成：{requirements[:240]}"
     must_cover = list(
         dict.fromkeys(
             item.strip()
             for item in re.split(r"[,，、;；\n]+", req.knowledge_points or topic)
             if item.strip()
         )
-    )[:4] or [topic]
+    )[:16] or [topic]
     criteria = list(_TYPE_CRITERIA[resource_type])
     quiz_config: dict[str, int] = {}
     if resource_type in {"quiz", "solution"} and req.quiz_config is not None:
@@ -212,6 +252,7 @@ def _fallback_task(
         day="D1",
         agent="quiz" if resource_type == "solution" else resource_type,
         type=resource_type,
+        type_origin="user",
         title=f"{topic} · {label}",
         knowledge_points=must_cover,
         difficulty="适中",
@@ -246,7 +287,7 @@ def build_explicit_request_plan(
 ) -> PlanArtifact:
     """Compile an explicit type selection into a validated server-owned plan.
 
-    A form selection is already a complete scheduling decision. Sending it to a
+    An explicit form or dialogue selection is already a scheduling decision. Sending it to a
     model first made valid one-resource requests depend on an unrelated draft
     shape and occasionally fail before the deterministic projection ran. This
     compiler performs the real constraint work without claiming an LLM call;
@@ -266,6 +307,11 @@ def build_explicit_request_plan(
         )
         for index, resource_type in enumerate(forced)
     ]
+    quiz_task = next((task for task in tasks if task.type == "quiz"), None)
+    if quiz_task:
+        for task in tasks:
+            if task.type == "solution":
+                task.depends_on = [quiz_task.task_id]
     minutes = min(120, max(15, 20 * len(tasks)))
     topic = _topic(req)
     plan = PlanArtifact(
@@ -354,6 +400,7 @@ def project_plan_to_request(
                             f"必须生成 {total} 道题",
                             *task.quality_criteria,
                         ][:12]
+            task.type_origin = "user"
             projected.append(task)
         plan.tasks = projected
         plan.days = [
@@ -405,7 +452,7 @@ def approved_resources(state: dict[str, Any]) -> list[dict[str, Any]]:
     approved: list[dict[str, Any]] = []
     for task_id, resource in latest.items():
         review = dict(reviews.get(task_id) or {})
-        if review.get("approved") is not True:
+        if not review_matches(resource, review):
             continue
         if int(review.get("retry_count") or 0) != int(resource.get("retry_count") or 0):
             continue
@@ -442,11 +489,13 @@ async def stream_planned_resource_pipeline(
     terminal_retryable = True
     terminal_observation = "资源运行中断，未保存未审核候选资料"
     disconnected = False
+    persisted_plan_id = ""
+    ready_total = 0
+    task_total = 0
     run_started_at = time.time()
     register_run(
         resolved_run_id,
         parent_run_id=parent_run_id,
-        model_call_limit=int(PIPELINE_RETRY_POLICY["max_model_calls"]),
         owner_id=req.student_id,
     )
 
@@ -474,7 +523,9 @@ async def stream_planned_resource_pipeline(
         "detail": "正在检索依据并制定资源计划",
     }
     forced = _forced_types(req)
-    planning_action_type = "constraint_compiler" if forced else "planner_call"
+    fast_lecture = _can_compile_fast_lecture(req)
+    compile_request = bool(forced and req.planning_mode != "learning_path")
+    planning_action_type = "constraint_compiler" if compile_request else "planner_call"
     yield "trace", _trace_payload(
         trace_event(
             run_id=resolved_run_id,
@@ -485,13 +536,13 @@ async def stream_planned_resource_pipeline(
             status="running",
             action=(
                 "把用户显式选择编译为可审核、可执行的资源任务"
-                if forced
+                if compile_request
                 else "结合请求、学习画像和知识库生成可执行任务"
             ),
             observation="规划尚未批准执行",
             decision_summary=(
                 "显式资料类型是硬约束，不增加隐藏任务。"
-                if forced
+                if compile_request
                 else "规划结果必须通过结构与依赖校验。"
             ),
             span_id=planning_span,
@@ -502,10 +553,12 @@ async def stream_planned_resource_pipeline(
 
     try:
         gate = await asyncio.to_thread(
-            check_knowledge_gate,
+            collect_evidence,
             topic,
             req.student_id,
             10,
+            policy=req.collaboration.sources.model_dump(),
+            attachments=req.attachment_evidence,
         )
         if not gate.matched:
             blocked = gate.error_payload()
@@ -525,7 +578,9 @@ async def stream_planned_resource_pipeline(
 
         request_text = _request_text(req, forced)
         cancellation_checkpoint(resolved_run_id)
-        if forced:
+        if fast_lecture:
+            plan = _build_fast_lecture_plan(req, gate.context)
+        elif compile_request:
             plan = build_explicit_request_plan(req, gate.context)
         else:
             plan = await asyncio.to_thread(
@@ -536,9 +591,27 @@ async def stream_planned_resource_pipeline(
                 kb_context=gate.context,
                 continuous_retry=False,
                 before_model_call=before_planner_model_call,
+                learner_context=req.learning_baseline.model_dump() if req.learning_baseline else None,
+                learning_path_preferences=req.learning_path_preferences.model_dump() if req.learning_path_preferences else None,
             )
             plan.student_id = req.student_id
-            plan = project_plan_to_request(plan, req, gate.context)
+            if req.planning_mode != "learning_path" and source != "studio":
+                plan = project_plan_to_request(plan, req, gate.context)
+        if forced and ({task.type for task in plan.tasks} != set(forced)):
+            raise PlanBuildError("plan_type_mismatch", "规划的资料类型与请求不一致", retryable=True)
+        plan.collaboration = req.collaboration
+        plan.delivery = "learning_path" if req.planning_mode == "learning_path" else "resources"
+        plan.request_contract = req.model_dump(exclude={"student_id", "attachment_evidence"})
+        from app.services.resource_plan_builder import bind_plan_task_sources
+        policy = resolve_policy(req.collaboration.model_dump(), [t.model_dump() for t in plan.tasks])
+        plan, scoped_context = await asyncio.to_thread(
+            bind_plan_task_sources, plan, gate.context, student_id=req.student_id,
+            retriever=evidence_retriever(req.collaboration.sources.model_dump(), req.attachment_evidence),
+            sources_per_task=policy["sources_per_task"],
+        )
+        from app.services.pipeline_records import start_plan, checkpoint
+        await start_plan(plan, resolved_run_id)
+        persisted_plan_id = plan.plan_id
         cancellation_checkpoint(resolved_run_id)
         modules = [task.type for task in plan.tasks]
         yield "trace", _trace_payload(
@@ -579,12 +652,14 @@ async def stream_planned_resource_pipeline(
             {
                 "trace_run_id": resolved_run_id,
                 "parent_run_id": parent_run_id or "",
-                "run_started_at": run_started_at,
-                "retry_policy": PIPELINE_RETRY_POLICY,
+                # Planning already has its own bounded budget. Do not spend
+                # the generation/review allowance before execution even starts.
+                "run_started_at": time.time(),
+                "retry_policy": policy["retry_policy"],
             },
         )
         state["profile"] = profile
-        state["kb_context"] = gate.context
+        state["kb_context"] = scoped_context
         state["knowledge_gate_enforced"] = True
 
         async for chunk in astream_via_thread(
@@ -603,6 +678,7 @@ async def stream_planned_resource_pipeline(
             )
             if mode == "values" and isinstance(payload, dict):
                 final_state = payload
+                await checkpoint(plan.plan_id, payload)
                 continue
             if mode != "custom" or not isinstance(payload, dict):
                 continue
@@ -625,10 +701,11 @@ async def stream_planned_resource_pipeline(
             elif event == "task_review":
                 yield "progress", {
                     "agent": "reviewer",
-                    "status": "completed" if payload.get("approved") else "rework",
+                    "status": "completed" if payload.get("approved") else "failed" if payload.get("terminal") else "rework",
                     "detail": (
                         "审核通过"
                         if payload.get("approved")
+                        else "审核未通过，已达到本轮处理上限" if payload.get("terminal")
                         else "审核驳回，按结构化修复意见返工"
                     ),
                     "task_id": payload.get("task_id"),
@@ -698,10 +775,12 @@ async def stream_planned_resource_pipeline(
                     action_type="persistence_gate",
                 )
             )
+        await checkpoint(plan.plan_id, final_state, terminal=True)
         yield "saved", {"count": saved, "source": source}
 
         task_total = len(plan.tasks)
-        terminal_status = "completed" if task_total > 0 and len(approved) == task_total else "failed"
+        ready_total = len(approved)
+        terminal_status = "completed" if task_total > 0 and len(approved) == task_total and final_state.get("coverage", {}).get("complete") else "partial" if approved else "failed"
         terminal_error = "" if terminal_status == "completed" else "resource_review_failed"
         terminal_retryable = terminal_status != "completed"
         terminal_observation = (
@@ -721,6 +800,9 @@ async def stream_planned_resource_pipeline(
         terminal_error = str(
             getattr(exc, "error_code", "") or "run_budget_exhausted"
         )
+        if any(r.get("failure_kind") == "reviewer" for r in final_state.get("reviews", {}).values()):
+            terminal_error = "review_unavailable"
+            terminal_observation = f"审核服务未能完成检查，已保存 {ready_total} 份批准资料，其余内容未发布"
         terminal_retryable = True
         terminal_observation = str(exc)
         yield "error", {
@@ -755,6 +837,7 @@ async def stream_planned_resource_pipeline(
         release_run(resolved_run_id)
         raise
     except Exception as exc:  # noqa: BLE001
+        logger.exception("Resource pipeline failed run_id=%s source=%s", resolved_run_id, source)
         terminal_observation = f"资源运行中断：{type(exc).__name__}"
         yield "error", {
             "code": terminal_error,
@@ -777,7 +860,7 @@ async def stream_planned_resource_pipeline(
 
     for event in finish_trace_run(
         resolved_run_id,
-        status=terminal_status,  # type: ignore[arg-type]
+        status="failed" if terminal_status == "partial" else terminal_status,  # type: ignore[arg-type]
         observation=terminal_observation,
         error_code=terminal_error or None,
         retryable=terminal_retryable,
@@ -789,8 +872,17 @@ async def stream_planned_resource_pipeline(
 
     yield "done", {
         "run_id": resolved_run_id,
+        "plan_id": persisted_plan_id,
+        "ready_total": ready_total,
+        "task_total": task_total,
+        "message": terminal_observation,
         "status": terminal_status,
         "completed": terminal_status == "completed",
         "error_code": terminal_error or None,
         "retryable": terminal_retryable,
+        "failure_details": [
+            {"task_id": task_id, "issues": list(review.get("blocking_issues") or review.get("issues") or [])[:3]}
+            for task_id, review in final_state.get("reviews", {}).items()
+            if not review.get("approved")
+        ][:12],
     }

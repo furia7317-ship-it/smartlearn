@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.models.base import Base
+from app.main import _migrate_agent_memory
 from app.models.learning import (
     LearnerPreferenceSettings,
     LearnerWorkspaceState,
@@ -21,6 +22,7 @@ from app.routers.memory import (
 )
 from app.services import agent_memory
 from app.services.agent_memory import (
+    _select_recent_history,
     assemble_chat_context,
     consolidate_conversation,
     estimate_tokens,
@@ -36,6 +38,33 @@ async def memory_db():
     factory = async_sessionmaker(engine, expire_on_commit=False)
     async with factory() as session:
         yield session, factory
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_agent_memory_migration_upgrades_existing_sqlite_tables(tmp_path):
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'legacy-memory.db'}")
+    async with engine.begin() as connection:
+        await connection.exec_driver_sql(
+            "CREATE TABLE conversation_sessions (id VARCHAR(96) PRIMARY KEY)"
+        )
+        await connection.exec_driver_sql(
+            "CREATE TABLE memory_episodes (id VARCHAR(64) PRIMARY KEY)"
+        )
+        await _migrate_agent_memory(connection)
+        session_columns = await connection.exec_driver_sql(
+            "PRAGMA table_info(conversation_sessions)"
+        )
+        episode_columns = await connection.exec_driver_sql(
+            "PRAGMA table_info(memory_episodes)"
+        )
+        assert {row[1] for row in session_columns} >= {"entry_channel", "context_metadata"}
+        assert {row[1] for row in episode_columns} >= {
+            "structured_summary",
+            "source_start_index",
+            "source_end_index",
+            "updated_at",
+        }
     await engine.dispose()
 
 
@@ -83,6 +112,69 @@ async def test_conversation_consolidates_episode_and_versioned_semantic_facts(me
         select(SemanticMemoryFact).where(SemanticMemoryFact.category == "preference")
     )).all())
     assert {fact.status for fact in preference_facts} == {"active", "superseded"}
+
+
+@pytest.mark.asyncio
+async def test_conversation_appends_structured_episode_segments_without_rewriting_old(memory_db):
+    db, _ = memory_db
+    first_messages = [
+        {"role": "user", "content": "我想复习二叉树遍历，下周有测验。"},
+        {"role": "assistant", "content": "建议先比较前序、中序和后序的访问顺序。"},
+        {"role": "user", "content": "中序遍历的迭代写法我还不会。"},
+        {"role": "assistant", "content": "下一步用显式栈完成一次迭代演示。"},
+    ]
+    first = await consolidate_conversation(
+        db,
+        student_id="segmented-student",
+        conversation_id="segmented-conversation",
+        messages=first_messages,
+        occurred_at=1000,
+    )
+    await db.commit()
+    first_summary = first.summary
+
+    second_messages = [
+        *first_messages,
+        {"role": "user", "content": "前序已经掌握了，现在继续中序。"},
+        {"role": "assistant", "content": "先把当前节点一路压栈到最左侧。"},
+        {"role": "user", "content": "弹栈以后为什么要转向右子树？"},
+        {"role": "assistant", "content": "接着处理右子树，才能保持左、根、右的顺序。"},
+    ]
+    second = await consolidate_conversation(
+        db,
+        student_id="segmented-student",
+        conversation_id="segmented-conversation",
+        messages=second_messages,
+        occurred_at=2000,
+    )
+    await db.commit()
+
+    rows = list((await db.scalars(
+        select(MemoryEpisode)
+        .where(MemoryEpisode.conversation_id == "segmented-conversation")
+        .order_by(MemoryEpisode.source_start_index)
+    )).all())
+    assert len(rows) == 2
+    assert [(row.source_start_index, row.source_end_index) for row in rows] == [(0, 4), (4, 8)]
+    assert rows[0].summary == first_summary
+    assert second.structured_summary["source_range"] == [4, 8]
+    assert second.structured_summary["topic"]
+    assert "学生当前意图" in second.summary
+
+
+def test_recent_history_window_keeps_complete_question_answer_turns():
+    history = [
+        {"role": "user", "content": "第一问" * 20},
+        {"role": "assistant", "content": "第一答" * 20},
+        {"role": "user", "content": "第二问" * 20},
+        {"role": "assistant", "content": "第二答" * 20},
+    ]
+    last_turn_budget = sum(estimate_tokens(item["content"]) + 4 for item in history[-2:])
+    selected, overflow = _select_recent_history(history, last_turn_budget)
+
+    assert selected == history[-2:]
+    assert overflow == history[:2]
+    assert [item["role"] for item in selected] == ["user", "assistant"]
 
 
 @pytest.mark.asyncio
@@ -228,6 +320,159 @@ async def test_disabled_long_term_memory_stops_consolidation_and_recall(memory_d
     assert context == ""
     assert counts == {"facts": 0, "episodes": 0}
     assert list((await db.scalars(select(SemanticMemoryFact))).all()) == []
+
+
+@pytest.mark.asyncio
+async def test_new_conversation_does_not_recall_unrelated_recent_episode(memory_db, monkeypatch):
+    db, _ = memory_db
+    db.add(MemoryEpisode(
+        id="episode-old-topic",
+        student_id="isolated-student",
+        conversation_id="conversation-old",
+        source_fingerprint="old-topic",
+        summary="旧会话讨论了二叉树遍历。",
+        keywords=["二叉树"],
+        importance=0.95,
+        occurred_at=2_000_000_000,
+    ))
+    await db.commit()
+
+    async def no_semantic_scores(_student_id: str, _query: str) -> dict[str, float]:
+        return {}
+
+    monkeypatch.setattr(
+        "app.services.episodic_memory_index.semantic_episode_scores",
+        no_semantic_scores,
+    )
+    monkeypatch.setattr(
+        "app.services.episodic_memory_index.schedule_episode_index",
+        lambda _episode: None,
+    )
+    context, counts = await agent_memory.recall_memory_context(
+        db,
+        student_id="isolated-student",
+        conversation_id="conversation-new",
+        query="你好",
+        token_limit=500,
+    )
+
+    assert counts == {"facts": 0, "episodes": 0}
+    assert "旧会话讨论" not in context
+
+    continued_context, continued_counts = await agent_memory.recall_memory_context(
+        db,
+        student_id="isolated-student",
+        conversation_id="conversation-new",
+        query="继续讲解当前题目",
+        token_limit=500,
+    )
+    assert continued_counts["episodes"] == 0
+    assert "旧会话讨论" not in continued_context
+
+
+@pytest.mark.asyncio
+async def test_episode_recall_respects_current_and_explicit_cross_session_scope(memory_db, monkeypatch):
+    db, _ = memory_db
+    db.add_all([
+        MemoryEpisode(
+            id="episode-current",
+            student_id="scope-student",
+            conversation_id="conversation-current",
+            source_fingerprint="current",
+            summary="当前会话较早讨论了栈。",
+            keywords=["栈"],
+            occurred_at=100,
+        ),
+        MemoryEpisode(
+            id="episode-previous",
+            student_id="scope-student",
+            conversation_id="conversation-previous",
+            source_fingerprint="previous",
+            summary="上一会话讨论了二叉树。",
+            keywords=["二叉树"],
+            occurred_at=200,
+        ),
+    ])
+    await db.commit()
+
+    async def no_semantic_scores(_student_id: str, _query: str) -> dict[str, float]:
+        return {}
+
+    monkeypatch.setattr(
+        "app.services.episodic_memory_index.semantic_episode_scores",
+        no_semantic_scores,
+    )
+    monkeypatch.setattr(
+        "app.services.episodic_memory_index.schedule_episode_index",
+        lambda _episode: None,
+    )
+
+    current_context, current_counts = await agent_memory.recall_memory_context(
+        db,
+        student_id="scope-student",
+        conversation_id="conversation-current",
+        query="你好",
+        token_limit=800,
+    )
+    assert current_counts["episodes"] == 1
+    assert "当前会话较早讨论了栈" in current_context
+    assert "上一会话讨论了二叉树" not in current_context
+
+    previous_context, previous_counts = await agent_memory.recall_memory_context(
+        db,
+        student_id="scope-student",
+        conversation_id="conversation-new",
+        query="继续上次",
+        token_limit=800,
+    )
+    assert previous_counts["episodes"] == 1
+    assert "上一会话讨论了二叉树" in previous_context
+
+
+@pytest.mark.asyncio
+async def test_cross_session_episode_requires_explicit_history_reference(memory_db, monkeypatch):
+    db, _ = memory_db
+    db.add(MemoryEpisode(
+        id="episode-binary-tree",
+        student_id="topic-student",
+        conversation_id="conversation-old",
+        source_fingerprint="binary-tree",
+        summary="旧会话梳理了二叉树的前序遍历。",
+        keywords=["二叉树", "前序遍历"],
+        occurred_at=100,
+    ))
+    await db.commit()
+
+    async def no_semantic_scores(_student_id: str, _query: str) -> dict[str, float]:
+        return {}
+
+    monkeypatch.setattr(
+        "app.services.episodic_memory_index.semantic_episode_scores",
+        no_semantic_scores,
+    )
+    monkeypatch.setattr(
+        "app.services.episodic_memory_index.schedule_episode_index",
+        lambda _episode: None,
+    )
+    isolated_context, isolated_counts = await agent_memory.recall_memory_context(
+        db,
+        student_id="topic-student",
+        conversation_id="conversation-new",
+        query="二叉树",
+        token_limit=800,
+    )
+    assert isolated_counts["episodes"] == 0
+    assert "前序遍历" not in isolated_context
+
+    context, counts = await agent_memory.recall_memory_context(
+        db,
+        student_id="topic-student",
+        conversation_id="conversation-new",
+        query="回到之前聊的二叉树",
+        token_limit=800,
+    )
+    assert counts["episodes"] == 1
+    assert "前序遍历" in context
 
 
 @pytest.mark.asyncio

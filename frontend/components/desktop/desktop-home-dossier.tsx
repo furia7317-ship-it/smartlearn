@@ -1,21 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
-  ArrowLeft,
   ArrowRight,
   BarChart3,
   BookOpenCheck,
-  BrainCircuit,
   CalendarDays,
   Check,
   CheckCircle2,
   ChevronRight,
   Clock3,
-  Code2,
   Download,
   FilePlus2,
   FileText,
@@ -25,48 +23,47 @@ import {
   MessageCircle,
   NotebookPen,
   Search,
-  Sparkles,
   Target,
   Upload,
 } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  RadialBar,
-  RadialBarChart,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-  ZAxis,
-} from "recharts";
-
 import { useAuth } from "@/components/auth-provider";
+import { TeacherOpenButton } from "@/components/desktop/teacher-window-provider";
 import { UserAvatar } from "@/components/user-avatar";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
 import type { DailyTaskItem, DailyTaskPlan } from "@/lib/daily-task-plan";
 import type { LearningActivityEvent } from "@/lib/learning-activity";
 import type { LearningAnalytics, MasteryEvidence } from "@/lib/learning-analytics";
 import type { ResourceItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { getDesktopPagerSwap, type DesktopPagerDirection } from "@/lib/web-motion";
 
 import styles from "./desktop-home-dossier.module.css";
 
-type HomePage = "today" | "analysis" | "growth";
+const DesktopHomeMiniTrendChart = dynamic(
+  () => import("./desktop-home-charts").then((module) => module.DesktopHomeMiniTrendChart),
+  { ssr: false },
+);
+const DesktopHomeAnalysisTrendChart = dynamic(
+  () => import("./desktop-home-charts").then((module) => module.DesktopHomeAnalysisTrendChart),
+  { ssr: false },
+);
+const KnowledgeMasteryGraph = dynamic(
+  () => import("./knowledge-mastery-graph").then((module) => module.KnowledgeMasteryGraph),
+  { ssr: false },
+);
+const DesktopHomeGrowthChart = dynamic(
+  () => import("./desktop-home-charts").then((module) => module.DesktopHomeGrowthChart),
+  { ssr: false },
+);
+
 type Period = "week" | "month" | "term" | "all";
 
-const PAGE_ORDER: HomePage[] = ["today", "analysis", "growth"];
-const PAGE_META: Record<HomePage, { title: string; range: string }> = {
-  today: { title: "今日案头", range: "今天" },
-  analysis: { title: "学习分析", range: "近 30 天" },
-  growth: { title: "成长记录", range: "本月" },
-};
+const PERIOD_ORDER: Period[] = ["week", "month", "term", "all"];
+const HOME_SECTIONS = [
+  { id: "today", label: "今日案头" },
+  { id: "analysis", label: "学习分析" },
+  { id: "growth", label: "成长记录" },
+] as const;
+type HomeSection = (typeof HOME_SECTIONS)[number]["id"];
 
 function clamp(value: number, minimum = 0, maximum = 100) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -186,62 +183,66 @@ export function DesktopHomeDossier({
   const router = useRouter();
   const { user } = useAuth();
   const reducedMotion = useReducedMotion();
-  const [activePage, setActivePage] = useState<HomePage>("today");
-  const activePageRef = useRef<HomePage>("today");
-  const [pageDirection, setPageDirection] = useState<DesktopPagerDirection>(1);
-  const [search, setSearch] = useState("");
-  const [period, setPeriod] = useState<Period>("week");
-  const [subject, setSubject] = useState("all");
-  const [sessionNow] = useState(() => Date.now());
-  const pageSwap = useMemo(() => getDesktopPagerSwap(Boolean(reducedMotion)), [reducedMotion]);
+  const stageRef = useRef<HTMLElement>(null);
+  const sectionNavRef = useRef<HTMLElement>(null);
+  const [activeSection, setActiveSection] = useState<HomeSection>("today");
 
-  const applyPage = useCallback((next: HomePage, updateHistory: boolean) => {
-    const current = activePageRef.current;
-    if (next === current) return;
-    const currentIndex = PAGE_ORDER.indexOf(current);
-    const nextIndex = PAGE_ORDER.indexOf(next);
-    setPageDirection(nextIndex >= currentIndex ? 1 : -1);
-    activePageRef.current = next;
-    setActivePage(next);
-    if (!updateHistory) return;
-    const url = new URL(window.location.href);
-    if (next === "today") url.searchParams.delete("view");
-    else url.searchParams.set("view", next);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  useEffect(() => {
+    const stage = stageRef.current;
+    const workspace = stage?.parentElement;
+    if (!stage || !workspace) return;
+    let frame = 0;
+    const update = () => {
+      const viewport = getComputedStyle(stage).overflowY === "visible" ? workspace : stage;
+      const edge = Math.max(viewport.getBoundingClientRect().top, sectionNavRef.current?.getBoundingClientRect().bottom ?? 0) + 36;
+      let current: HomeSection = "today";
+      for (const section of HOME_SECTIONS) {
+        const node = stage.querySelector<HTMLElement>(`[data-home-section="${section.id}"]`);
+        if (node && node.getBoundingClientRect().top <= edge) current = section.id;
+      }
+      if (viewport.scrollTop > 0 && viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop < 3) current = "growth";
+      setActiveSection(current);
+    };
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(update); };
+    const resize = new ResizeObserver(schedule);
+    resize.observe(stage);
+    stage.querySelectorAll<HTMLElement>("[data-home-section]").forEach((node) => resize.observe(node));
+    stage.addEventListener("scroll", schedule, { passive: true });
+    workspace.addEventListener("scroll", schedule, { passive: true });
+    schedule();
+    return () => { cancelAnimationFrame(frame); resize.disconnect(); stage.removeEventListener("scroll", schedule); workspace.removeEventListener("scroll", schedule); };
   }, []);
 
-  const changePage = useCallback((index: number) => {
-    const next = PAGE_ORDER[index];
-    if (next) applyPage(next, true);
-  }, [applyPage]);
-
   useEffect(() => {
-    const syncFromUrl = () => {
-      const view = new URLSearchParams(window.location.search).get("view");
-      const next = PAGE_ORDER.includes(view as HomePage) ? view as HomePage : "today";
-      applyPage(next, false);
-    };
-    syncFromUrl();
-    window.addEventListener("popstate", syncFromUrl);
-    return () => window.removeEventListener("popstate", syncFromUrl);
-  }, [applyPage]);
+    if (reducedMotion) return;
+    const node = stageRef.current?.querySelector<HTMLElement>(`[data-home-section="${activeSection}"]`);
+    const animation = node?.animate([{ opacity: .66 }, { opacity: 1 }], { duration: 320, easing: "cubic-bezier(.22, 1, .36, 1)" });
+    return () => animation?.cancel();
+  }, [activeSection, reducedMotion]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
-      if (event.key === "ArrowLeft") changePage(Math.max(0, PAGE_ORDER.indexOf(activePage) - 1));
-      if (event.key === "ArrowRight") changePage(Math.min(2, PAGE_ORDER.indexOf(activePage) + 1));
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activePage, changePage]);
-
-  useEffect(() => {
-    if (activePage === "analysis") setPeriod("week");
-    if (activePage === "growth") setPeriod("month");
-  }, [activePage]);
-
-  const currentIndex = PAGE_ORDER.indexOf(activePage);
+  const jumpToSection = (id: HomeSection) => {
+    const stage = stageRef.current;
+    const node = stage?.querySelector<HTMLElement>(`[data-home-section="${id}"]`);
+    if (!stage || !node) return;
+    const compact = getComputedStyle(stage).overflowY === "visible";
+    const viewport = compact ? stage.parentElement : stage;
+    if (!viewport) return;
+    const inset = compact ? (sectionNavRef.current?.offsetHeight ?? 54) + 16 : 20;
+    viewport.scrollTo({
+      top: viewport.scrollTop + node.getBoundingClientRect().top - viewport.getBoundingClientRect().top - inset,
+      behavior: reducedMotion ? "instant" : "smooth",
+    });
+    node?.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
+  };
+  const [search, setSearch] = useDesktopModuleStringState<string>("home", "dossier.search", "");
+  const [period, setPeriod] = useDesktopModuleStringState<Period>(
+    "home",
+    "dossier.period",
+    "week",
+    PERIOD_ORDER
+  );
+  const [subject, setSubject] = useDesktopModuleStringState<string>("home", "dossier.subject", "all");
+  const [sessionNow] = useState(() => Date.now());
   const generatedAt = new Date(analytics.generatedAt);
   const formattedToday = Number.isNaN(generatedAt.getTime())
     ? "今日"
@@ -288,38 +289,6 @@ export function DesktopHomeDossier({
       .map((item) => ({ title: item.topic, score: Math.round(percentScore(item.severity)), hint: item.reasons[0] || "需要巩固" }))
       .slice(0, 3);
   }, [analytics.bottlenecks.items, analytics.forgetting.items, subject]);
-
-  const graphData = useMemo(() => {
-    const byTopic = new Map<string, number>();
-    (filteredEvidence.length > 0 ? filteredEvidence : subjectEvidence).forEach((item) => byTopic.set(compactTaskTitle(item.knowledgePoint, 12).slice(0, 5), Math.round(percentScore(item.score))));
-    const selectedTitle = selectedTask?.title || selectedTask?.action || "";
-    const rootName = selectedTitle.includes("动态规划")
-      ? "动态规划"
-      : selectedTitle.split("·").at(-1)?.trim().slice(0, 8) || subjects[0] || "核心主题";
-    const rootScore = Math.round(clamp(analytics.health.factors.find((item) => item.id === "mastery")?.score ?? analytics.health.score ?? 78));
-    const values = [{ name: rootName, score: rootScore }];
-    for (const item of Array.from(byTopic, ([name, score]) => ({ name, score })).slice(-5)) {
-      if (values.length >= 6) break;
-      if (!values.some((value) => value.name === item.name)) values.push(item);
-    }
-    for (const item of priorityItems) {
-      if (values.length >= 6) break;
-      const name = compactTaskTitle(item.title, 12).slice(0, 5);
-      if (!values.some((value) => value.name === name)) values.push({ name, score: item.score });
-    }
-    const fallback = ["动态定义", "综合应用", "复杂度分析", "边界条件", "状态转移"];
-    for (const [index, name] of fallback.entries()) {
-      if (values.length >= 6) break;
-      if (!values.some((value) => value.name === name)) values.push({ name, score: [82, 79, 72, 68, 61][index] });
-    }
-    const positions = [[50, 50], [50, 15], [16, 42], [84, 42], [28, 80], [72, 80]];
-    return values.slice(0, 6).map((item, index) => ({
-      ...item,
-      x: positions[index][0],
-      y: positions[index][1],
-      z: index === 0 ? 420 : 250,
-    }));
-  }, [analytics.health.factors, analytics.health.score, filteredEvidence, priorityItems, selectedTask?.action, selectedTask?.title, subjectEvidence, subjects]);
 
   const activityByDay = useMemo(() => {
     const map = new Map<string, number>();
@@ -406,9 +375,9 @@ export function DesktopHomeDossier({
     <div className={styles.workspace}>
       <header className={styles.header}>
         <div className={styles.headline}>
-          <span>{PAGE_META[activePage].range}</span>
-          <h1>{PAGE_META[activePage].title}</h1>
-          <p>{activePage === "today" ? formattedToday : activePage === "analysis" ? displayDateRange(analytics.generatedAt, 7) : growthRangeLabel}</p>
+          <span>今天</span>
+          <h1>学习首页</h1>
+          <p>{formattedToday} · {grade || "年级未设置"} · {major || "专业未设置"}</p>
         </div>
 
         <div className={styles.headerTools}>
@@ -418,116 +387,132 @@ export function DesktopHomeDossier({
             <input id="home-dossier-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索课程、资料、知识点" />
           </form>
           <Link href="/desktop/profile" className={styles.profileLink}>
-            <UserAvatar userId={user?.id} name={displayName} size={58} fallback="mascot" />
-            <span><strong>{displayName}</strong><small>服务正常</small></span>
+            <UserAvatar userId={user?.id} name={displayName} size={42} fallback="mascot" />
+            <span className={styles.profileCopy}><strong>{displayName}</strong><small>个人空间</small></span>
             <ChevronRight aria-hidden />
           </Link>
         </div>
 
-        {activePage === "today" ? (
-          <nav className={styles.quickActions} aria-label="首页快捷操作">
-            <Link href="/desktop/kb"><Upload aria-hidden />上传资料</Link>
-            <Link href="/desktop/notes/new"><NotebookPen aria-hidden />新建笔记</Link>
-            <Link href="/desktop/practice"><FilePlus2 aria-hidden />生成练习</Link>
-            <Link href="/desktop/studio"><MessageCircle aria-hidden />问教师</Link>
-          </nav>
-        ) : (
-          <div className={styles.analysisTools}>
-            <label>
-              <span className="sr-only">选择课程</span>
-              <select value={subject} onChange={(event) => setSubject(event.target.value)}>
-                <option value="all">全部课程</option>
-                {subjects.map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-            </label>
-            <div className={styles.periodTabs} aria-label="时间范围">
-              {(activePage === "analysis"
-                ? ([['week', '本周'], ['month', '本月'], ['term', '本学期']] as const)
-                : ([['month', '本月'], ['term', '本学期'], ['all', '全部']] as const)
-              ).map(([value, label]) => (
-                <button key={value} type="button" className={period === value ? styles.activePeriod : undefined} onClick={() => setPeriod(value)}>{label}</button>
-              ))}
-            </div>
-            <button type="button" className={styles.exportButton} onClick={activePage === "analysis" ? exportAnalysis : exportGrowth}>
-              <Download aria-hidden />{activePage === "analysis" ? "导出分析" : "导出记录"}
-            </button>
-          </div>
-        )}
-
-        <p className={styles.summaryLine}>
-          {activePage === "today"
-            ? <>计划 <strong>{tasks.length}</strong> 项 · 已完成 <strong>{completedToday}</strong> 项 · 待复习 <strong>{analytics.forgetting.items.length}</strong> 个 · 专注 <strong>{formatMinutes(analytics.dailySummary.activeMinutes)}</strong></>
-            : activePage === "analysis"
-              ? <>有效投入 <strong>{formatMinutes(analytics.evidence.activeMinutes)}</strong> · 学习证据 <strong>{analytics.evidence.activityEvents + analytics.evidence.masteryMeasurements + analytics.evidence.practiceAttempts + analytics.evidence.taskRecords}</strong> 条 · 掌握度 <strong>{Math.round(feedbackScore || 0)}%</strong></>
-              : <>连续学习 <strong>{activeDays}</strong> 天 · 累计 <strong>{growthData.at(-1)?.cumulative || 0}</strong> 小时 · 完成 <strong>{resources.length}</strong> 项 · 掌握度 <strong>+{Math.max(0, Math.round(feedbackScore || 0) - 68)}%</strong></>}
-        </p>
+        <dl className={styles.summaryLine} aria-label="学习概况">
+          <div><dt>今日计划</dt><dd>{tasks.length}<small>项</small></dd></div>
+          <div><dt>已完成</dt><dd>{completedToday}<small>项</small></dd></div>
+          <div><dt>待复习</dt><dd>{analytics.forgetting.items.length}<small>个</small></dd></div>
+          <div><dt>掌握度</dt><dd>{Math.round(feedbackScore || 0)}<small>%</small></dd></div>
+          <div><dt>有效投入</dt><dd className={styles.timeValue}>{formatMinutes(analytics.evidence.activeMinutes)}</dd></div>
+          <div><dt>学习天数</dt><dd>{activeDays}<small>天</small></dd></div>
+        </dl>
       </header>
 
-      <AnimatePresence initial={false} mode="wait" custom={pageDirection}>
-        <motion.main
-          key={activePage}
-          className={styles.stage}
-          custom={pageDirection}
-          variants={pageSwap}
-          transition={pageSwap.transition}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-        >
-          {activePage === "today" && (
-            <TodayPage
-              tasks={tasks}
-              activeTaskIndex={activeTaskIndex}
-              selectedTask={selectedTask}
-              selectedResource={selectedResource}
-              todayPlan={todayPlan}
-              progress={progress}
-              analytics={analytics}
-              resources={recentResources}
-              loading={loading}
-              hasLearningPath={hasLearningPath}
-              onSelectTask={onSelectTask}
-              onOpenResource={onOpenResource}
-            />
-          )}
-          {activePage === "analysis" && (
-            <AnalysisPage
-              trendData={trendData}
-              priorityItems={priorityItems}
-              graphData={graphData}
-              analytics={analytics}
-              activityData={growthData.slice(-7)}
-              focusAverage={focusAverage}
-              loading={loading}
-            />
-          )}
-          {activePage === "growth" && (
-            <GrowthPage
-              growthData={growthData}
-              resources={recentResources}
-              analytics={analytics}
-              activeDays={activeDays}
-              focusAverage={focusAverage}
-              goldenHour={goldenHour}
-              onOpenResource={onOpenResource}
-            />
-          )}
-        </motion.main>
-      </AnimatePresence>
+      <LayoutGroup id="home-section-navigation">
+        <nav ref={sectionNavRef} className={styles.sectionNav} aria-label="首页分区导航">
+          {HOME_SECTIONS.map((section, index) => <a key={section.id} href={`#desktop-home-${section.id}`}
+            aria-current={activeSection === section.id ? "location" : undefined}
+            onClick={(event) => { event.preventDefault(); jumpToSection(section.id); }}>
+            <span className={styles.sectionNumber} aria-hidden="true">0{index + 1}</span>{section.label}
+            {activeSection === section.id && <motion.span className={styles.sectionIndicator} aria-hidden="true"
+              layoutId={reducedMotion ? undefined : "active-home-section"} transition={{ duration: .28, ease: [.22, 1, .36, 1] }} />}
+          </a>)}
+        </nav>
+      </LayoutGroup>
 
-      <nav className={cn(styles.pager, activePage === "today" && styles.todayPager)} aria-label="首页分页">
-        <button type="button" disabled={currentIndex === 0} onClick={() => changePage(currentIndex - 1)}>
-          <ArrowLeft aria-hidden />{currentIndex > 0 ? `上一页：${PAGE_META[PAGE_ORDER[currentIndex - 1]].title}` : "已经是第一页"}
-        </button>
-        <div>
-          {PAGE_ORDER.map((page, index) => <button key={page} type="button" aria-label={`第 ${index + 1} 页：${PAGE_META[page].title}`} aria-current={page === activePage ? "page" : undefined} onClick={() => changePage(index)} />)}
-          <span>{currentIndex + 1} / 3</span>
-        </div>
-        <button type="button" disabled={currentIndex === 2} onClick={() => changePage(currentIndex + 1)}>
-          {currentIndex < 2 ? `下一页：${PAGE_META[PAGE_ORDER[currentIndex + 1]].title}` : "已经是最后一页"}<ArrowRight aria-hidden />
-        </button>
-      </nav>
+      <main ref={stageRef} className={styles.stage} data-desktop-scroll-memory="home-dossier">
+        <section className={styles.section} data-home-section="today" aria-labelledby="desktop-home-today">
+          <SectionHeader id="desktop-home-today" title="今日案头" meta="从当前任务开始，循序推进今天的学习。" actions={(
+            <nav className={styles.quickActions} aria-label="首页快捷操作">
+              <Link href="/desktop/kb"><Upload aria-hidden />上传资料</Link>
+              <Link href="/desktop/notes/new"><NotebookPen aria-hidden />新建笔记</Link>
+              <Link href="/desktop/practice"><FilePlus2 aria-hidden />生成练习</Link>
+              <TeacherOpenButton
+                context={{
+                  module: "home",
+                  title: "学习首页",
+                  detail: `今日计划 ${tasks.length} 项，已完成 ${completedToday} 项；请结合当前学习进度答疑。`,
+                }}
+              >
+                <MessageCircle aria-hidden />问教师
+              </TeacherOpenButton>
+            </nav>
+          )} />
+          <TodayPage
+            tasks={tasks}
+            activeTaskIndex={activeTaskIndex}
+            selectedTask={selectedTask}
+            selectedResource={selectedResource}
+            todayPlan={todayPlan}
+            progress={progress}
+            analytics={analytics}
+            resources={recentResources}
+            loading={loading}
+            hasLearningPath={hasLearningPath}
+            onSelectTask={onSelectTask}
+            onOpenResource={onOpenResource}
+          />
+        </section>
+
+        <section className={styles.section} data-home-section="analysis" aria-labelledby="desktop-home-analysis">
+          <SectionHeader
+            id="desktop-home-analysis"
+            title="学习分析"
+            meta={displayDateRange(analytics.generatedAt, 7)}
+            actions={(
+              <div className={styles.analysisTools}>
+                <label>
+                  <span className="sr-only">选择课程</span>
+                  <select value={subject} onChange={(event) => setSubject(event.target.value)}>
+                    <option value="all">全部课程</option>
+                    {subjects.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </label>
+                <div className={styles.periodTabs} aria-label="时间范围">
+                  {([["week", "本周"], ["month", "本月"], ["term", "本学期"], ["all", "全部"]] as const).map(([value, label]) => (
+                    <button key={value} type="button" className={period === value ? styles.activePeriod : undefined} onClick={() => setPeriod(value)}>{label}</button>
+                  ))}
+                </div>
+                <button type="button" className={styles.exportButton} onClick={exportAnalysis}>
+                  <Download aria-hidden />导出分析
+                </button>
+                <button type="button" className={styles.exportButton} onClick={exportGrowth}>
+                  <Download aria-hidden />导出记录
+                </button>
+              </div>
+            )}
+          />
+          <AnalysisPage
+            trendData={trendData}
+            priorityItems={priorityItems}
+            analytics={analytics}
+            activityData={growthData.slice(-7)}
+            focusAverage={focusAverage}
+            loading={loading}
+          />
+        </section>
+
+        <section className={styles.section} data-home-section="growth" aria-labelledby="desktop-home-growth">
+          <SectionHeader id="desktop-home-growth" title="成长记录" meta={growthRangeLabel} />
+          <GrowthPage
+            growthData={growthData}
+            resources={recentResources}
+            analytics={analytics}
+            activeDays={activeDays}
+            focusAverage={focusAverage}
+            goldenHour={goldenHour}
+            onOpenResource={onOpenResource}
+          />
+        </section>
+      </main>
     </div>
+  );
+}
+
+function SectionHeader({ id, title, meta, actions }: { id: string; title: string; meta: string; actions?: ReactNode }) {
+  return (
+    <header className={styles.sectionHeader}>
+      <div>
+        <h2 id={id} tabIndex={-1}>{title}</h2>
+        <p>{meta}</p>
+      </div>
+      {actions}
+    </header>
   );
 }
 
@@ -568,9 +553,21 @@ function TodayPage({
           {tasks.length > 0 && selectedTask ? (
             <div className={styles.currentBody}>
               <div className={styles.currentCopy}>
-                <small>{taskSubjectLabel(selectedTask)}</small>
-                <h2 title={selectedTask.title}>{compactTaskTitle(selectedTask.title, 22)}</h2>
-                <p>{selectedTask.detail}</p>
+                <div className={styles.currentIntro}>
+                  <div className={styles.currentHeading}>
+                    <small>{taskSubjectLabel(selectedTask)}</small>
+                    <h2 title={selectedTask.title}>{compactTaskTitle(selectedTask.title, 22)}</h2>
+                    <p>{selectedTask.detail}</p>
+                  </div>
+                  <div className={styles.progressRing} aria-label={`当前路径完成 ${progress}%`}>
+                    <svg viewBox="0 0 80 80" aria-hidden>
+                      <circle cx="40" cy="40" r="34" />
+                      <circle cx="40" cy="40" r="34" pathLength="100" strokeDasharray={`${clamp(progress)} 100`} transform="rotate(-90 40 40)" />
+                    </svg>
+                    <strong>{progress}%</strong>
+                    <span>路径进度</span>
+                  </div>
+                </div>
                 <ol className={styles.taskSteps} aria-label="今日学习步骤">
                   {tasks.slice(0, 5).map((task, index) => (
                     <li key={task.key} className={cn(task.completed && styles.doneStep, index === activeTaskIndex && styles.currentStep)}>
@@ -595,14 +592,6 @@ function TodayPage({
                   <Link href="/desktop/path">查看学习路径<ChevronRight aria-hidden /></Link>
                   {selectedResource && <button type="button" onClick={() => onOpenResource(selectedResource)}>打开资料</button>}
                 </div>
-              </div>
-              <div className={styles.progressRing} aria-label={`当前路径完成 ${progress}%`}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 112, height: 112 }}>
-                  <RadialBarChart data={[{ value: progress, fill: "#b73727" }]} startAngle={90} endAngle={-270} innerRadius="72%" outerRadius="98%">
-                    <RadialBar dataKey="value" background={{ fill: "#e9e1d5" }} cornerRadius={8} />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <strong>{progress}%</strong>
               </div>
             </div>
           ) : (
@@ -667,7 +656,7 @@ function TodayPage({
           <div className={styles.feedbackBody}>
             <div><small>本周期掌握度</small><strong>{Math.round(analytics.health.factors.find((item) => item.id === "mastery")?.score || 0)}%</strong><p>{loading ? "正在同步学习证据…" : analytics.health.risks[0] || analytics.health.strengths[0] || "继续积累学习证据"}</p></div>
             <div className={styles.miniChart}>
-              {trend.length > 1 ? <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 180, height: 72 }}><LineChart data={trend}><Line dataKey="score" stroke="#37654b" strokeWidth={2.5} dot={{ r: 3, fill: "#f8f2e8", strokeWidth: 2 }} /><XAxis dataKey="label" hide /><YAxis domain={[0, 100]} hide /></LineChart></ResponsiveContainer> : <span>证据不足</span>}
+              {trend.length > 1 ? <DesktopHomeMiniTrendChart data={trend} /> : <span>证据不足</span>}
             </div>
           </div>
         </section>
@@ -676,10 +665,9 @@ function TodayPage({
   );
 }
 
-function AnalysisPage({ trendData, priorityItems, graphData, analytics, activityData, focusAverage, loading }: {
+function AnalysisPage({ trendData, priorityItems, analytics, activityData, focusAverage, loading }: {
   trendData: Array<{ date: string; score: number; topic: string }>;
   priorityItems: Array<{ title: string; score: number; hint: string }>;
-  graphData: Array<{ name: string; score: number; x: number; y: number; z: number }>;
   analytics: LearningAnalytics;
   activityData: Array<{ date: string; minutes: number; cumulative: number }>;
   focusAverage: number;
@@ -692,9 +680,6 @@ function AnalysisPage({ trendData, priorityItems, graphData, analytics, activity
     ...item,
     level: item.minutes === 0 ? 0 : item.minutes < 20 ? 1 : item.minutes < 45 ? 2 : item.minutes < 75 ? 3 : 4,
   }));
-  const graphEdges = graphData.length > 1
-    ? graphData.slice(1).flatMap((item) => [graphData[0], item, graphData[0]])
-    : [];
   const displayedTrend = trendMetric === "mastery"
     ? trendData.map((item) => ({ date: item.date, value: item.score, topic: item.topic }))
     : activityData.map((item) => ({ date: item.date, value: item.minutes, topic: `${item.minutes} 分钟` }));
@@ -705,39 +690,14 @@ function AnalysisPage({ trendData, priorityItems, graphData, analytics, activity
           <CardTitle aside={<div className={styles.chartTabs}><button type="button" className={trendMetric === "mastery" ? styles.activeChartTab : undefined} onClick={() => setTrendMetric("mastery")}>掌握度</button><button type="button" className={trendMetric === "minutes" ? styles.activeChartTab : undefined} onClick={() => setTrendMetric("minutes")}>学习时长</button></div>}>掌握度趋势</CardTitle>
           <div className={styles.chartArea}>
             {displayedTrend.length > 1 ? (
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 640, height: 260 }}>
-                <AreaChart data={displayedTrend} margin={{ top: 14, right: 18, bottom: 4, left: -16 }}>
-                  <CartesianGrid vertical={false} stroke="#ded4c6" />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "#786b5a", fontSize: 12 }} />
-                  <YAxis domain={trendMetric === "mastery" ? [0, 100] : [0, "auto"]} axisLine={false} tickLine={false} tick={{ fill: "#786b5a", fontSize: 12 }} />
-                  <Tooltip contentStyle={{ border: "1px solid #cfbea7", background: "#fffaf2", borderRadius: 6, fontSize: 11 }} />
-                  <Area type="monotone" dataKey="value" name={trendMetric === "mastery" ? "掌握度" : "学习分钟"} stroke="#37654b" strokeWidth={3} fill="#dbe3d8" fillOpacity={0.72} dot={{ r: 4, fill: "#fffaf2", strokeWidth: 2 }} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <DesktopHomeAnalysisTrendChart data={displayedTrend} metric={trendMetric} />
             ) : <div className={styles.emptyChart}>{loading ? "正在同步趋势…" : "至少需要两次掌握度测量才能形成趋势"}</div>}
           </div>
         </section>
 
         <section className={cn(styles.card, styles.knowledgeCard)}>
-          <CardTitle aside={<span>点击知识图谱可查看完整判断</span>}>知识结构</CardTitle>
-          {graphData.length > 0 ? (
-            <Link href="/desktop/profile?view=graph" className={styles.scatterWrap} aria-label="打开完整知识掌握图谱">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 560, height: 230 }}>
-                <ScatterChart margin={{ top: 18, right: 22, bottom: 18, left: 22 }}>
-                  <XAxis type="number" dataKey="x" domain={[0, 100]} hide />
-                  <YAxis type="number" dataKey="y" domain={[0, 100]} hide />
-                  <ZAxis type="number" dataKey="z" range={[3200, 9200]} />
-                  <Scatter data={graphEdges} line={{ stroke: "#72917d", strokeWidth: 1.35 }} lineType="joint" fill="transparent" />
-                  <Scatter data={graphData} dataKey="z">
-                    {graphData.map((item) => <Cell key={item.name} fill={item.score < 65 ? "#b93b2b" : item.score < 78 ? "#bd7a24" : "#37654b"} />)}
-                  </Scatter>
-                </ScatterChart>
-              </ResponsiveContainer>
-              <span className={styles.graphLabels} aria-hidden>
-                {graphData.map((item) => <span key={item.name} style={{ left: `${item.x}%`, top: `${100 - item.y}%` }}>{item.name}</span>)}
-              </span>
-            </Link>
-          ) : <div className={styles.emptyChart}>完成摸底或阶段练习后形成知识结构。</div>}
+          <CardTitle aside={<Link href="/desktop/profile?view=graph">查看完整图谱<ChevronRight aria-hidden /></Link>}>个人知识图谱</CardTitle>
+          <KnowledgeMasteryGraph compact />
         </section>
       </div>
 
@@ -767,7 +727,7 @@ function AnalysisPage({ trendData, priorityItems, graphData, analytics, activity
         </section>
 
         <section className={cn(styles.card, styles.conclusionCard)}>
-          <CardTitle><Sparkles aria-hidden />智能教师结论</CardTitle>
+          <CardTitle>智能教师结论</CardTitle>
           <p>{topObservation?.detail || analytics.subjectBalance.findings[0] || "目前证据不足，继续完成学习任务后再给出判断。"}{priorityItems[0] ? ` 当前最高优先项为“${priorityItems[0].title}”，建议先完成一次针对性回顾，再验证掌握变化。` : ""}</p>
           <div><Link href="/desktop/practice"><Target aria-hidden />{priorityItems[0] ? `先复习 ${priorityItems[0].title}` : "先完成一组针对性练习"}</Link><Link href="/desktop/profile?view=graph"><BarChart3 aria-hidden />再查看完整掌握图谱</Link></div>
         </section>
@@ -786,9 +746,9 @@ function GrowthPage({ growthData, resources, analytics, activeDays, focusAverage
   onOpenResource: (resource: ResourceItem) => void;
 }) {
   const abilities = [
-    ["算法思维", analytics.health.factors.find((item) => item.id === "mastery")?.score, BrainCircuit],
-    ["代码实现", analytics.health.factors.find((item) => item.id === "practice")?.score, Code2],
-    ["问题解决", analytics.health.factors.find((item) => item.id === "completion")?.score, Target],
+    ["算法思维", analytics.health.factors.find((item) => item.id === "mastery")?.score],
+    ["代码实现", analytics.health.factors.find((item) => item.id === "practice")?.score],
+    ["问题解决", analytics.health.factors.find((item) => item.id === "completion")?.score],
   ] as const;
   const heatCells = growthData.map((item) => ({ label: item.date, minutes: item.minutes, level: item.minutes === 0 ? 0 : item.minutes < 20 ? 1 : item.minutes < 45 ? 2 : item.minutes < 75 ? 3 : 4 }));
   const milestoneIndices = new Set([0, 4, 9, growthData.length - 1]);
@@ -803,19 +763,7 @@ function GrowthPage({ growthData, resources, analytics, activeDays, focusAverage
             {milestones.map((item) => <span key={item.date}><strong>{item.date}</strong><small>累计 {item.cumulative} 小时</small></span>)}
           </div>
           <div className={styles.chartArea}>
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 760, height: 280 }}>
-              <AreaChart data={growthData} margin={{ top: 16, right: 18, bottom: 2, left: -12 }}>
-                <CartesianGrid vertical={false} stroke="#ded4c6" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "#786b5a", fontSize: 12 }} interval={2} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#786b5a", fontSize: 12 }} />
-                <Tooltip contentStyle={{ border: "1px solid #cfbea7", background: "#fffaf2", borderRadius: 6, fontSize: 11 }} />
-                <Area type="monotone" dataKey="cumulative" name="累计小时" stroke="#37654b" strokeWidth={3} fill="#dbe3d8" fillOpacity={0.72} dot={(props) => {
-                  const { cx, cy, index } = props;
-                  const show = index === 0 || index === growthData.length - 1 || index % 4 === 0;
-                  return show ? <circle cx={cx} cy={cy} r={4} fill="#fffaf2" stroke="#37654b" strokeWidth={2} /> : <g />;
-                }} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <DesktopHomeGrowthChart data={growthData} />
           </div>
         </section>
 
@@ -832,7 +780,7 @@ function GrowthPage({ growthData, resources, analytics, activeDays, focusAverage
         <section className={cn(styles.card, styles.abilityCard)}>
           <CardTitle>能力变化</CardTitle>
           <div>
-            {abilities.map(([label, score, Icon]) => <div key={label}><Icon aria-hidden /><strong>{label}</strong><i><b style={{ width: `${score || 0}%` }} /></i><em>{score === null || score === undefined ? "—" : Math.round(score)}</em></div>)}
+            {abilities.map(([label, score]) => <div key={label}><strong>{label}</strong><i><b style={{ width: `${score || 0}%` }} /></i><em>{score === null || score === undefined ? "—" : Math.round(score)}</em></div>)}
           </div>
         </section>
 
@@ -853,8 +801,8 @@ function GrowthPage({ growthData, resources, analytics, activeDays, focusAverage
           <CardTitle>智能教师月评</CardTitle>
           <p>{observations[0]?.detail || analytics.subjectBalance.findings[0] || "继续完成学习任务，月评会依据真实证据更新。"}</p>
           <div>
-            {observations.map((item) => <span key={item.id}><Sparkles aria-hidden /><strong>{item.title}</strong><small>{item.evidence} 条证据</small></span>)}
-            {observations.length === 0 && <span><Sparkles aria-hidden /><strong>暂无足够证据</strong></span>}
+            {observations.map((item) => <span key={item.id}><strong>{item.title}</strong><small>{item.evidence} 条证据</small></span>)}
+            {observations.length === 0 && <span><strong>暂无足够证据</strong></span>}
           </div>
         </section>
       </div>

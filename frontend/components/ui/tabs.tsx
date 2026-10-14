@@ -4,6 +4,7 @@ import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 
 import { cn } from "@/lib/utils";
+import styles from "./tabs.module.css";
 
 function Tabs({
   className,
@@ -57,7 +58,7 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn("flex-1 outline-none", className)}
+      className={cn("flex-1 outline-none", styles.content, className)}
       {...props}
     />
   );

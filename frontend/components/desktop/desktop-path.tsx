@@ -1,25 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import Image from "next/image";
 import NextLink from "next/link";
 import { ShellLink as Link } from "@/components/shell-link";
+import { TeacherOpenButton } from "@/components/desktop/teacher-window-provider";
 import {
-  ArrowDown,
   ArrowUpRight,
   BookOpen,
   CalendarDays,
   Check,
   CheckCircle2,
-  ChevronRight,
   Circle,
-  CircleGauge,
-  Clock3,
   GitBranch,
-  GitMerge,
   ListChecks,
   Loader2,
-  LocateFixed,
   Plus,
   Route,
   Sparkles,
@@ -27,32 +30,25 @@ import {
   Trash2,
   X,
   BookOpenCheck,
+  Bell,
   CalendarClock,
+  Mail,
   Pause,
-  PanelRightClose,
-  PanelRightOpen,
   PlayCircle,
   RotateCcw,
-  ZoomIn,
-  ZoomOut,
 } from "lucide-react";
 
 import { AGENT_ICONS } from "@/components/agent-bits";
-import { DesktopEmptyState } from "@/components/desktop/desktop-empty-state";
-import { LearningBaselineGate } from "@/components/learning-baseline-gate";
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
-import { ResourceViewer } from "@/components/resource-viewer";
 import { Button } from "@/components/ui/button";
 import { AGENT_MAP } from "@/lib/agents";
 import {
-  buildDailyTaskPlan,
   buildPathDashboardPlan,
   getDailyTaskResourceAction,
   type DailyTaskItem,
   type DailyTaskPlan,
   type DailyTaskResource,
   type PathDashboardPlan,
-  type PathStageSummary,
 } from "@/lib/daily-task-plan";
 import {
   assessmentToContext,
@@ -66,16 +62,33 @@ import {
 import { resolveResourceForTaskTarget } from "@/lib/path-resource-links";
 import {
   defaultActivationDate,
-  reflowSubjectPath,
-  subjectActivationLabel,
   type SubjectLearningPath,
 } from "@/lib/master-learning-path";
+import {
+  emptyLearningPathWorkspaceSummary,
+  getLearningPathWorkspaceSummary,
+  type LearningPathWorkspaceSummary,
+} from "@/lib/learning-path-api";
 import { reflectionHref } from "@/lib/reflection";
 import type { OrchestratorMode } from "@/hooks/use-orchestrator";
+import { useDesktopModuleStringState } from "@/hooks/use-desktop-module-view-state";
+import { useAppFeatureNavigation } from "@/hooks/use-app-feature-navigation";
 import type { PathStep, ResourceItem } from "@/lib/types";
 import { getDesktopViewSwap } from "@/lib/web-motion";
 import { cn } from "@/lib/utils";
 import styles from "./desktop-path.module.css";
+import FocusWorkspace from "./focus-workspace";
+import { buildAbilityTree, abilityCoursesFromSubjects, buildAbilityTodayQueue, type AbilityCourse } from "@/lib/ability-path";
+
+const LearningBaselineGate = dynamic(
+  () => import("@/components/learning-baseline-gate").then((module) => module.LearningBaselineGate),
+  { ssr: false },
+);
+
+const ResourceViewer = dynamic(
+  () => import("@/components/resource-viewer").then((module) => module.ResourceViewer),
+  { ssr: false },
+);
 
 /**
  * 桌面专属「学习路径」——完全独立于 web 的 /path：自己的布局、自己的 StepCard/GoalsSection
@@ -355,7 +368,13 @@ function TodayActionPanel({
   );
 }
 
-export function GoalsSection({ mode }: { mode: OrchestratorMode }) {
+export function GoalsSection({
+  mode,
+  onChanged,
+}: {
+  mode: OrchestratorMode;
+  onChanged?: () => void;
+}) {
   const [goals, setGoals] = useState<GoalRecord[]>([]);
   const [assessments, setAssessments] = useState<AssessmentRecord[]>([]);
   const [open, setOpen] = useState(false);
@@ -396,11 +415,13 @@ export function GoalsSection({ mode }: { mode: OrchestratorMode }) {
     reset();
     setOpen(false);
     refresh();
+    onChanged?.();
   };
 
   const remove = async (id: string | number) => {
     setGoals((prev) => prev.filter((g) => g.id !== id));
     await deleteGoal(mode, id);
+    onChanged?.();
   };
 
   const importAssessment = (id: string) => {
@@ -565,7 +586,7 @@ function LearningPathRequestDialog({
   const [topic, setTopic] = useState("");
   const [goal, setGoal] = useState("");
   const [currentState, setCurrentState] = useState("");
-  const [deadline, setDeadline] = useState("");
+  const [focus, setFocus] = useState("");
   const inputClass = "mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#c59a62]/35";
 
   const submit = () => {
@@ -575,7 +596,7 @@ function LearningPathRequestDialog({
       `学习主题：${topic.trim()}`,
       `学习目标：${goal.trim()}`,
       currentState.trim() ? `当前情况或卡点：${currentState.trim()}` : "",
-      deadline ? `希望完成日期：${deadline}` : "",
+      focus.trim() ? `希望优先掌握：${focus.trim()}` : "",
     ].filter(Boolean).join("\n");
     onSubmit(request);
     onClose();
@@ -607,57 +628,15 @@ function LearningPathRequestDialog({
               <textarea value={currentState} onChange={(event) => setCurrentState(event.target.value)} rows={3} placeholder="如：会写递归，但不会定义状态和转移方程" className={`${inputClass} resize-none`} />
             </label>
             <label className="text-xs font-medium text-[#62513c]">
-              希望完成日期
-              <input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} className={inputClass} />
-              <span className="mt-1.5 block text-[11px] font-normal text-muted-foreground">下一步会继续确认学情、每日时长和资料类型。</span>
+              希望优先掌握的内容
+              <textarea value={focus} onChange={(event) => setFocus(event.target.value)} rows={3} placeholder="如：先理解状态转移，再集中练习背包问题" className={`${inputClass} resize-none`} />
+              <span className="mt-1.5 block text-[11px] font-normal text-muted-foreground">下一步会继续确认学情、学习重点和资料类型。</span>
             </label>
           </div>
           <div className="mt-4 flex items-center justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>取消</Button>
             <Button onClick={submit} disabled={disabled || !topic.trim() || !goal.trim()} className="gap-1.5">
               <Sparkles className="size-4" />{disabled ? "当前任务运行中" : "继续确认并生成"}
-            </Button>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function SubjectActivationDialog({
-  subject,
-  onClose,
-  onConfirm,
-}: {
-  subject: SubjectLearningPath | null;
-  onClose: () => void;
-  onConfirm: (subjectId: string, date: string) => void;
-}) {
-  const [date, setDate] = useState(defaultActivationDate());
-
-  useEffect(() => {
-    if (subject) setDate(subject.activationDate || defaultActivationDate());
-  }, [subject]);
-
-  if (!subject) return null;
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-label={`设置${subject.title}启用时间`} onClick={onClose}>
-      <section className="w-full max-w-md rounded-xl border border-[#d5c2a4] bg-[#fffaf2] shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <header className="flex items-center gap-3 border-b border-[#dfcfb8] px-5 py-4">
-          <span className="grid size-9 place-items-center rounded-lg bg-[#3a2a18] text-[#fffaf1]"><CalendarClock className="size-4" /></span>
-          <span className="min-w-0 flex-1"><strong className="block text-sm">设置启用时间</strong><span className="mt-0.5 block truncate text-xs text-muted-foreground">{subject.title}</span></span>
-          <button type="button" onClick={onClose} aria-label="关闭启用时间设置" className="grid size-8 place-items-center rounded-lg hover:bg-black/5"><X className="size-4" /></button>
-        </header>
-        <div className="space-y-4 px-5 py-4">
-          <p className="text-sm leading-relaxed text-muted-foreground">选择今天会立即加入总路径；选择未来日期会在当天自动加入统筹。在启用前不会占用每日学习时间。</p>
-          <label className="block text-xs font-medium text-[#62513c]">
-            启用日期
-            <input type="date" min={defaultActivationDate()} value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#c59a62]/35" />
-          </label>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={onClose}>取消</Button>
-            <Button disabled={!date} onClick={() => { onConfirm(subject.id, date); onClose(); }}>
-              {date > defaultActivationDate() ? "确认定时启用" : "立即启用"}
             </Button>
           </div>
         </div>
@@ -689,59 +668,6 @@ function SubjectDeleteDialog({
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>取消</Button>
             <Button variant="destructive" onClick={() => { onConfirm(subject.id); onClose(); }}>确认删除</Button>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function SubjectReplanDialog({
-  subject,
-  onClose,
-  onConfirm,
-}: {
-  subject: SubjectLearningPath | null;
-  onClose: () => void;
-  onConfirm: (subjectId: string, dailyMinutes: number) => void;
-}) {
-  const [dailyMinutes, setDailyMinutes] = useState(40);
-
-  useEffect(() => {
-    if (subject) setDailyMinutes(subject.dailyMinutes);
-  }, [subject]);
-
-  if (!subject) return null;
-  const boundedMinutes = Math.max(10, Math.min(240, Math.round(dailyMinutes || 0)));
-  const estimatedDays = reflowSubjectPath(subject.path, boundedMinutes).length;
-  const totalMinutes = subject.path.reduce(
-    (total, step) => total + (step.steps ?? []).reduce((sum, task) => sum + task.minutes, 0),
-    0,
-  );
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-label={`重新编排${subject.title}学习路径`} onClick={onClose}>
-      <section className="w-full max-w-md rounded-xl border border-[#d5c2a4] bg-[#fffaf2] shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <header className="flex items-center gap-3 border-b border-[#dfcfb8] px-5 py-4">
-          <span className="grid size-9 place-items-center rounded-lg bg-[#3a2a18] text-[#fffaf1]"><CalendarClock className="size-4" /></span>
-          <span className="min-w-0 flex-1"><strong className="block text-sm">重新编排学习时间</strong><span className="mt-0.5 block truncate text-xs text-muted-foreground">{subject.title}</span></span>
-          <button type="button" onClick={onClose} aria-label="关闭重新编排" className="grid size-8 place-items-center rounded-lg hover:bg-black/5"><X className="size-4" /></button>
-        </header>
-        <div className="space-y-4 px-5 py-4">
-          <p className="text-sm leading-relaxed text-muted-foreground">只调整现有任务和资源的日期分布，不重新生成任何资源，也不会清除已经完成的学习记录。</p>
-          <label className="block text-xs font-medium text-[#62513c]">
-            每天用于该科目的时间
-            <div className="mt-1 flex items-center gap-2">
-              <input type="number" min={10} max={240} step={5} value={dailyMinutes} onChange={(event) => setDailyMinutes(Number(event.target.value))} className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#c59a62]/35" />
-              <span className="text-xs text-muted-foreground">分钟</span>
-            </div>
-          </label>
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-2/60 p-3 text-xs">
-            <span><span className="block text-muted-foreground">现有任务总时长</span><strong className="mt-1 block">{totalMinutes} 分钟</strong></span>
-            <span><span className="block text-muted-foreground">重新编排后</span><strong className="mt-1 block">约 {estimatedDays} 天</strong></span>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={onClose}>取消</Button>
-            <Button disabled={!dailyMinutes || dailyMinutes < 10 || dailyMinutes > 240} onClick={() => { onConfirm(subject.id, boundedMinutes); onClose(); }}>确认重新编排</Button>
           </div>
         </div>
       </section>
@@ -791,181 +717,268 @@ function SubjectSupplementDialog({
   );
 }
 
-function SubjectPathPanel({
+type PathWorkspaceTab = "overview" | "courses" | "plan";
+
+const PATH_WORKSPACE_TABS: readonly PathWorkspaceTab[] = ["overview", "courses", "plan"];
+
+function subjectStatusLabel(subject: SubjectLearningPath): string {
+  if (subject.status === "completed") return "已完成";
+  if (subject.status === "active") return "总路径中";
+  if (subject.status === "paused") return "已暂停";
+  if (subject.status === "scheduled") return "待排入";
+  return "未启用";
+}
+
+function CourseManagementWorkspace({
   subjects,
-  selectedId,
-  onSelect,
-  onSchedule,
+  watchedVideoCount,
+  onView,
+  onActivate,
   onPause,
   onResume,
-  onReplan,
   onSupplement,
   onDelete,
   onGenerate,
-  compact = false,
 }: {
   subjects: SubjectLearningPath[];
-  selectedId?: string;
-  onSelect: (subject: SubjectLearningPath) => void;
-  onSchedule: (subject: SubjectLearningPath) => void;
+  watchedVideoCount: number;
+  onView: (subject: SubjectLearningPath) => void;
+  onActivate: (subjectId: string) => void;
   onPause: (subjectId: string) => void;
   onResume: (subjectId: string) => void;
-  onReplan: (subject: SubjectLearningPath) => void;
   onSupplement: (subject: SubjectLearningPath) => void;
   onDelete: (subject: SubjectLearningPath) => void;
   onGenerate: () => void;
-  compact?: boolean;
 }) {
+  const activeSubjects = subjects.filter((subject) => subject.status === "active");
+  const dailyMinutes = activeSubjects.reduce((total, subject) => total + subject.dailyMinutes, 0);
+  const nextMilestone = subjects
+    .filter((subject) => subject.progress < 100)
+    .sort((left, right) => right.progress - left.progress)[0];
+  const emptyCourseSlots = Math.max(0, 3 - subjects.length);
+  const remainingTasks = nextMilestone
+    ? Math.max(0, nextMilestone.totalTasks - nextMilestone.completedTasks)
+    : 0;
+  const estimatedDays = nextMilestone && nextMilestone.dailyMinutes > 0
+    ? Math.max(1, Math.ceil((remainingTasks * 20) / nextMilestone.dailyMinutes))
+    : 0;
+
   return (
-    <section className={cn("rounded-xl border bg-card p-4", compact && styles.subjectSidebarPanel)}>
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">科目学习路径</h2>
-          <p className="mt-1 text-xs text-muted-foreground">启用后由总路径统一安排</p>
-        </div>
-        <Button size="sm" onClick={onGenerate} className={cn("h-8 gap-1.5", compact && styles.subjectSidebarGenerate)}><Plus className="size-3.5" />生成科目路径</Button>
-      </div>
-      <div className={cn("mt-4 space-y-2.5", compact && styles.subjectSidebarList)}>
-        {subjects.length === 0 ? (
-          <p className="rounded-lg border border-dashed px-3 py-6 text-center text-xs leading-relaxed text-muted-foreground">还没有科目路径。生成后可在这里设置启用日期。</p>
-        ) : subjects.map((subject) => {
-          const enabled = subject.status === "active" || subject.status === "completed";
-          return (
-            <div key={subject.id} className={cn("rounded-lg border p-3", compact && styles.subjectSidebarCard, selectedId === subject.id && "border-primary/50 bg-primary/[0.04]")}>
-              <div className="flex items-start gap-2">
-                <button type="button" onClick={() => onSelect(subject)} className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <strong className="truncate text-sm">{subject.title}</strong>
-                    <span className={cn("rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground", enabled && "bg-success/10 text-success")}>{subjectActivationLabel(subject)}</span>
-                  </span>
-                  <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-muted"><i className="block h-full rounded-full bg-primary" style={{ width: `${subject.progress}%` }} /></span>
-                  <span className="mt-1.5 flex justify-between text-[11px] text-muted-foreground"><span>{subject.path.length} 天 · 每日 {subject.dailyMinutes} 分钟</span><span>进度 {subject.progress}%</span></span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(subject)}
-                  aria-label={`删除${subject.title}学习路径`}
-                  title="删除学习路径"
-                  className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </div>
-              <div className={cn("mt-2 flex flex-wrap justify-end gap-2 border-t pt-2", compact && styles.subjectSidebarActions)}>
-                <button type="button" aria-label={`补充${subject.title}学习路径`} onClick={() => onSupplement(subject)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium text-primary hover:bg-accent"><Plus className="size-3" />补充</button>
-                <button type="button" aria-label={`重新编排${subject.title}学习路径`} onClick={() => onReplan(subject)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"><CalendarClock className="size-3" />重新编排</button>
-                {(subject.status === "ready" || subject.status === "scheduled") && (
-                  <button type="button" onClick={() => onSchedule(subject)} className="rounded-md border px-2.5 py-1 text-xs font-medium text-primary hover:bg-accent">
-                    {subject.status === "scheduled" ? "修改启用时间" : "设置启用时间"}
-                  </button>
-                )}
-                {subject.status === "active" && (
-                  <button type="button" onClick={() => onPause(subject.id)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"><Pause className="size-3" />暂停</button>
-                )}
-                {subject.status === "paused" && (
-                  <button type="button" onClick={() => onResume(subject.id)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium text-primary hover:bg-accent"><RotateCcw className="size-3" />重新启用</button>
-                )}
-              </div>
+    <div className={`thin-scroll ${styles.tabWorkspace}`}>
+      <div className={styles.courseWorkspace}>
+        <section className={styles.courseListPanel} aria-label="课程列表">
+          <header className={styles.coursePanelHeader}>
+            <div>
+              <span className={styles.coursePanelTitle}><strong>我的课程</strong><i>{subjects.length}</i></span>
+              <p>管理与编排你的课程路径，持续精进</p>
             </div>
-          );
-        })}
+            {watchedVideoCount > 0 ? (
+              <NextLink href="/desktop/video-learning" className={styles.workspaceTextLink}>
+                <PlayCircle className="size-4" aria-hidden />视频学习记录 {watchedVideoCount}
+              </NextLink>
+            ) : null}
+          </header>
+          {subjects.length === 0 ? (
+            <div className={styles.workspaceEmpty}>
+              <BookOpen className="size-6" aria-hidden />
+              <strong>还没有课程</strong>
+              <p>新增一门课程，系统会生成知识节点和对应资料。</p>
+              <button type="button" onClick={onGenerate}>新增第一门课程</button>
+            </div>
+          ) : (
+            <div className={styles.courseRows}>
+              {subjects.map((subject, index) => (
+                <article key={subject.id} className={styles.courseRow}>
+                  <button type="button" className={styles.courseArtwork} onClick={() => onView(subject)} aria-label={`查看${subject.title}课程路径`}>
+                    <Image src="/brand/path/course-data-structures-v1.webp" alt="" fill sizes="12vw" priority={index === 0} />
+                    <span>{index + 1}</span>
+                  </button>
+                  <button type="button" className={styles.courseMain} onClick={() => onView(subject)}>
+                    <span className={styles.courseTitleLine}>
+                      <strong>{learningSubjectName(subject.title || subject.requestSummary)}</strong>
+                    </span>
+                    <span className={styles.courseStatusLine} data-status={subject.status}>
+                      <CheckCircle2 className="size-3.5" aria-hidden />{subjectStatusLabel(subject)}
+                    </span>
+                    <span className={styles.courseProgress} aria-label={`课程进度 ${subject.progress}%`}>
+                      <i style={{ width: `${subject.progress}%` }} />
+                    </span>
+                    <span className={styles.courseProgressValue}>{subject.progress}%</span>
+                  </button>
+                  <dl className={styles.courseMetrics}>
+                    <div><dt><ListChecks className="size-4" aria-hidden />任务节点</dt><dd>{subject.completedTasks}/{subject.totalTasks || 0}</dd></div>
+                    <div><dt><Target className="size-4" aria-hidden />知识点</dt><dd>{Math.round(subject.path.length * subject.progress / 100)}/{subject.path.length}</dd></div>
+                  </dl>
+                  <div className={styles.courseActions}>
+                    <button type="button" onClick={() => onView(subject)}><GitBranch className="size-3.5" aria-hidden />查看路径</button>
+                    <button type="button" onClick={() => onSupplement(subject)}><BookOpenCheck className="size-3.5" aria-hidden />补充内容</button>
+                    {(subject.status === "ready" || subject.status === "scheduled") ? (
+                      <button type="button" className={styles.courseActionStrong} onClick={() => onActivate(subject.id)}><Route className="size-3.5" aria-hidden />加入总路径</button>
+                    ) : null}
+                    {subject.status === "active" ? (
+                      <button type="button" onClick={() => onPause(subject.id)}><Pause className="size-3.5" aria-hidden />暂停</button>
+                    ) : null}
+                    {subject.status === "paused" ? (
+                      <button type="button" className={styles.courseActionStrong} onClick={() => onResume(subject.id)}><RotateCcw className="size-3.5" aria-hidden />启用</button>
+                    ) : null}
+                    <button type="button" className={styles.courseActionDanger} aria-label={`删除${subject.title}`} onClick={() => onDelete(subject)}>
+                      <Trash2 className="size-3.5" aria-hidden />删除
+                    </button>
+                  </div>
+                </article>
+              ))}
+              {Array.from({ length: emptyCourseSlots }, (_, index) => (
+                <button key={`empty-course-${index}`} type="button" className={styles.courseEmptySlot} onClick={onGenerate}>
+                  <span><Plus className="size-5" aria-hidden /></span>
+                  <strong>添加下一门课程</strong>
+                  <small>生成新的课程路径后，将在这里统一编排</small>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <aside className={styles.courseSummary} aria-label="课程编排摘要">
+          <header className={styles.summaryHeader}><h2>课程编排</h2><span aria-hidden>录</span></header>
+          <section className={styles.summaryMeasure}>
+            <div><span>进行中课程</span><strong>{activeSubjects.length}</strong><small>门</small></div>
+            <BookOpen className="size-12" strokeWidth={1.2} aria-hidden />
+          </section>
+          <section className={styles.summaryMeasure}>
+            <div><span>预计每日学习时长</span><strong>{dailyMinutes || subjects[0]?.dailyMinutes || 0}</strong><small>分钟</small></div>
+            <CalendarClock className="size-12" strokeWidth={1.2} aria-hidden />
+          </section>
+          <section className={styles.summaryMilestone}>
+            <span>下一个里程碑</span>
+            {nextMilestone ? (
+              <>
+                <strong>{learningSubjectName(nextMilestone.title || nextMilestone.requestSummary)}</strong>
+                <p>完成剩余 {remainingTasks} 个任务节点</p>
+                <em>预计 <b>{estimatedDays}</b> 天内完成</em>
+              </>
+            ) : (
+              <p>所有课程都已完成，可以新增课程继续学习。</p>
+            )}
+          </section>
+          <button type="button" className={styles.summaryAddCourse} onClick={onGenerate}>新增课程<Plus className="size-5" aria-hidden /></button>
+        </aside>
       </div>
-    </section>
+    </div>
   );
 }
 
-type FlowStageStatus = "complete" | "current" | "upcoming";
-
-function flowStageStatus(
-  stage: PathStageSummary,
-  currentIndex: number,
-): FlowStageStatus {
-  if (stage.current) return "current";
-  if (
-    stage.index < currentIndex ||
-    (stage.taskCount > 0 && stage.completedTaskCount >= stage.taskCount)
-  ) {
-    return "complete";
-  }
-  return "upcoming";
-}
-
-function FlowTaskNode({
-  task,
+function LearningPlanWorkspace({
+  dashboard,
+  path,
+  pathId,
+  subjects,
   resources,
+  summary,
+  mode,
+  onRecordEvidence,
   onOpenResource,
+  onReplan,
+  onSummaryChanged,
 }: {
-  task: DailyTaskItem;
+  dashboard: PathDashboardPlan;
+  path: PathStep[];
+  pathId: string;
+  subjects: SubjectLearningPath[];
   resources: ResourceItem[];
+  summary: LearningPathWorkspaceSummary;
+  mode: OrchestratorMode;
+  onRecordEvidence: (key: string, content: string) => void;
   onOpenResource: (resource: ResourceItem, taskKey: string) => void;
+  onReplan: (subjectId: string, dailyMinutes: number) => void;
+  onSummaryChanged: () => void;
 }) {
-  const resolvedTargets = task.resourceTargets.map((target) => ({
-    target,
-    resource: resolveResourceForTaskTarget(target, task, resources),
-  }));
-  const readyTarget = resolvedTargets.find((entry) => Boolean(entry.resource));
-  const missingExactTarget = resolvedTargets.some(
-    (entry) => Boolean(entry.target.id) && !entry.resource,
-  );
-  const targetType = readyTarget?.target.type ?? task.resourceTargets[0]?.type;
-  const visualTitle = task.kind === "practice" || targetType === "quiz"
-    ? "匹配练习"
-    : task.kind === "review"
-      ? "阶段复盘"
-      : targetType === "video"
-        ? "概念视频"
-        : targetType === "code" || targetType === "interactive"
-          ? "代码实践"
-          : "概念讲义";
-  const Icon = task.kind === "practice"
-    ? ListChecks
-    : task.kind === "review"
-      ? BookOpenCheck
-      : BookOpen;
-  const content = (
-    <>
-      <span className={styles.taskIcon}>
-        <Icon className="size-3.5" aria-hidden />
-      </span>
-      <span className={styles.taskCopy}>
-        <strong>{visualTitle}</strong>
-        <span>
-          {readyTarget
-            ? task.title
-            : missingExactTarget
-              ? "资料审核完成后自动出现"
-              : task.action}
-        </span>
-      </span>
-      <span className={styles.taskTime}>{task.minutes} 分钟</span>
-      <span className={styles.taskOutputPort} aria-hidden />
-    </>
-  );
-
-  if (readyTarget?.resource) {
-    return (
-      <button
-        type="button"
-        className={styles.taskCard}
-        onClick={() => onOpenResource(readyTarget.resource!, task.key)}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  if (missingExactTarget) {
-    return (
-      <div className={styles.taskCard} aria-disabled="true">
-        {content}
-      </div>
-    );
-  }
+  const totalTasks = dashboard.stages.reduce((total, stage) => total + stage.taskCount, 0);
+  const completedTasks = dashboard.stages.reduce((total, stage) => total + stage.completedTaskCount, 0);
 
   return (
-    <Link href={task.href} className={styles.taskCard}>
-      {content}
-    </Link>
+    <div className={`thin-scroll ${styles.tabWorkspace}`}>
+      <header className={styles.workspaceIntro}>
+        <span className={styles.workspaceKicker}>TODAY&apos;S STUDY</span>
+        <div>
+          <h2>学习计划</h2>
+          <p>今日任务来自当前路径；课程节奏和学习目标会共同影响后续安排。</p>
+        </div>
+        <Link href="/path/assessment" className={styles.workspaceSecondary}>进入考试测评<ArrowUpRight className="size-4" aria-hidden /></Link>
+      </header>
+
+      <div className={styles.planWorkspace}>
+        <main className={styles.planMain}>
+          {dashboard.today ? (
+            <TodayActionPanel
+              step={dashboard.today.step}
+              pathId={pathId}
+              index={dashboard.today.index}
+              total={path.length}
+              plan={dashboard.today.plan}
+              resources={resources}
+              onRecordEvidence={onRecordEvidence}
+              onOpenResource={onOpenResource}
+            />
+          ) : (
+            <div className={styles.workspaceEmpty}>
+              <CalendarClock className="size-6" aria-hidden />
+              <strong>今天还没有安排</strong>
+              <p>先在课程管理中启用课程，系统会把知识节点编排进今日任务。</p>
+            </div>
+          )}
+
+          <section className={styles.planUpcoming}>
+            <div className={styles.panelHeading}>
+              <div><strong>接下来学什么</strong><span>{completedTasks}/{totalTasks} 项学习内容已完成</span></div>
+            </div>
+            {dashboard.upcoming.length > 0 ? dashboard.upcoming.slice(0, 5).map((stage, index) => (
+              <article key={`${stage.index}-${stage.title}`} className={styles.planStage}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <div><strong>{stage.title}</strong><p>{stage.desc}</p></div>
+                <small>{stage.totalMinutes} 分钟 · {stage.taskCount} 项</small>
+              </article>
+            )) : <p className={styles.planComplete}>当前路径没有待学习节点。</p>}
+          </section>
+        </main>
+
+        <aside className={styles.planSidebar}>
+          <section className={styles.planSummaryCard}>
+            <div className={styles.panelHeading}><div><strong>学习数据</strong><span>来自当前账号</span></div></div>
+            <div className={styles.planSummaryGrid}>
+              <div><span>进行中目标</span><strong>{summary.active_goals}</strong></div>
+              <div><span>已完成目标</span><strong>{summary.completed_goals}</strong></div>
+              <div><span>待复习卡片</span><strong>{summary.due_reviews}</strong></div>
+              <div><span>错题记录</span><strong>{summary.wrong_questions}</strong></div>
+            </div>
+          </section>
+          <section className={styles.planPacingCard}>
+            <div className={styles.panelHeading}><div><strong>每日课程节奏</strong><span>10–240 分钟</span></div></div>
+            <div className={styles.planCourseMinutes}>
+              {subjects.length > 0 ? subjects.map((subject) => (
+                <label key={subject.id}>
+                  <span>{learningSubjectName(subject.title || subject.requestSummary)}</span>
+                  <input
+                    type="number"
+                    min={10}
+                    max={240}
+                    step={5}
+                    defaultValue={subject.dailyMinutes}
+                    aria-label={`${subject.title}每日学习分钟数`}
+                    onBlur={(event) => {
+                      const minutes = Number(event.currentTarget.value);
+                      if (Number.isFinite(minutes)) onReplan(subject.id, minutes);
+                      else event.currentTarget.value = String(subject.dailyMinutes);
+                    }}
+                  />
+                  <small>分钟</small>
+                </label>
+              )) : <p>暂无可调整的课程。</p>}
+            </div>
+          </section>
+          <GoalsSection mode={mode} onChanged={onSummaryChanged} />
+        </aside>
+      </div>
+    </div>
   );
 }
 
@@ -981,296 +994,12 @@ function learningSubjectName(value?: string): string {
   return cleaned || "科目";
 }
 
-function LearningPathFlowCanvas({
-  dashboard,
-  pathSteps,
-  completedKeys,
-  title,
-  caption,
-  pathId,
-  view,
-  onViewChange,
-  resources,
-  onOpenResource,
-}: {
-  dashboard: PathDashboardPlan;
-  pathSteps: PathStep[];
-  completedKeys: string[];
-  title: string;
-  caption: string;
-  pathId: string;
-  view: "master" | "subjects";
-  onViewChange: (view: "master" | "subjects") => void;
-  resources: ResourceItem[];
-  onOpenResource: (resource: ResourceItem, taskKey: string) => void;
-}) {
-  const [zoom, setZoom] = useState(1);
-  const [selectedStageIndex, setSelectedStageIndex] = useState<number | null>(null);
-  const [summaryOpen, setSummaryOpen] = useState(true);
-  const currentIndex = dashboard.stages.findIndex((stage) => stage.current);
-  const resolvedCurrentIndex = currentIndex >= 0 ? currentIndex : 0;
-  const completedStages = dashboard.stages.filter(
-    (stage) => flowStageStatus(stage, resolvedCurrentIndex) === "complete",
-  ).length;
-  const todayPlan = dashboard.today?.plan;
-  const firstActionHref = todayPlan?.tasks[0]?.href ?? "/desktop/path/study";
-  const selectedStagePlan = selectedStageIndex !== null && pathSteps[selectedStageIndex]
-    ? buildDailyTaskPlan(pathSteps[selectedStageIndex], selectedStageIndex, completedKeys)
-    : null;
-
-  useEffect(() => {
-    setSelectedStageIndex(null);
-  }, [pathId]);
-
-  return (
-    <section
-      className={cn(styles.layout, !summaryOpen && styles.layoutSummaryCollapsed)}
-      aria-label="学习路径连线画布"
-    >
-      <div className={styles.canvasColumn}>
-        <span className={styles.spineLead} aria-hidden />
-        <header className={styles.canvasHeader}>
-          <div className={styles.canvasTitle}>
-            <h2>{title}</h2>
-            <p>{caption}</p>
-            <div className={styles.canvasModeSwitch} role="tablist" aria-label="学习路径视图">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={view === "master"}
-                onClick={() => onViewChange("master")}
-                className={cn(view === "master" && styles.canvasModeActive)}
-              >
-                总路径
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={view === "subjects"}
-                onClick={() => onViewChange("subjects")}
-                className={cn(view === "subjects" && styles.canvasModeActive)}
-              >
-                科目路径
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <div className={`thin-scroll ${styles.canvasViewport}`}>
-          <div
-            className={styles.canvas}
-            style={{ transform: `scale(${zoom})` }}
-          >
-            {dashboard.stages.map((stage) => {
-              const status = flowStageStatus(stage, resolvedCurrentIndex);
-              const isCurrent = status === "current";
-              const isSelected = selectedStageIndex === stage.index;
-              const side = isCurrent || stage.index % 2 === 0 ? "left" : "right";
-              const stageCard = (
-                <article
-                  className={cn(
-                    styles.stageCard,
-                    side === "left" ? styles.cardLeft : styles.cardRight,
-                    status === "complete" && styles.cardComplete,
-                    status === "current" && styles.cardCurrent,
-                    status === "upcoming" && styles.cardUpcoming,
-                    isSelected && styles.cardSelected,
-                  )}
-                  aria-current={isCurrent ? "step" : undefined}
-                >
-                  <button
-                    type="button"
-                    className={styles.stageSelectButton}
-                    aria-expanded={isSelected}
-                    aria-controls={`stage-materials-${stage.index}`}
-                    onClick={() => setSelectedStageIndex((value) =>
-                      value === stage.index ? null : stage.index
-                    )}
-                  >
-                    <div className={styles.stageHeader}>
-                      <span className={styles.stageIndex}>
-                        {String(stage.index + 1).padStart(2, "0")}
-                      </span>
-                      <div className={styles.stageCopy}>
-                        <h3>{stage.title}</h3>
-                        <p>{stage.desc}</p>
-                      </div>
-                      <span className={styles.stageState}>
-                        {status === "complete"
-                          ? "已完成"
-                          : status === "current"
-                            ? "进行中"
-                            : "待学习"}
-                      </span>
-                    </div>
-                    <div className={styles.stageMeta}>
-                      <span><CalendarDays className="size-3.5" aria-hidden />{isCurrent ? "今天" : stage.day}</span>
-                      <span><ListChecks className="size-3.5" aria-hidden />{stage.taskCount} 项任务</span>
-                      <span><Clock3 className="size-3.5" aria-hidden />{stage.totalMinutes} 分钟</span>
-                    </div>
-                  </button>
-                  {isCurrent && (
-                    <Link href={firstActionHref} className={styles.stageAction}>
-                      继续今日学习
-                      <ChevronRight className="size-3.5" aria-hidden />
-                    </Link>
-                  )}
-                </article>
-              );
-
-              return (
-                <div
-                  key={`${stage.day}-${stage.index}`}
-                  className={cn(
-                    styles.stageRow,
-                    isCurrent && styles.activeRow,
-                    isSelected && styles.expandedRow,
-                  )}
-                >
-                  <div
-                    className={cn(
-                      styles.cardSlot,
-                      side === "left" ? styles.cardSlotLeft : styles.cardSlotRight,
-                    )}
-                  >
-                    {stageCard}
-                  </div>
-                  <div
-                    className={cn(
-                      styles.spine,
-                      status === "complete" && styles.spineComplete,
-                      status === "current" && styles.spineCurrent,
-                      status === "upcoming" && styles.spineUpcoming,
-                    )}
-                    aria-hidden
-                  >
-                    <span
-                      className={cn(
-                        styles.spineNode,
-                        status === "complete" && styles.nodeComplete,
-                        status === "current" && styles.nodeCurrent,
-                      )}
-                    />
-                    {isCurrent && <span className={styles.flowParticle} />}
-                  </div>
-                  {isSelected && selectedStagePlan && selectedStagePlan.tasks.length > 0 && (
-                    <div
-                      id={`stage-materials-${stage.index}`}
-                      className={cn(
-                        styles.branchSlot,
-                        side === "left" ? styles.branchSlotRight : styles.branchSlotLeft,
-                        status === "complete" && styles.branchSlotComplete,
-                        status === "upcoming" && styles.branchSlotUpcoming,
-                      )}
-                      aria-label={`${stage.title}学习资料`}
-                    >
-                      {selectedStagePlan.tasks.slice(0, 3).map((task) => (
-                        <FlowTaskNode
-                          key={`${pathId}-${task.key}`}
-                          task={task}
-                          resources={resources}
-                          onOpenResource={onOpenResource}
-                        />
-                      ))}
-                      <span className={styles.mergeNode} aria-hidden />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            <span className={styles.pathTerminus} aria-hidden>
-              <ArrowDown className="size-4" />
-            </span>
-          </div>
-          <div className={styles.canvasControls} aria-label="路径画布缩放">
-            <button
-              type="button"
-              aria-label="缩小路径画布"
-              onClick={() => setZoom((value) => Math.max(0.85, Number((value - 0.1).toFixed(2))))}
-            >
-              <ZoomOut className="size-3.5" aria-hidden />
-            </button>
-            <button
-              type="button"
-              aria-label="居中路径画布"
-              title={`${Math.round(zoom * 100)}%`}
-              onClick={() => setZoom(1)}
-            >
-              <LocateFixed className="size-3.5" aria-hidden />
-            </button>
-            <button
-              type="button"
-              aria-label="放大学习路径画布"
-              onClick={() => setZoom((value) => Math.min(1.15, Number((value + 0.1).toFixed(2))))}
-            >
-              <ZoomIn className="size-3.5" aria-hidden />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <aside
-        className={cn(styles.summaryRail, !summaryOpen && styles.summaryRailCollapsed)}
-        aria-label="路径摘要"
-      >
-        <button
-          type="button"
-          className={styles.summaryToggle}
-          onClick={() => setSummaryOpen((open) => !open)}
-          aria-expanded={summaryOpen}
-          aria-label={summaryOpen ? "收起路径摘要" : "展开路径摘要"}
-          title={summaryOpen ? "收起路径摘要" : "展开路径摘要"}
-        >
-          {summaryOpen
-            ? <PanelRightClose className="size-4" aria-hidden />
-            : <PanelRightOpen className="size-4" aria-hidden />}
-        </button>
-        {summaryOpen && (
-          <>
-            <section className={styles.summarySection}>
-              <h3>进度</h3>
-              <div className={styles.progressDial} aria-label={`已完成 ${completedStages}/${dashboard.stages.length} 个阶段`}>
-                <CircleGauge aria-hidden />
-                <strong>{completedStages}<small>/{dashboard.stages.length}</small></strong>
-              </div>
-            </section>
-            <section className={styles.summarySection}>
-              <h3>预计完成</h3>
-              <div className={styles.summaryValue}>
-                {dashboard.stages.at(-1)?.day ?? "—"}
-              </div>
-              <p className={styles.summaryCaption}>完成当前路径全部阶段</p>
-            </section>
-            <section className={styles.summarySection}>
-              <h3>图例说明</h3>
-              <div className={styles.legend}>
-                <span className={styles.legendComplete}><i />已完成</span>
-                <span className={styles.legendCurrent}><i />进行中</span>
-                <span className={styles.legendUpcoming}><i />待学习</span>
-              </div>
-              <p className={styles.branchLegend}>
-                <GitBranch className={`size-4 ${styles.branchLegendIcon}`} aria-hidden />
-                分支节点
-              </p>
-              <p className={styles.branchLegend}>
-                <GitMerge className={`size-4 ${styles.branchLegendIcon}`} aria-hidden />
-                合并节点
-              </p>
-            </section>
-          </>
-        )}
-      </aside>
-    </section>
-  );
-}
-
 export default function DesktopPath() {
   const {
     hydrated,
     mode,
     subjectPaths,
     masterPath,
-    masterPathScheduleAnchor,
     activateSubjectPath,
     pauseSubjectPath,
     resumeSubjectPath,
@@ -1278,8 +1007,8 @@ export default function DesktopPath() {
     deleteSubjectPath,
     resources,
     completedMaterials,
+    taskEvidence,
     watchedVideos,
-    recordTaskEvidence,
     running,
     requestLearningPath,
     requestSubjectPathSupplement,
@@ -1290,64 +1019,156 @@ export default function DesktopPath() {
     openLearningPathKnowledgeBase,
     cancelLearningPath,
     recordLearningPathClarification,
-  } = useOrchestratorContext();
+    recordTaskEvidence,
+  } = useOrchestratorContext((state) => ({
+    hydrated: state.hydrated,
+    mode: state.mode,
+    subjectPaths: state.subjectPaths,
+    masterPath: state.masterPath,
+    activateSubjectPath: state.activateSubjectPath,
+    pauseSubjectPath: state.pauseSubjectPath,
+    resumeSubjectPath: state.resumeSubjectPath,
+    replanSubjectPath: state.replanSubjectPath,
+    deleteSubjectPath: state.deleteSubjectPath,
+    resources: state.resources,
+    completedMaterials: state.completedMaterials,
+    taskEvidence: state.taskEvidence,
+    watchedVideos: state.watchedVideos,
+    running: state.running,
+    requestLearningPath: state.requestLearningPath,
+    requestSubjectPathSupplement: state.requestSubjectPathSupplement,
+    pendingLearningPath: state.pendingLearningPath,
+    continueLearningPath: state.continueLearningPath,
+    retryLearningPath: state.retryLearningPath,
+    editLearningPath: state.editLearningPath,
+    openLearningPathKnowledgeBase: state.openLearningPathKnowledgeBase,
+    cancelLearningPath: state.cancelLearningPath,
+    recordLearningPathClarification: state.recordLearningPathClarification,
+    recordTaskEvidence: state.recordTaskEvidence,
+  }));
+  const viewSwap = getDesktopViewSwap(Boolean(useReducedMotion()));
   const [openResource, setOpenResource] = useState<{
     item: ResourceItem;
     taskKey?: string;
   } | null>(null);
+  const [resourceViewerActivated, setResourceViewerActivated] = useState(false);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
-  const [view, setView] = useState<"master" | "subjects">("subjects");
-  const viewSwap = getDesktopViewSwap(Boolean(useReducedMotion()));
-  const [selectedSubjectId, setSelectedSubjectId] = useState("");
-  const [activationSubject, setActivationSubject] = useState<SubjectLearningPath | null>(null);
-  const [replanSubject, setReplanSubject] = useState<SubjectLearningPath | null>(null);
+  const [activeCourseId, setActiveCourseId] = useDesktopModuleStringState<string>("path", "ability.course", "");
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useDesktopModuleStringState<PathWorkspaceTab>(
+    "path",
+    "workspace.tab",
+    "overview",
+    PATH_WORKSPACE_TABS,
+  );
+  useAppFeatureNavigation("/desktop/path/", "tab", PATH_WORKSPACE_TABS, setActiveWorkspaceTab);
+  const [, setSelectedSubjectId] = useDesktopModuleStringState<string>(
+    "path",
+    "workspace.subject",
+    ""
+  );
   const [supplementSubject, setSupplementSubject] = useState<SubjectLearningPath | null>(null);
   const [deleteSubject, setDeleteSubject] = useState<SubjectLearningPath | null>(null);
-  const selectedSubject = subjectPaths.find((subject) => subject.id === selectedSubjectId)
-    ?? subjectPaths[0];
-  const displayPath = view === "master" ? masterPath : selectedSubject?.path ?? [];
-  const displayAnchor = view === "master"
-    ? masterPathScheduleAnchor
-    : selectedSubject?.activationDate || defaultActivationDate();
-  const dashboard = buildPathDashboardPlan(displayPath, completedMaterials, {
-    anchorDate: displayAnchor,
-  });
+  const [workspaceSummary, setWorkspaceSummary] = useState<LearningPathWorkspaceSummary>(
+    () => emptyLearningPathWorkspaceSummary(),
+  );
+  const refreshWorkspaceSummary = useCallback(() => {
+    if (mode !== "live") {
+      setWorkspaceSummary(emptyLearningPathWorkspaceSummary());
+      return;
+    }
+    getLearningPathWorkspaceSummary()
+      .then(setWorkspaceSummary)
+      .catch(() => setWorkspaceSummary(emptyLearningPathWorkspaceSummary()));
+  }, [mode]);
+
+  useEffect(() => {
+    if (hydrated) refreshWorkspaceSummary();
+  }, [hydrated, refreshWorkspaceSummary]);
+
+  const appliedCourseQuery = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    const requested = new URLSearchParams(window.location.search).get("course");
+    if (requested && requested !== appliedCourseQuery.current && subjectPaths.some((subject) => subject.id === requested)) {
+      appliedCourseQuery.current = requested;
+      setActiveCourseId(requested);
+    }
+  }, [hydrated, subjectPaths, setActiveCourseId]);
+
+  const abilityCourses = useMemo<AbilityCourse[]>(() => abilityCoursesFromSubjects(subjectPaths, masterPath).map((course) => ({ ...course, title: learningSubjectName(course.title) })), [subjectPaths, masterPath]);
+  const plannedCourses = activeCourseId ? abilityCourses.filter((course) => course.id === activeCourseId) : abilityCourses.filter((course) => !course.paused);
+  const displayPath = plannedCourses.flatMap((course) => course.path);
+  const abilityTree = buildAbilityTree(plannedCourses, completedMaterials, taskEvidence);
+  const currentAbilityIndex = abilityTree.nodes.findIndex((node) => node.id === abilityTree.currentId);
+  const view = activeCourseId || "master";
+  const dashboard = buildPathDashboardPlan(displayPath, completedMaterials, { currentIndex: currentAbilityIndex });
+  const todayQueue = buildAbilityTodayQueue(abilityTree, plannedCourses.reduce((sum, course) => sum + (course.dailyMinutes || 60), 0));
+  if (dashboard.today) {
+    const tasks = todayQueue.entries.map((entry) => ({ ...entry.task, minutes: entry.minutes }));
+    dashboard.today.plan = { ...dashboard.today.plan, tasks, totalMinutes: todayQueue.plannedMinutes, taskCount: tasks.length, completedTaskCount: 0, progressLabel: `0/${tasks.length}` };
+  }
   const openSubject = (subject: SubjectLearningPath) => {
     setSelectedSubjectId(subject.id);
-    setView("subjects");
+    setActiveCourseId(subject.id);
   };
-  const selectedSubjectName = learningSubjectName(
-    selectedSubject?.title || selectedSubject?.requestSummary,
-  );
-  const flowTitle = view === "master"
-    ? "总学习路径"
-    : `${selectedSubjectName} · 学习路径`;
-  const flowCaption = view === "master"
-    ? "各科目学习阶段按日期统筹，支线卡片是当前阶段需要完成的真实学习任务。"
-    : `系统梳理${selectedSubjectName}的核心知识与方法 · ${selectedSubject?.path.length ?? 0} 个阶段`;
-  const subjectPathPanel = (
-    <SubjectPathPanel
-      compact
-      subjects={subjectPaths}
-      selectedId={selectedSubject?.id}
-      onSelect={openSubject}
-      onSchedule={setActivationSubject}
-      onPause={pauseSubjectPath}
-      onResume={resumeSubjectPath}
-      onReplan={setReplanSubject}
-      onSupplement={setSupplementSubject}
-      onDelete={setDeleteSubject}
-      onGenerate={() => setRequestDialogOpen(true)}
-    />
-  );
-
   return (
-    <div className={cn("desktop-book-page thin-scroll h-full overflow-y-auto", styles.page)}>
-      <div className={cn("desktop-book-page__frame mx-auto", styles.frame)}>
+    <div className={styles.page}>
+      <div className={styles.frame}>
+        <header className={styles.pathTopbar}>
+          <div className={styles.pathTopbarTitle}>
+            <h1>学习路径</h1>
+            <span aria-hidden>学</span>
+          </div>
+          <nav className={styles.pathTopbarNav} aria-label="学习路径页面导航">
+            <button
+              type="button"
+              aria-pressed={activeWorkspaceTab === "overview"}
+              className={activeWorkspaceTab === "overview" ? styles.pathTopbarActive : undefined}
+              onClick={() => setActiveWorkspaceTab("overview")}
+            >
+              路径总览
+            </button>
+            <button
+              type="button"
+              aria-pressed={activeWorkspaceTab === "courses"}
+              className={activeWorkspaceTab === "courses" ? styles.pathTopbarActive : undefined}
+              onClick={() => setActiveWorkspaceTab("courses")}
+            >
+              课程管理<span className={styles.pathNavCount}>{subjectPaths.length}</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={activeWorkspaceTab === "plan"}
+              className={activeWorkspaceTab === "plan" ? styles.pathTopbarActive : undefined}
+              onClick={() => setActiveWorkspaceTab("plan")}
+            >
+              学习计划{dashboard.today?.plan.taskCount ? <span className={styles.pathNavCount}>{dashboard.today.plan.taskCount}</span> : null}
+            </button>
+            <Link href="/path/assessment">
+              考试测评
+            </Link>
+          </nav>
+          <div className={styles.pathTopbarTools}>
+            <details className={styles.pathNoticeMenu}>
+              <summary aria-label="查看通知"><Bell className="size-[18px]" aria-hidden /></summary>
+              <div><strong>学习提醒</strong><p>完成今日任务后，路径进度会自动更新。</p></div>
+            </details>
+            <TeacherOpenButton
+              context={{
+                module: "path",
+                title: "学习路径",
+                detail: "围绕当前学习路径、课程编排与学习计划提问。",
+              }}
+              aria-label="打开智能教师消息"
+            >
+              <Mail className="size-[18px]" aria-hidden />
+            </TeacherOpenButton>
+          </div>
+        </header>
 
         {pendingLearningPath?.stage === "planning" && !pendingLearningPath.error && (
           <div
-            className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/20 bg-primary/[0.05] px-4 py-3 text-sm"
+            className={styles.planningNotice}
             role="status"
             aria-live="polite"
           >
@@ -1360,96 +1181,61 @@ export default function DesktopPath() {
         )}
 
         {!hydrated ? (
-          <div className="rounded-2xl border border-dashed px-5 py-16 text-center text-sm text-muted-foreground">
+          <div className={styles.pathLoading}>
             正在恢复学习路径…
           </div>
         ) : (
-          /* 视图切换只包这一层最外层容器：列表项很多，逐项 motion 会明显掉帧 */
           <AnimatePresence mode="wait" initial={false}>
-            <motion.div key={view} {...viewSwap} className="space-y-4">
-              {displayPath.length > 0 ? (
-                <>
-                  <div className={styles.pathWorkspace}>
-                    <aside className={styles.subjectSidebar} aria-label="科目学习路径管理">
-                      {subjectPathPanel}
-                    </aside>
-                    <LearningPathFlowCanvas
-                      dashboard={dashboard}
-                      pathSteps={displayPath}
-                      completedKeys={completedMaterials}
-                      title={flowTitle}
-                      caption={flowCaption}
-                      pathId={view === "master" ? "master" : selectedSubject?.id ?? "master"}
-                      view={view}
-                      onViewChange={setView}
-                      resources={resources}
-                      onOpenResource={(item, taskKey) => setOpenResource({ item, taskKey })}
-                    />
-                  </div>
-                  {dashboard.today && (
-                    <details className={styles.taskDetails}>
-                      <summary>展开今日任务详情与学习产出</summary>
-                      <TodayActionPanel
-                        step={dashboard.today.step}
-                        pathId={view === "master" ? "master" : selectedSubject?.id ?? "master"}
-                        index={dashboard.today.index}
-                        total={displayPath.length}
-                        plan={dashboard.today.plan}
-                        resources={resources}
-                        onRecordEvidence={(key, content) => recordTaskEvidence(key, content, "written_response")}
-                        onOpenResource={(item, taskKey) => setOpenResource({ item, taskKey })}
-                      />
-                    </details>
-                  )}
-                </>
+            <motion.div key={`${activeWorkspaceTab}:${view}`} {...viewSwap} className={styles.pathBody}>
+              {activeWorkspaceTab === "courses" ? (
+                <CourseManagementWorkspace
+                  subjects={subjectPaths}
+                  watchedVideoCount={watchedVideos.length}
+                  onView={(subject) => {
+                    openSubject(subject);
+                    setActiveWorkspaceTab("overview");
+                  }}
+                  onActivate={(subjectId) => activateSubjectPath(subjectId, defaultActivationDate())}
+                  onPause={pauseSubjectPath}
+                  onResume={resumeSubjectPath}
+                  onSupplement={setSupplementSubject}
+                  onDelete={setDeleteSubject}
+                  onGenerate={() => setRequestDialogOpen(true)}
+                />
+              ) : activeWorkspaceTab === "plan" ? (
+                <LearningPlanWorkspace
+                  dashboard={dashboard}
+                  path={displayPath}
+                  pathId={activeCourseId || "master"}
+                  subjects={subjectPaths}
+                  resources={resources}
+                  summary={workspaceSummary}
+                  mode={mode}
+                  onRecordEvidence={(key, content) => recordTaskEvidence(key, content, "written_response")}
+                  onOpenResource={(item, taskKey) => {
+                    setResourceViewerActivated(true);
+                    setOpenResource({ item, taskKey });
+                  }}
+                  onReplan={replanSubjectPath}
+                  onSummaryChanged={refreshWorkspaceSummary}
+                />
               ) : (
-                <div className={styles.pathWorkspace}>
-                  <aside className={styles.subjectSidebar} aria-label="科目学习路径管理">
-                    {subjectPathPanel}
-                  </aside>
-                  <div className={styles.emptyState}>
-                    <DesktopEmptyState
-                      icon={Route}
-                      title={subjectPaths.length > 0 ? "总学习路径尚未启用" : "还没有科目学习路径"}
-                      desc={subjectPaths.length > 0 ? "请在左侧为待启用科目设置日期；启用后，系统会把多个科目的每日任务统一排入这里。" : "点击左侧「生成科目路径」，完成生成后再设置启用时间。"}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {watchedVideos.length > 0 && (
-                <div className={styles.management}>
-                  <section className="rounded-xl border bg-card p-4">
-                    <div className="flex items-center gap-1.5">
-                      <PlayCircle className="size-4 text-primary" />
-                      <h2 className="text-sm font-semibold">视频学习记录</h2>
-                      <span className="ml-auto text-xs text-muted-foreground">{watchedVideos.length} 个</span>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {watchedVideos.slice(0, 3).map((video) => (
-                        <div key={video.bvid} className="rounded-lg border bg-surface-2/40 p-3">
-                          <div className="truncate text-xs font-semibold">{video.title}</div>
-                          <NextLink href="/desktop/video-learning" className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
-                            回到内置播放器
-                          </NextLink>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                </div>
+                <FocusWorkspace onLegacy={() => setActiveWorkspaceTab("courses")}
+                  existingCourses={abilityCourses.map(course => ({ title: course.title, goal: `掌握${course.title}的核心知识并能够独立完成练习。`, outline: course.path.map(step => `${step.title}\n${step.objective || ""}`).join("\n\n") }))}
+                />
               )}
             </motion.div>
           </AnimatePresence>
         )}
       </div>
-      <ResourceViewer
-        item={openResource?.item ?? null}
-        taskKey={openResource?.taskKey}
-        onClose={() => setOpenResource(null)}
-      />
+      {resourceViewerActivated ? (
+        <ResourceViewer
+          item={openResource?.item ?? null}
+          taskKey={openResource?.taskKey}
+          onClose={() => setOpenResource(null)}
+        />
+      ) : null}
       <LearningPathRequestDialog disabled={running || mode !== "live"} open={requestDialogOpen} onClose={() => setRequestDialogOpen(false)} onSubmit={requestLearningPath} />
-      <SubjectActivationDialog subject={activationSubject} onClose={() => setActivationSubject(null)} onConfirm={activateSubjectPath} />
-      <SubjectReplanDialog subject={replanSubject} onClose={() => setReplanSubject(null)} onConfirm={replanSubjectPath} />
       <SubjectSupplementDialog subject={supplementSubject} disabled={running || mode !== "live"} onClose={() => setSupplementSubject(null)} onConfirm={requestSubjectPathSupplement} />
       <SubjectDeleteDialog subject={deleteSubject} onClose={() => setDeleteSubject(null)} onConfirm={deleteSubjectPath} />
       {pendingLearningPath?.request &&

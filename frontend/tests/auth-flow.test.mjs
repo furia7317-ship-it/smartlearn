@@ -19,14 +19,16 @@ test("root shell keeps marketing public and guards application routes with the a
   assert.match(shell, /user\.onboarding_completed/);
 });
 
-test("login and first-use onboarding route directly into the desktop app", async () => {
+test("login and onboarding enter the student desktop without role selection", async () => {
   const [login, onboarding, majorCatalog] = await Promise.all([
     readFile(new URL("../app/login/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/major-catalog-combobox.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(login, /router\.replace\("\/desktop"\)/);
+  assert.match(login, /signedIn\.onboarding_completed \? "\/desktop" : "\/onboarding"/);
+  assert.doesNotMatch(login, /account-role|教师登录|教师账户|TEACHER_DEMO_ACCOUNT/);
+  assert.doesNotMatch(onboarding, /ClassJoin|加入班级/);
   assert.match(onboarding, /router\.replace\("\/desktop"\)/);
   assert.doesNotMatch(login, /\/mobile|\/choose-platform/);
   assert.doesNotMatch(onboarding, /\/mobile|\/choose-platform/);
@@ -56,6 +58,33 @@ test("account endpoints always send the HttpOnly session cookie", async () => {
   assert.doesNotMatch(auth, /localStorage.*password|password.*localStorage/);
 });
 
+test("account recovery is bounded and retries after the local service returns", async () => {
+  const [provider, auth] = await Promise.all([
+    readFile(new URL("../components/auth-provider.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/auth.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(auth, /AUTH_REQUEST_TIMEOUT_MS\s*=\s*8_000/);
+  assert.match(auth, /controller\.abort\(\)/);
+  assert.match(provider, /if \(!serviceError \|\| isLocallySignedOut\(\)\) return/);
+  assert.match(provider, /window\.setInterval\(retry, 2_500\)/);
+  assert.match(provider, /window\.addEventListener\("online", retry\)/);
+  assert.match(provider, /document\.addEventListener\("visibilitychange", retry\)/);
+});
+
+test("logout clears local identity immediately and cannot be undone by a stale cookie", async () => {
+  const [provider, auth] = await Promise.all([
+    readFile(new URL("../components/auth-provider.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/auth.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(provider, /LOCALLY_SIGNED_OUT_KEY/);
+  assert.match(provider, /setLocallySignedOut\(true\)[\s\S]*setUser\(null\)[\s\S]*await logoutAccount/);
+  assert.match(provider, /if \(isLocallySignedOut\(\)\)/);
+  assert.match(auth, /logoutAccount\(signal\?: AbortSignal\)/);
+  assert.match(auth, /keepalive: true/);
+});
+
 test("web shell exposes a real logout action that clears auth and returns to marketing", async () => {
   const [shell, provider] = await Promise.all([
     readFile(new URL("../components/layout/app-shell.tsx", import.meta.url), "utf8"),
@@ -64,9 +93,9 @@ test("web shell exposes a real logout action that clears auth and returns to mar
 
   assert.match(shell, /function LogoutButton/);
   assert.match(shell, /await logout\(\)/);
-  assert.match(shell, /window\.location\.assign\("\/"\)/);
+  assert.match(shell, /router\.replace\("\/"\)/);
   assert.match(shell, /退出 Web 登录/);
-  assert.match(provider, /await logoutAccount\(\)/);
+  assert.match(provider, /await logoutAccount\(/);
   assert.match(provider, /clearAuthenticatedStudentId\(\)/);
   assert.match(provider, /setUser\(null\)/);
 });

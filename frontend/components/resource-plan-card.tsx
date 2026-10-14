@@ -121,6 +121,7 @@ export function ResourcePlanCard({
               </span>
             </div>
             <h3 className="mt-2 text-base font-semibold">{draft.request_summary}</h3>
+            {draft.collaboration && <p className="mt-2 text-xs text-muted-foreground">协作强度：{({ auto: "自动", fast: "快速", standard: "标准", deep: "深度", rigorous: "严谨" } as Record<string, string>)[draft.collaboration.effort] ?? "标准"} · {draft.collaboration.sources.web ? "允许联网补充" : "联网补充关闭"}</p>}
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               先确认每天学什么和每份资料的大纲，再让资料智能体并行生成。
             </p>

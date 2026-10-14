@@ -6,10 +6,13 @@ const graph = await readFile(new URL("../components/desktop/knowledge-mastery-gr
 const bookshelf = await readFile(new URL("../components/desktop/desktop-bookshelf.tsx", import.meta.url), "utf8");
 const styles = await readFile(new URL("../components/desktop/knowledge-graph.module.css", import.meta.url), "utf8");
 
-test("mastery graph renders grouped curriculum relationships and AI evidence", () => {
-  assert.match(graph, /DATA_STRUCTURE_GROUPS/);
-  assert.match(graph, /strength: "strong"/);
-  assert.match(graph, /判断置信度/);
+test("mastery graph separates knowledge scores from profile dimensions and teacher advice", () => {
+  assert.match(graph, /buildKnowledgeMastery/);
+  assert.match(graph, /LearningProfileRadar/);
+  assert.match(graph, /教师判断/);
+  assert.match(graph, /目前掌握度/);
+  assert.match(graph, /现阶段学习建议/);
+  assert.doesNotMatch(graph, /subjectChip|判断置信度|DATA_STRUCTURE_GROUPS/);
   assert.match(graph, /当前薄弱点/);
   assert.match(graph, /近 30 天/);
 });

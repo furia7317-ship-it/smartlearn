@@ -115,94 +115,55 @@ function statusOf(node: MindmapNode) {
 }
 
 function buildLayout(nodes: MindmapNode[], expanded: Set<string>) {
-  const branchEntries = nodes.map((node, index) => ({
-    key: nodeKey(node, [index]),
-    node,
-    index,
-  }));
-  const left = branchEntries.filter((_, index) => index % 2 === 0);
-  const right = branchEntries.filter((_, index) => index % 2 === 1);
-  const maxSide = Math.max(left.length, right.length, 1);
-  const canvasHeight = Math.max(MIN_CANVAS_HEIGHT, maxSide * 214 + 120);
-  const rootX = (CANVAS_WIDTH - ROOT_WIDTH) / 2;
+  const flat = flattenMindmapNodes(nodes);
+  const maxDepth = Math.max(1, ...flat.map((item) => item.depth));
+  const canvasWidth = CANVAS_WIDTH + Math.max(0, maxDepth - 1) * 460;
+  const gap = 22;
+  const heightOf = (node: MindmapNode, path: number[], depth: number): number => {
+    const children = expanded.has(nodeKey(node, path)) ? childrenOf(node) : [];
+    const ownHeight = depth === 0 ? BRANCH_HEIGHT : CHILD_HEIGHT;
+    return Math.max(ownHeight, children.reduce((sum, child, index) =>
+      sum + heightOf(child, [...path, index], depth + 1), 0) + Math.max(0, children.length - 1) * gap);
+  };
+  const entries = nodes.map((node, index) => ({ node, index, height: heightOf(node, [index], 0) }));
+  const sides = [entries.filter((entry) => entry.index % 2 === 0), entries.filter((entry) => entry.index % 2 === 1)];
+  const sideHeight = (items: typeof entries) => items.reduce((sum, item) => sum + item.height, 0) + Math.max(0, items.length - 1) * 40;
+  const canvasHeight = Math.max(MIN_CANVAS_HEIGHT, ...sides.map((items) => sideHeight(items) + 100));
+  const rootX = (canvasWidth - ROOT_WIDTH) / 2;
   const rootY = (canvasHeight - ROOT_HEIGHT) / 2;
   const positioned: PositionedNode[] = [];
   const connectors: Connector[] = [];
 
-  const placeSide = (entries: typeof branchEntries, side: "left" | "right") => {
-    const slotHeight = canvasHeight / Math.max(entries.length, 1);
-    entries.forEach((entry, sideIndex) => {
-      const palette = BRANCH_PALETTE[entry.index % BRANCH_PALETTE.length];
-      const centerY = slotHeight * (sideIndex + 0.5);
-      const branchX = side === "left" ? 288 : 690;
-      const branchY = centerY - BRANCH_HEIGHT / 2;
-      positioned.push({
-        key: entry.key,
-        node: entry.node,
-        depth: 0,
-        parentKey: null,
-        parentLabel: null,
-        x: branchX,
-        y: branchY,
-        width: BRANCH_WIDTH,
-        height: BRANCH_HEIGHT,
-        branchIndex: entry.index,
-        side,
-        kind: "branch",
-      });
-
-      const rootAnchorX = side === "left" ? rootX : rootX + ROOT_WIDTH;
-      const branchAnchorX = side === "left" ? branchX + BRANCH_WIDTH : branchX;
-      const rootCenterY = rootY + ROOT_HEIGHT / 2;
-      const branchCenterY = branchY + BRANCH_HEIGHT / 2;
-      const bend = (rootAnchorX + branchAnchorX) / 2;
-      connectors.push({
-        key: `root-${entry.key}`,
-        path: `M ${rootAnchorX} ${rootCenterY} C ${bend} ${rootCenterY}, ${bend} ${branchCenterY}, ${branchAnchorX} ${branchCenterY}`,
-        color: palette.line,
-        width: 5,
-      });
-
-      if (!expanded.has(entry.key)) return;
-      const children = childrenOf(entry.node).slice(0, 4);
-      const childGap = 9;
-      const totalChildrenHeight = children.length * CHILD_HEIGHT + Math.max(0, children.length - 1) * childGap;
-      const childStartY = centerY - totalChildrenHeight / 2;
-      children.forEach((child, childIndex) => {
-        const key = nodeKey(child, [entry.index, childIndex]);
-        const childX = side === "left" ? 40 : 962;
-        const childY = childStartY + childIndex * (CHILD_HEIGHT + childGap);
-        positioned.push({
-          key,
-          node: child,
-          depth: 1,
-          parentKey: entry.key,
-          parentLabel: entry.node.label,
-          x: childX,
-          y: childY,
-          width: CHILD_WIDTH,
-          height: CHILD_HEIGHT,
-          branchIndex: entry.index,
-          side,
-          kind: "child",
-        });
-        const parentAnchorX = side === "left" ? branchX : branchX + BRANCH_WIDTH;
-        const childAnchorX = side === "left" ? childX + CHILD_WIDTH : childX;
-        const childCenterY = childY + CHILD_HEIGHT / 2;
-        const childBend = (parentAnchorX + childAnchorX) / 2;
-        connectors.push({
-          key: `${entry.key}-${key}`,
-          path: `M ${parentAnchorX} ${branchCenterY} C ${childBend} ${branchCenterY}, ${childBend} ${childCenterY}, ${childAnchorX} ${childCenterY}`,
-          color: palette.line,
-          width: 2.5,
-        });
-      });
+  const place = (node: MindmapNode, path: number[], depth: number, top: number, side: "left" | "right", branchIndex: number, parent: PositionedNode | null) => {
+    const key = nodeKey(node, path);
+    const width = depth === 0 ? BRANCH_WIDTH : CHILD_WIDTH;
+    const height = depth === 0 ? BRANCH_HEIGHT : CHILD_HEIGHT;
+    const x = side === "left" ? rootX - 60 - width - depth * 230 : rootX + ROOT_WIDTH + 60 + depth * 230;
+    const y = top + (heightOf(node, path, depth) - height) / 2;
+    const item: PositionedNode = {key, node, depth, parentKey: parent?.key ?? null, parentLabel: parent?.node.label ?? null, x, y, width, height, branchIndex, side, kind: depth === 0 ? "branch" : "child"};
+    positioned.push(item);
+    const fromX = parent ? (side === "left" ? parent.x : parent.x + parent.width) : (side === "left" ? rootX : rootX + ROOT_WIDTH);
+    const fromY = parent ? parent.y + parent.height / 2 : rootY + ROOT_HEIGHT / 2;
+    const toX = side === "left" ? x + width : x;
+    const toY = y + height / 2;
+    const bend = (fromX + toX) / 2;
+    connectors.push({ key: `${parent?.key ?? "root"}-${key}`, path: `M ${fromX} ${fromY} C ${bend} ${fromY}, ${bend} ${toY}, ${toX} ${toY}`, color: BRANCH_PALETTE[branchIndex % BRANCH_PALETTE.length].line, width: depth === 0 ? 5 : 2.5 });
+    if (!expanded.has(key)) return;
+    let childTop = top;
+    childrenOf(node).forEach((child, index) => {
+      const childPath = [...path, index];
+      place(child, childPath, depth + 1, childTop, side, branchIndex, item);
+      childTop += heightOf(child, childPath, depth + 1) + gap;
     });
   };
-
-  placeSide(left, "left");
-  placeSide(right, "right");
-  return { canvasHeight, rootX, rootY, positioned, connectors };
+  sides.forEach((items, sideIndex) => {
+    let top = (canvasHeight - sideHeight(items)) / 2;
+    items.forEach((entry) => {
+      place(entry.node, [entry.index], 0, top, sideIndex === 0 ? "left" : "right", entry.index, null);
+      top += entry.height + 40;
+    });
+  });
+  return { canvasWidth, canvasHeight, rootX, rootY, positioned, connectors };
 }
 
 function MapNodeCard({
@@ -291,7 +252,7 @@ export function MindmapWorkspace({
   const workspaceRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const flatNodes = useMemo(() => flattenMindmapNodes(nodes), [nodes]);
-  const branchKeys = useMemo(() => new Set(nodes.map((node, index) => nodeKey(node, [index]))), [nodes]);
+  const branchKeys = useMemo(() => new Set(flatNodes.filter((item) => childrenOf(item.node).length > 0).map((item) => item.key)), [flatNodes]);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(branchKeys));
   const [selectedKey, setSelectedKey] = useState<string>(() => flatNodes[0]?.key ?? "root");
   const [query, setQuery] = useState("");
@@ -310,9 +271,10 @@ export function MindmapWorkspace({
   );
   const allExpanded = branchKeys.size > 0 && [...branchKeys].every((key) => expanded.has(key));
 
-  const setZoomSafe = (value: number) => setZoom(Math.max(60, Math.min(140, value)));
+  const setZoomSafe = (value: number) => setZoom(Math.max(25, Math.min(140, value)));
   const resetView = () => {
-    setZoom(90);
+    const viewport = scrollerRef.current;
+    setZoom(Math.max(25, Math.min(100, Math.floor(Math.min((viewport?.clientWidth ?? CANVAS_WIDTH) / layout.canvasWidth, (viewport?.clientHeight ?? MIN_CANVAS_HEIGHT) / layout.canvasHeight) * 95))));
     requestAnimationFrame(() => {
       const scroller = scrollerRef.current;
       if (!scroller) return;
@@ -331,7 +293,15 @@ export function MindmapWorkspace({
     const match = flatNodes.find((entry) => entry.node.label.toLocaleLowerCase("zh-CN").includes(normalized));
     if (!match) return;
     setSelectedKey(match.key);
-    if (match.parentKey) setExpanded((current) => new Set(current).add(match.parentKey!));
+    if (match.parentKey) setExpanded((current) => {
+      const next = new Set(current);
+      let ancestor = match.parentKey;
+      while (ancestor) {
+        next.add(ancestor);
+        ancestor = flatNodes.find((item) => item.key === ancestor)?.parentKey ?? null;
+      }
+      return next;
+    });
   };
 
   const toggleExpanded = (key: string) => {
@@ -419,13 +389,13 @@ export function MindmapWorkspace({
             <div
               className="relative mx-auto origin-center transition-transform duration-150"
               style={{
-                width: CANVAS_WIDTH,
+                width: layout.canvasWidth,
                 height: layout.canvasHeight,
                 transform: `scale(${zoom / 100})`,
                 marginBlock: `${Math.max(20, (layout.canvasHeight * (zoom / 100 - 1)) / 2 + 20)}px`,
               }}
             >
-              <svg aria-hidden="true" className="pointer-events-none absolute inset-0 size-full" viewBox={`0 0 ${CANVAS_WIDTH} ${layout.canvasHeight}`} fill="none">
+              <svg aria-hidden="true" className="pointer-events-none absolute inset-0 size-full" viewBox={`0 0 ${layout.canvasWidth} ${layout.canvasHeight}`} fill="none">
                 {layout.connectors.map((connector) => (
                   <path key={connector.key} d={connector.path} stroke={connector.color} strokeWidth={connector.width} strokeLinecap="round" opacity="0.84" />
                 ))}
@@ -454,7 +424,7 @@ export function MindmapWorkspace({
                   highlighted={highlightedKeys.has(item.key)}
                   expanded={expanded.has(item.key)}
                   onSelect={() => setSelectedKey(item.key)}
-                  onToggle={() => toggleExpanded(item.parentKey ?? item.key)}
+                  onToggle={() => toggleExpanded(item.key)}
                 />
               ))}
 

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, ChevronLeft, ChevronRight, GraduationCap, LoaderCircle } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth-provider";
@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { AuthRequestError, type MajorCatalogEntry, type MajorLevel } from "@/lib/auth";
 import { DEFAULT_GRADE, GRADES, isUndergraduateGrade, normalizeGrade } from "@/lib/user-settings";
 import { cn } from "@/lib/utils";
+import { WelcomeHandbook } from "@/components/welcome/welcome-handbook";
+import styles from "./onboarding.module.css";
 
 const PREFERENCES = [
   { id: "图示讲解", detail: "用结构图和动画理解概念" },
@@ -27,6 +29,7 @@ export default function OnboardingPage() {
   const reduceMotion = useReducedMotion();
   const { user, completeOnboarding } = useAuth();
   const [step, setStep] = useState(0);
+  const [readingHandbook, setReadingHandbook] = useState(true);
   const [direction, setDirection] = useState(1);
   const [grade, setGrade] = useState(normalizeGrade(user?.grade || DEFAULT_GRADE));
   const [selectedMajor, setSelectedMajor] = useState<MajorCatalogEntry | null>(null);
@@ -101,37 +104,29 @@ export default function OnboardingPage() {
   };
 
   return (
-    <main className="relative grid min-h-dvh place-items-center overflow-hidden bg-[#f5efe3] px-4 py-8 text-[#2d261b]">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[#8b5b18]" />
-      <motion.section
-        initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-[760px]"
+    <main className={styles.scene}>
+      <AnimatePresence mode="wait" initial={false}>
+      <motion.div key={readingHandbook ? "handbook" : "profile"}
+        initial={reduceMotion ? false : { opacity: 0, y: 24, filter: "blur(4px)" }}
+        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+        exit={reduceMotion ? undefined : { opacity: 0, y: -16, filter: "blur(3px)" }}
+        transition={{ duration: reduceMotion ? 0 : .45, ease: [.22, 1, .36, 1] }}
+        className={styles.stage}
+      >
+      {readingHandbook ? <WelcomeHandbook onContinue={() => setReadingHandbook(false)} /> : <section
+        className={styles.setup}
         aria-labelledby="onboarding-title"
       >
-        <header className="mb-5 flex items-center gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-[#3a2b17] text-[#fffaf0]">
-            <GraduationCap className="size-5" aria-hidden />
-          </div>
-          <div className="min-w-0">
-            <h1 id="onboarding-title" className="text-xl font-semibold tracking-normal">建立你的学习档案</h1>
-            <p className="mt-0.5 text-sm text-[#756a59]">这些信息会用于规划课程节奏和学习内容</p>
-          </div>
-          <span className="ml-auto font-mono text-xs text-[#756a59]">{step + 1} / {STEPS.length}</span>
-        </header>
-
-        <div className="mb-3 grid grid-cols-3 gap-2" aria-label="设置进度">
-          {STEPS.map((label, index) => (
-            <div key={label} className="min-w-0">
-              <div className={cn("h-1 rounded-full transition-colors duration-300", index <= step ? "bg-[#8b5b18]" : "bg-[#d8cbb7]")} />
-              <span className={cn("mt-1.5 block truncate text-xs", index === step ? "font-medium text-[#3a2b17]" : "text-[#8a7c67]")}>{label}</span>
-            </div>
-          ))}
-        </div>
-
-        <form onSubmit={submit} className="overflow-hidden rounded-lg border border-[#d8cbb7] bg-[#fffdf8] shadow-[0_18px_55px_rgba(58,43,23,0.09)]">
-          <div className="min-h-[390px] p-5 sm:p-7">
+        <header className={styles.header}><div><span>学枢 · 新生入学</span><h1 id="onboarding-title">建立你的学习档案</h1></div><button type="button" onClick={() => setReadingHandbook(true)}>重看入门手册 <span aria-hidden>↗</span></button></header>
+        <div className={styles.setupFrame}>
+          <aside className={styles.journey}>
+            <p className={styles.eyebrow}>认识你，是教好你的第一步</p><h2>从你的起点，<br />走向你的目标。</h2>
+            <p>花一点时间，让智能教师了解你的学习阶段与习惯，为接下来的学习找到合适的节奏。</p>
+            <ol aria-label="设置进度">{STEPS.map((label, index) => <li key={label} data-active={index === step} data-complete={index < step} aria-current={index === step ? "step" : undefined}><span>{index < step ? "✓" : String(index + 1).padStart(2, "0")}</span><div><strong>{label}</strong><small>{["了解目前的学习基础", "找到适合你的学习方式", "明确下一步想做到的事", "邀请码或查找教师已建立的班级"][index]}</small></div></li>)}</ol>
+            <p className={styles.journeyNote}>这些选择都可以在设置中修改。<br />你的学习画像，会随着真实学习逐步完善。</p>
+          </aside>
+        <form onSubmit={submit} className={styles.form}>
+          <div className={styles.formBody}>
             <AnimatePresence mode="wait" custom={direction} initial={false}>
               <motion.div
                 key={step}
@@ -242,7 +237,7 @@ export default function OnboardingPage() {
             </AnimatePresence>
           </div>
 
-          <footer className="flex min-h-16 items-center gap-3 border-t border-[#e2d7c6] bg-[#fbf7ef] px-5 py-3 sm:px-7">
+          <footer className={styles.formFooter}>
             <div className="min-w-0 flex-1">
               {error && <p role="alert" className="text-xs text-[#983f3d]">{error}</p>}
             </div>
@@ -251,13 +246,17 @@ export default function OnboardingPage() {
                 <ChevronLeft className="size-4" aria-hidden />返回
               </Button>
             )}
-            <Button type="submit" disabled={saving || !stepReady} className="min-w-24 bg-[#3a2b17] text-[#fffaf0] hover:bg-[#4a371d]">
+            <Button type="submit" disabled={saving || !stepReady} className={styles.next}>
               {saving ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : step === STEPS.length - 1 ? <Check className="size-4" aria-hidden /> : null}
               {saving ? "保存中" : step === STEPS.length - 1 ? "完成设置" : <>继续<ChevronRight className="size-4" aria-hidden /></>}
             </Button>
           </footer>
         </form>
-      </motion.section>
+        </div>
+        <p className={styles.setupNote}>入门手册 <span>—</span> 学习档案 <span>—</span> 认识书房 <span>—</span> 开始学习</p>
+      </section>}
+      </motion.div>
+      </AnimatePresence>
     </main>
   );
 }

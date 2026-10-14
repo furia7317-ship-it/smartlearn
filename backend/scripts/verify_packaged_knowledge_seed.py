@@ -7,7 +7,6 @@ import os
 import sys
 from pathlib import Path
 
-
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
@@ -17,19 +16,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--knowledge-dir", required=True)
     parser.add_argument("--seed-dir", required=True)
-    parser.add_argument("--embedding-model", required=True)
+    parser.add_argument("--embedding-model", default="Qwen/Qwen3-VL-Embedding-8B")
     args = parser.parse_args()
     os.environ.update(
         {
             "KNOWLEDGE_DIR": str(Path(args.knowledge_dir).resolve()),
             "CHROMA_PERSIST_DIR": str(Path(args.seed_dir).resolve()),
-            "EMBEDDING_MODEL": str(Path(args.embedding_model).resolve()),
-            "HF_HUB_OFFLINE": "1",
-            "TRANSFORMERS_OFFLINE": "1",
+            "EMBEDDING_MODEL": args.embedding_model,
         }
     )
 
-    from app.services.rag import get_or_create_collection, retrieve
+    from app.services.rag import get_or_create_collection, get_retrieval_health, retrieve
 
     cases = [
         ("特征值和主成分分析", "11-数学与计算理论基础.md"),
@@ -51,8 +48,9 @@ def main() -> int:
         if expected_source not in sources:
             failures.append(f"{query} -> expected {expected_source}")
     count = get_or_create_collection().count()
-    if count != 156:
-        failures.append(f"collection count is {count}, expected 156")
+    health = get_retrieval_health()
+    if not health['index_complete']:
+        failures.append(f"collection count is {count}, expected {health['expected_chunks']}")
     if failures:
         raise RuntimeError("; ".join(failures))
     print(f"verified_topics={len(cases)} collection_count={count}")

@@ -1,6 +1,7 @@
 "use client";
 
 import { CustomAgentWorkspace } from "@/components/custom-agent-workspace";
+import { LearningDataCard } from "@/components/learning-data-card";
 
 export default function DesktopAgents() {
   return (
@@ -12,6 +13,7 @@ export default function DesktopAgents() {
             自建的是资料生成的「执行者」，不是新的资料类型；产出类型仍从既有 9 种里选，随后在学习资料规划的执行者下拉里指派。
           </p>
         </header>
+        <LearningDataCard />
         <CustomAgentWorkspace />
       </div>
     </div>

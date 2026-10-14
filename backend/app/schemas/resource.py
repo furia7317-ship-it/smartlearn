@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+from app.schemas.orchestration import CollaborationOptions
 
 
 class QuizConfig(BaseModel):
@@ -52,6 +53,8 @@ class ResourceRequest(BaseModel):
     topic: str
     student_id: str
     requirements: str = ""
+    collaboration: CollaborationOptions = Field(default_factory=CollaborationOptions)
+    attachment_evidence: list[dict[str, Any]] = Field(default_factory=list, max_length=5)
     # 表单生成（/api/materials/generate）专用，默认空时保持原分诊行为：
     material_types: list[str] = Field(default_factory=list)  # 用户勾选的资料类型 → 强制生成
     knowledge_points: str = ""  # 用户填写的知识点，并入 requirements 注入各生成器

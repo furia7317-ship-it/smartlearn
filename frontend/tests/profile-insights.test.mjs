@@ -111,8 +111,8 @@ test("profile insights aggregate persisted learning records without sample value
   assert.equal(insights.summary.studyMinutes, 62);
   assert.equal(insights.summary.completedQuestions, 10);
   assert.equal(insights.summary.accuracy, 70);
-  assert.equal(insights.summary.mastery, 60);
-  assert.equal(insights.summary.masteryDelta, 3);
+  assert.equal(insights.summary.mastery, 64);
+  assert.equal(insights.summary.masteryDelta, 4);
   assert.equal(insights.summary.activityLevels.length, 30);
   assert.ok(insights.summary.activityLevels.some((level) => level > 0));
   assert.deepEqual(

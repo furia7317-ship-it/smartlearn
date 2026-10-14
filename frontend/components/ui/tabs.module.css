@@ -1,0 +1,3 @@
+.content[data-state="active"] { animation: tabEnter 280ms cubic-bezier(.22, 1, .36, 1); }
+@keyframes tabEnter { from { opacity: .64; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .content[data-state="active"] { animation: none; } }

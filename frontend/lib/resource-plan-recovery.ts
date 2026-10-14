@@ -129,6 +129,20 @@ export function scheduleSnapshotToPath(schedule: unknown[], planId?: string): Pa
       title: String(day.title ?? `第 ${index + 1} 天`),
       desc: String(day.objective ?? "按规划完成当天学习任务"),
       objective: String(day.objective ?? ""),
+      module: typeof day.module === "string" ? day.module : undefined,
+      node_kind: (["main", "reinforcement", "extension", "milestone"] as const).find((kind) => kind === day.node_kind),
+      prerequisite_mode: day.prerequisite_mode === "any" ? "any" as const : "all" as const,
+      recommended_prerequisites: Array.isArray(day.recommended_prerequisites) ? day.recommended_prerequisites.map(String) : [],
+      completion_criteria: typeof day.completion_criteria === "string" ? day.completion_criteria : undefined,
+      progress_weight: typeof day.progress_weight === "number" && day.progress_weight > 0 ? day.progress_weight : undefined,
+      knowledge_points: Array.isArray(day.knowledge_points)
+        ? day.knowledge_points.map(String).map((item) => item.trim()).filter(Boolean)
+        : [],
+      knowledge_nodes: Array.isArray(day.knowledge_nodes) ? day.knowledge_nodes.filter((item) => item && typeof item.id === "string" && typeof item.title === "string") : [],
+      knowledge_relations: Array.isArray(day.knowledge_relations) ? day.knowledge_relations.filter((item) => item && typeof item.from === "string" && typeof item.to === "string" && ["prerequisite", "related"].includes(item.kind)) : [],
+      prerequisites: Array.isArray(day.prerequisites)
+        ? day.prerequisites.map(String).map((item) => item.trim()).filter(Boolean)
+        : [],
       minutes: Number(day.minutes ?? 60),
       types: Array.from(new Set(steps.flatMap((step) => step.resource_types))),
       state: index === 0 ? ("current" as const) : ("todo" as const),
@@ -147,7 +161,29 @@ export function resourcePlanRecordToPath(record: ResourcePlanRecord): PathStep[]
     record.execution.schedule ?? [],
     record.plan.plan_id,
   );
-  if (scheduled.length > 0) return scheduled;
+  if (scheduled.length > 0) {
+    const plannedDays = new Map(record.plan.days.map((day) => [day.day, day]));
+    return scheduled.map((step) => {
+      const planned = plannedDays.get(step.day);
+      return {
+        ...step,
+        knowledge_nodes: step.knowledge_nodes?.length ? step.knowledge_nodes : planned?.knowledge_nodes,
+        knowledge_relations: step.knowledge_relations?.length ? step.knowledge_relations : planned?.knowledge_relations,
+        module: step.module || planned?.module,
+        node_kind: step.node_kind || planned?.node_kind,
+        prerequisite_mode: planned?.prerequisite_mode || step.prerequisite_mode,
+        recommended_prerequisites: step.recommended_prerequisites?.length ? step.recommended_prerequisites : planned?.recommended_prerequisites,
+        completion_criteria: step.completion_criteria || planned?.completion_criteria,
+        progress_weight: step.progress_weight || planned?.progress_weight,
+        knowledge_points: step.knowledge_points?.length
+          ? step.knowledge_points
+          : planned?.knowledge_points ?? [],
+        prerequisites: step.prerequisites?.length
+          ? step.prerequisites
+          : planned?.prerequisites ?? [],
+      };
+    });
+  }
   if (record.plan.days.length === 0 || record.plan.status === "cancelled") return [];
 
   const tasksById = new Map(
@@ -165,6 +201,16 @@ export function resourcePlanRecordToPath(record: ResourcePlanRecord): PathStep[]
       day: day.day,
       title: day.title,
       objective: day.objective,
+      knowledge_points: day.knowledge_points,
+      knowledge_nodes: day.knowledge_nodes,
+      knowledge_relations: day.knowledge_relations,
+      prerequisites: day.prerequisites,
+      module: day.module,
+      node_kind: day.node_kind,
+      prerequisite_mode: day.prerequisite_mode,
+      recommended_prerequisites: day.recommended_prerequisites,
+      completion_criteria: day.completion_criteria,
+      progress_weight: day.progress_weight,
       minutes: day.minutes,
       steps: tasks.map((task) => ({
         id: task.task_id,

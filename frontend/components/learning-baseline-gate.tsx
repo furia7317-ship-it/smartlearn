@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { BrainCircuit, Loader2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CollaborationControls } from "@/components/collaboration-controls";
 import { streamSSE } from "@/lib/api";
 import { diagnosticBaseline } from "@/lib/learning-baseline-gate";
 import type { LearningBaseline } from "@/lib/learning-baseline";
@@ -13,6 +14,7 @@ import type {
   LearningPathGoal,
   LearningPathMaterialType,
 } from "@/lib/learning-path-confirmation";
+import { invalidateLibraryListCache } from "@/lib/library";
 import { getStudentId } from "@/lib/student-identity";
 import { cn } from "@/lib/utils";
 
@@ -363,6 +365,7 @@ export function LearningBaselineGate({
         },
       );
       if (!examId || generated.length === 0) throw new Error("AI 未返回可用的摸底题，请重试");
+      invalidateLibraryListCache("papers");
       setDiagnosticExamId(examId);
       setDiagnosticQuestions(generated);
       setDiagnosticStage("questions");
@@ -391,6 +394,7 @@ export function LearningBaselineGate({
             : {};
         },
       );
+      invalidateLibraryListCache("papers", "assessments", "goals");
       setDiagnosticResult(diagnosticBaseline(overall, mastery, diagnosticQuestions.length));
       setDiagnosticStage("done");
       setSummary(true);
@@ -535,6 +539,7 @@ export function LearningBaselineGate({
               )}
             </div>
             <h2 id="learning-confirmation-title" className="text-base font-semibold">确认后继续生成学习任务</h2>
+            <CollaborationControls disabled={Boolean(planning || submitting)} />
             <p className="mt-1 text-xs text-muted-foreground">只补充仍会改变结果的信息 · {stepCurrent}/{stepTotal}，你也可以取消后继续浏览其他页面</p>
           </div>
         </div>

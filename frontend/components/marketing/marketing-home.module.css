@@ -263,7 +263,7 @@
 .startCopy h2 { margin-top: 18px; font: 770 clamp(46px, 4.8vw, 72px)/1.12 var(--font-display); letter-spacing: -0.055em; }
 .startCopy > p { max-width: 560px; margin-top: 20px; color: var(--ink-soft); font-size: 15px; line-height: 1.85; }
 .startCopy > small { display: block; margin-top: 17px; color: var(--ink-soft); font-size: 10px; }
-.footer { position: absolute; z-index: 4; right: 0; bottom: 0; left: 0; display: flex; min-height: 54px; align-items: center; justify-content: center; gap: 28px; border-top: 1px solid rgb(118 80 31 / 14%); background: rgb(252 250 244 / 76%); color: var(--ink-soft); font-size: 9px; backdrop-filter: blur(10px); }
+.footer { position: absolute; z-index: 4; right: 0; bottom: 0; left: 0; display: flex; flex-wrap: wrap; min-height: 54px; padding: 12px; align-items: center; justify-content: center; gap: 10px 28px; border-top: 1px solid rgb(118 80 31 / 14%); background: rgb(252 250 244 / 76%); color: var(--ink-soft); font-size: 12px; backdrop-filter: blur(10px); }
 .footer span { display: inline-flex; align-items: center; gap: 5px; }
 .footer svg { width: 13px; height: 13px; color: var(--green); }
 

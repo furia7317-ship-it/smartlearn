@@ -40,6 +40,8 @@
   "exclude": [
     "node_modules",
     "dist-electron",
-    "runtime"
+    "dist-electron-demo",
+    "runtime",
+    "remotion-runtime"
   ]
 }

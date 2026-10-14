@@ -113,12 +113,14 @@ def get_profile(student_id: str) -> dict[str, Any]:
 
     from app.core.config import sync_session
     from app.models.profile import Profile
+    from app.models.learning_data import LearningDataState
+    from app.models.learning import LearnerPreferenceSettings
 
     with sync_session() as s:
         p = s.execute(select(Profile).where(Profile.student_id == student_id)).scalar_one_or_none()
-    if p is None:
-        return dict(_DEFAULT_PROFILE)
-    return {
+        managed = s.get(LearningDataState, student_id)
+        preferences = s.get(LearnerPreferenceSettings, student_id)
+    profile = dict(_DEFAULT_PROFILE) if p is None else {
         "knowledge_level": p.knowledge_level or {},
         "cognitive_style": p.cognitive_style or _DEFAULT_PROFILE["cognitive_style"],
         "goals": p.goals or {},
@@ -126,6 +128,15 @@ def get_profile(student_id: str) -> dict[str, Any]:
         "pace": p.pace or _DEFAULT_PROFILE["pace"],
         "interests": p.interests or [],
     }
+    if managed and managed.revision:
+        from app.services.learning_data import published_profile
+        snapshot = managed.snapshot
+        if preferences and (preferences.preferences or {}).get("long_term_memory_enabled") is False:
+            # Apply an explicit opt-out immediately, even between worker cycles.
+            snapshot = {**snapshot, "observations": [item for item in snapshot.get("observations", []) if item["kind"] not in {"conversation", "preferences"}],
+                "learner": {key: value for key, value in snapshot.get("learner", {}).items() if key != "explicit_facts"}}
+        profile.update(published_profile(snapshot))
+    return profile
 
 
 def update_from_exam(student_id: str, mastery: dict[str, Any], results: list[dict[str, Any]]) -> None:

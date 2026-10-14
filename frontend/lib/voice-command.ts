@@ -13,7 +13,7 @@ const DESTINATIONS: Array<[RegExp, string, string]> = [
   [/^(资源生成|生成资料|创建资料)$/, "create", "资源生成"],
   [/^(学习路径|路径|总学习路径)$/, "path", "学习路径"],
   [/^(练习|练习中心)$/, "practice", "练习中心"],
-  [/^(代码挑战|代码编译器|编译器|代码实验室)$/, "code-lab", "代码挑战"],
+  [/^(实训中心|代码实训|编程实训)$/, "training", "实训中心"],
   [/^(知识库|课程知识库)$/, "kb", "知识库"],
   [/^(错题本|错题)$/, "practice", "错题本"],
   [/^(视频学习|学习视频)$/, "video-learning", "视频学习"],
@@ -44,6 +44,7 @@ export function parseVoiceCommand(raw: string): VoiceCommand | null {
 }
 
 export function voiceDestinationPath(destination: string, pathname: string): string {
+  if (destination === "training") return "/desktop/training/";
   const desktop = pathname.startsWith("/desktop");
   if (!destination) return desktop ? "/desktop/" : "/";
   return desktop ? `/desktop/${destination}/` : `/${destination}/`;

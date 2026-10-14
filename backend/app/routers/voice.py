@@ -6,7 +6,7 @@ import asyncio
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from app.core.config import settings
 from app.services.iflytek import iat
 from app.services.iflytek import tts as iflytek_tts
-from app.services.media import mimo_tts, minimax_tts
+from app.services.media import mimo_asr, mimo_tts, minimax_tts
 from app.services.voice_action import plan_voice_action
 
 
@@ -24,6 +24,7 @@ router = APIRouter()
 
 class VoiceTtsRequest(BaseModel):
     text: str = Field(min_length=1, max_length=600)
+    provider: Literal["auto", "minimax"] = "auto"
 
 
 class VoiceResourceCandidate(BaseModel):
@@ -39,11 +40,19 @@ class VoiceActionRequest(BaseModel):
 
 
 def preferred_tts_provider() -> str | None:
-    if mimo_tts.is_configured():
-        return "mimo"
     if minimax_tts.is_configured():
         return "minimax"
+    if mimo_tts.is_configured():
+        return "mimo"
     if iflytek_tts.is_configured():
+        return "iflytek"
+    return None
+
+
+def preferred_asr_provider() -> str | None:
+    if mimo_asr.is_configured():
+        return "mimo"
+    if iat.is_configured():
         return "iflytek"
     return None
 
@@ -51,19 +60,23 @@ def preferred_tts_provider() -> str | None:
 @router.get("/status")
 async def voice_status() -> dict[str, Any]:
     provider = preferred_tts_provider()
+    asr_provider = preferred_asr_provider()
+    features = [
+        "barge_in",
+        "adaptive_endpointing",
+        "persistent_call",
+        "voice_commands",
+        "agent_actions",
+    ]
+    if asr_provider == "iflytek":
+        features.insert(0, "partial_transcript")
     return {
-        "asr_ready": iat.is_configured(),
+        "asr_ready": asr_provider is not None,
+        "asr_provider": asr_provider,
         "tts_ready": provider is not None,
         "tts_provider": provider,
         "sample_rate": 16_000,
-        "features": [
-            "partial_transcript",
-            "barge_in",
-            "adaptive_endpointing",
-            "persistent_call",
-            "voice_commands",
-            "agent_actions",
-        ],
+        "features": features,
     }
 
 
@@ -73,7 +86,9 @@ async def synthesize_voice(req: VoiceTtsRequest):
     text = req.text.strip()
     if not text:
         raise HTTPException(status_code=422, detail="播报文本不能为空")
-    provider = preferred_tts_provider()
+    provider = "minimax" if req.provider == "minimax" else preferred_tts_provider()
+    if provider == "minimax" and not minimax_tts.is_configured():
+        raise HTTPException(status_code=503, detail="MiniMax TTS 尚未配置")
     if provider is None:
         raise HTTPException(status_code=503, detail="没有可用的语音合成服务")
 
@@ -134,16 +149,17 @@ async def resolve_voice_action(req: VoiceActionRequest) -> dict[str, Any]:
 
 @router.websocket("/asr")
 async def realtime_asr(websocket: WebSocket) -> None:
-    """Proxy browser PCM frames to iFlytek while preserving partial results."""
+    """Recognize browser PCM turns with MiMo, falling back to iFlytek."""
     await websocket.accept()
     send_lock = asyncio.Lock()
-    recognizer: iat.StreamingIatSession | None = None
+    recognizer: mimo_asr.BufferedAsrSession | iat.StreamingIatSession | None = None
+    provider = preferred_asr_provider()
 
     async def send(payload: dict[str, Any]) -> None:
         async with send_lock:
             await websocket.send_json(payload)
 
-    if not iat.is_configured():
+    if provider is None:
         await send({"type": "error", "code": "asr_not_configured", "message": "语音识别服务尚未配置"})
         await websocket.close(code=1011)
         return
@@ -172,12 +188,14 @@ async def realtime_asr(websocket: WebSocket) -> None:
             if message_type == "start":
                 if recognizer is not None:
                     await recognizer.close()
-                recognizer = iat.StreamingIatSession(
-                    language=str(command.get("language") or "zh_cn"),
-                    on_transcript=send,
+                language = str(command.get("language") or "zh_cn")
+                recognizer = (
+                    mimo_asr.BufferedAsrSession(language=language)
+                    if provider == "mimo"
+                    else iat.StreamingIatSession(language=language, on_transcript=send)
                 )
                 await recognizer.start()
-                await send({"type": "ready", "sample_rate": 16_000})
+                await send({"type": "ready", "sample_rate": 16_000, "provider": provider})
             elif message_type == "commit" and recognizer is not None:
                 final_text = await recognizer.finish()
                 await send({"type": "final", "text": final_text})

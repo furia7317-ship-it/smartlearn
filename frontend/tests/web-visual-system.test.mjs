@@ -108,7 +108,6 @@ test("web app dashboard keeps live learning data and delegates presentation to t
 test("primary web routes use a wider desktop work area", async () => {
   const routes = [
     "../app/create/page.tsx",
-    "../app/diagnostic/page.tsx",
     "../app/kb/page.tsx",
     "../app/path/page.tsx",
     "../app/path/study/page.tsx",
@@ -132,11 +131,10 @@ test("primary web routes use a wider desktop work area", async () => {
 });
 
 test("web and desktop expose equivalent learning tools through independent page components", async () => {
-  const [shell, webVideo, webCodeLab, webPath, webStudio, desktopRoute, desktopPath, desktopFeature] =
+  const [shell, webVideo, webPath, webStudio, desktopRoute, desktopPath, desktopFeature] =
     await Promise.all([
       source("../components/layout/app-shell.tsx"),
       source("../app/video-learning/page.tsx"),
-      source("../app/code-lab/page.tsx"),
       source("../app/path/page.tsx"),
       source("../app/studio/page.tsx"),
       source("../app/desktop/video-learning/page.tsx"),
@@ -145,13 +143,12 @@ test("web and desktop expose equivalent learning tools through independent page 
     ]);
 
   assert.match(shell, /href="\/video-learning"/);
-  assert.match(shell, /href="\/code-lab"/);
+  assert.doesNotMatch(shell, /href="\/code-lab"/);
   assert.match(webVideo, /searchBilibiliVideos/);
   assert.match(webVideo, /analyzeBilibiliVideo/);
-  assert.match(webCodeLab, /executeCodeWithReview/);
   assert.match(webPath, /WebSubjectPathManager/);
   assert.match(webStudio, /WebConversationSidebar/);
-  for (const webSource of [webVideo, webCodeLab, webPath, webStudio]) {
+  for (const webSource of [webVideo, webPath, webStudio]) {
     assert.doesNotMatch(webSource, /@\/components\/desktop|@\/app\/desktop/);
     assert.doesNotMatch(webSource, /["']\/desktop(?:\/|["'])/);
   }
@@ -185,7 +182,7 @@ test("public home is a five-scene marketing story whose trial CTA enters login f
   assert.match(marketing, /dashboard-plan-mascot\.webp/);
   assert.match(marketing, /dashboard-review-mascot\.webp/);
   assert.match(marketing, /题目解析/);
-  assert.match(marketing, /代码挑战/);
+  assert.match(marketing, /编程实训/);
   assert.match(marketing, /图片、PDF 和文档/);
   assert.match(marketing, /30 天/);
   assert.match(marketing, /transitioning/);
@@ -210,9 +207,10 @@ test("studio conversation uses the available desktop width", async () => {
   assert.doesNotMatch(chat, /max-w-\[760px\]/);
 });
 
-test("local preview allows the 127.0.0.1 browser origin", async () => {
-  const config = await source("../next.config.ts");
-  assert.match(config, /allowedDevOrigins:\s*\[\s*["']127\.0\.0\.1["']\s*\]/);
+test("local preview allows loopback and the current WSL browser origin", async () => {
+  const config = await source("../next.config.mjs");
+  assert.match(config, /allowedDevOrigins:\s*\[[^\]]*["']127\.0\.0\.1["']/);
+  assert.match(config, /allowedDevOrigins:\s*\[[^\]]*["']172\.24\.20\.109["']/);
 });
 
 test("desktop launcher enters the exported desktop route", async () => {

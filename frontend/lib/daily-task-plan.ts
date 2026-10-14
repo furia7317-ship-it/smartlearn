@@ -72,7 +72,7 @@ const RESOURCE_ACTIONS: Record<ResourceType, { label: string; href: string }> = 
   quiz: { label: "开始练习", href: "/practice" },
   solution: { label: "查看题目解析", href: "/resources" },
   reading: { label: "打开阅读", href: "/resources" },
-  code: { label: "开始代码挑战", href: "/code-lab" },
+  code: { label: "打开代码资料", href: "/resources" },
   video: { label: "打开视频", href: "/resources" },
   courseware: { label: "打开课件", href: "/resources" },
   interactive: { label: "打开交互演示", href: "/resources" },
@@ -375,9 +375,9 @@ export function buildDailyTaskResources(
 export function buildPathDashboardPlan(
   path: PathStep[],
   completedKeys: string[] = [],
-  options: { anchorDate?: string; today?: Date } = {},
+  options: { anchorDate?: string; today?: Date; currentIndex?: number } = {},
 ): PathDashboardPlan {
-  const currentIndex = pathScheduleCurrentIndex(path, options.anchorDate, options.today);
+  const currentIndex = options.currentIndex ?? pathScheduleCurrentIndex(path, options.anchorDate, options.today);
   const stages = path.map((step, index) => {
     const plan = buildDailyTaskPlan(step, index, completedKeys);
     return {

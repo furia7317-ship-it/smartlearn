@@ -1,6 +1,7 @@
 import { API_BASE } from "./api";
 import { requireOk } from "./api-error";
 import { getStudentId } from "./student-identity";
+import type { CodeLanguage } from "./code-languages";
 
 export interface CodeExecutionError {
   type: string;
@@ -34,7 +35,9 @@ export interface CodeTraceStep {
 }
 
 export interface CodeExecution {
-  language: "python";
+  language: CodeLanguage;
+  stderr?: string;
+  compile_output?: string;
   stdout: string;
   error: CodeExecutionError | null;
   trace: CodeTraceStep[];
@@ -101,6 +104,10 @@ export interface CodeExercise {
   test_count: number;
   ai_status: "completed" | "fallback" | "unavailable";
   created_at: string | null;
+  training_metadata?: {
+    source: string; exercise_kind: string; path_signature: string; node_index: number;
+    node_title: string; node_day: string; course: string;
+  };
 }
 
 export interface CodeExerciseSubmission extends CodeExecutionResponse {
@@ -203,6 +210,7 @@ export async function executeCodeWithReview(
   const response = await requireOk(
     await fetch(`${API_BASE}/api/code-lab/execute`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         code,

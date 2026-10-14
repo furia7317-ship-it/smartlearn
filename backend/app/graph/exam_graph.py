@@ -16,6 +16,9 @@ def classifier(state: ExamState) -> dict[str, Any]:
     writer = get_stream_writer()
     writer({"event": "stage", "stage": "classify", "detail": "分析知识点分布..."})
 
+    if state.get("requested_composition"):
+        return {"composition": dict(state["requested_composition"])}
+
     from app.agents.classifier import classify_exam_scope
 
     composition = classify_exam_scope(

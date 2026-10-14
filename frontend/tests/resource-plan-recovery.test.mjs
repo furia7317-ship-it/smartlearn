@@ -76,6 +76,16 @@ function preExecutionRecord(status = "awaiting_confirmation") {
   return record;
 }
 
+test("knowledge children and relations survive saved schedule recovery", () => {
+  const record = collisionRecord("tree-plan", "数组与链表");
+  const nodes = [{ id: "array", title: "数组" }, { id: "list", title: "链表" }];
+  const relations = [{ from: "array", to: "list", kind: "related", label: "对比" }];
+  Object.assign(record.execution.schedule[0], { knowledge_nodes: nodes, knowledge_relations: relations });
+  const path = scheduleSnapshotToPath(record.execution.schedule);
+  assert.deepEqual(path[0].knowledge_nodes, nodes);
+  assert.deepEqual(path[0].knowledge_relations, relations);
+});
+
 for (const status of ["draft", "awaiting_confirmation"]) {
   test(`${status} recovery creates no resources and keeps generation pending`, () => {
     const recovered = recoverResourcePlanRecord(preExecutionRecord(status), []);

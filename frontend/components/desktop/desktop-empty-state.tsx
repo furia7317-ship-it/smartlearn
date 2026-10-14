@@ -19,7 +19,7 @@ export function DesktopEmptyState({
   icon: LucideIcon;
   title: string;
   desc: string;
-  cta?: { href: string; label: string };
+  cta?: { href?: string; label: string; onClick?: () => void };
   className?: string;
 }) {
   return (
@@ -34,7 +34,7 @@ export function DesktopEmptyState({
       </div>
       <h3 className="mt-5 text-lg font-semibold">{title}</h3>
       <p className="mt-2 max-w-[40em] text-sm leading-relaxed text-muted-foreground">{desc}</p>
-      {cta && (
+      {cta?.href && (
         <Link
           href={cta.href}
           className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
@@ -42,6 +42,16 @@ export function DesktopEmptyState({
           {cta.label}
           <ArrowRight className="size-4" />
         </Link>
+      )}
+      {cta?.onClick && !cta.href && (
+        <button
+          type="button"
+          onClick={cta.onClick}
+          className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          {cta.label}
+          <ArrowRight className="size-4" />
+        </button>
       )}
     </div>
   );

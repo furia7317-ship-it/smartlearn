@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.core.config import settings
 from app.core.llm import build_llm, parse_json_response
 
 SYSTEM_PROMPT = """你是学习资源推荐专家。根据主题生成延伸阅读材料。
@@ -33,16 +32,13 @@ def generate(state: dict[str, Any]) -> dict[str, Any]:
         max_content_chars=1200,
         max_total_chars=6000,
     )
-    web_results: list[dict[str, Any]] = []
-    if settings.BOCHA_API_KEY:
-        try:
-            from app.services.web_search import bocha_search
-
-            web_results = bocha_search(f"{state['topic']} 延伸阅读", count=5)
-        except Exception:
-            # 联网来源是增强项。网络波动或未授权时继续使用课程知识库，
-            # 不让整份阅读资料因为搜索服务失败而中断。
-            web_results = []
+    # The evidence coordinator owns network permission and retrieval. Never
+    # introduce a source here that the matching reviewer cannot inspect.
+    web_results: list[dict[str, Any]] = [
+        {"title": (item.get("metadata") or {}).get("source", "网页资料"),
+         "url": (item.get("metadata") or {})["url"], "summary": str(item.get("content") or "")[:1200]}
+        for item in state.get("kb_context", []) if (item.get("metadata") or {}).get("url")
+    ]
     web_text = "\n".join(
         f"- {item.get('title')}: {item.get('summary') or item.get('snippet')} ({item.get('url')})"
         for item in web_results

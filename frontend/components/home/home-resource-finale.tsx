@@ -15,7 +15,7 @@ import { WEB_EASE } from "@/lib/web-motion";
 const ACTIONS = [
   { href: "/studio", label: "继续答疑", desc: "带着上下文继续提问", icon: BookOpen },
   { href: "/create", label: "生成资料", desc: "讲义、导图与题库", icon: FilePlus2 },
-  { href: "/diagnostic", label: "学情摸底", desc: "更新画像与学习建议", icon: ClipboardCheck },
+  { href: "/practice", label: "练习与错题", desc: "巩固知识，复盘错题", icon: ClipboardCheck },
 ];
 
 export function HomeResourceFinale({

@@ -1,4 +1,5 @@
 /** Shared, bounded intent rules for teacher-driven software actions. */
+import { isAppPageRequest } from "./app-navigation.ts";
 
 export interface AgentResourceCandidate {
   id: string;
@@ -53,12 +54,12 @@ const GENERATION_KEYWORDS = [
 
 export function isResourceOpenIntent(raw: string): boolean {
   const text = raw.replace(/[\r\n]+/g, " ").trim();
-  if (!text || HOW_TO_OPEN_RE.test(text)) return false;
+  if (!text || HOW_TO_OPEN_RE.test(text) || /不要|别|不用|不想/.test(text) || isAppPageRequest(text)) return false;
   return OPEN_RESOURCE_RE.test(text);
 }
 
 export function wantsResourceGeneration(text: string): boolean {
-  return !isResourceOpenIntent(text) && GENERATION_KEYWORDS.some((keyword) => text.includes(keyword));
+  return !isAppPageRequest(text) && !isResourceOpenIntent(text) && GENERATION_KEYWORDS.some((keyword) => text.includes(keyword));
 }
 
 export function hasResourceTypeHint(text: string): boolean {

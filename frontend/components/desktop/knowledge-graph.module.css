@@ -38,9 +38,13 @@
   align-items: center;
   gap: 5px;
   margin-bottom: 7px;
+  padding: 0;
+  border: 0;
   color: #8c7d68;
+  background: transparent;
   font-size: 11px;
   transition: color 160ms ease;
+  cursor: pointer;
 }
 
 .back:hover {
@@ -176,6 +180,7 @@
 }
 
 .subjectChip {
+  pointer-events: auto;
   max-width: 260px;
   padding: 7px 10px;
   border: 1px solid #e1d7c8;
@@ -262,7 +267,9 @@
   height: 68px;
   place-items: center;
   transform: translate(-50%, -50%);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   border: 2px solid #cf9c42;
   border-radius: 999px;
   outline: 0;
@@ -270,6 +277,14 @@
   background: #fffdf7;
   box-shadow: 0 0 0 4px rgba(207, 156, 66, .08), 0 4px 12px rgba(72, 49, 22, .08);
   transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+.nodeDragging,
+.nodeDragging:hover {
+  z-index: 10;
+  cursor: grabbing;
+  transform: translate(-50%, -50%);
+  transition: none;
 }
 
 .node:hover,
@@ -321,25 +336,34 @@
 }
 
 .nodeRoot .nodeInner small {
-  color: #a34d3d;
+  color: var(--mastery-color, #8d7d67);
   font-size: 12px;
 }
 
 .nodeMastered {
+  --mastery-color: #62865f;
+  --mastery-halo: 98, 134, 95;
   border-color: #62865f;
   box-shadow: 0 0 0 4px rgba(98, 134, 95, .09), 0 4px 12px rgba(72, 49, 22, .08);
 }
 
 .nodeDeveloping {
+  --mastery-color: #cf9c42;
+  --mastery-halo: 207, 156, 66;
   border-color: #cf9c42;
+  box-shadow: 0 0 0 4px rgba(207, 156, 66, .08), 0 4px 12px rgba(72, 49, 22, .08);
 }
 
 .nodeWeak {
+  --mastery-color: #ad5142;
+  --mastery-halo: 173, 81, 66;
   border-color: #ad5142;
   box-shadow: 0 0 0 4px rgba(173, 81, 66, .09), 0 4px 12px rgba(72, 49, 22, .08);
 }
 
 .nodeUnseen {
+  --mastery-color: #b9b0a3;
+  --mastery-halo: 122, 113, 99;
   border-color: #b9b0a3;
   color: #726a60;
   background: #faf7f0;
@@ -348,8 +372,8 @@
 
 .nodeSelected {
   z-index: 8;
-  border-color: #9e4435;
-  box-shadow: 0 0 0 8px rgba(158, 68, 53, .13), 0 0 0 12px rgba(158, 68, 53, .045), 0 8px 24px rgba(108, 49, 38, .17);
+  border-color: var(--mastery-color, #cf9c42);
+  box-shadow: 0 0 0 8px rgba(var(--mastery-halo, 207, 156, 66), .13), 0 0 0 12px rgba(var(--mastery-halo, 207, 156, 66), .045), 0 8px 24px rgba(72, 49, 22, .14);
 }
 
 .nodeDimmed {
@@ -1203,4 +1227,77 @@
   .legend { min-height: 36px; padding-block: 6px; }
   .sectionTitle { margin-top: 12px; }
   .suggestionCard { padding: 9px; }
+}
+
+/* The home preview uses the same nodes, edges and interaction as the full graph. */
+.page.compact { height: 420px; background: transparent; }
+.compact .content { padding: 0; display: block; height: 100%; }
+.compact .canvas { height: 100%; border: 0; border-radius: 8px; box-shadow: none; }
+.compact .canvasToolbar { top: 8px; left: 8px; right: 8px; gap: 8px; }
+.compact .toolbarHint { font-size: 10px; }
+.compact .graphStage { inset: 50px 12px 66px; }
+.compact .zoomControls { top: 44px; right: 8px; }
+.compact .groupLabel { min-width: 86px; gap: 4px; font-size: 11px; padding-bottom: 5px; }
+.compact .groupLabel svg { width: 13px; height: 13px; }
+.compact .node { width: 50px; height: 50px; }
+.compact .nodeRoot { width: 74px; height: 74px; }
+.compact .nodeInner { max-width: 44px; }
+.compact .nodeRoot .nodeInner { max-width: 62px; }
+.compact .nodeRoot .nodeInner b { font-size: 12px; }
+.compact .weakFlag { font-size: 8px; }
+.compact .legend { inset: auto 4px 4px; flex-wrap: wrap; gap: 6px 10px; padding: 8px; font-size: 9px; }
+.compact .legendTitle { display: none; }
+.compact .legendDot { width: 12px; height: 12px; }
+.compact .legendLines { margin-left: 0; gap: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .graphStage, .node { transition: none; }
+}
+
+/* Knowledge evidence and the learner profile have separate visual roles. */
+.page:not(.compact) .content { grid-template-columns: minmax(0, 1fr) 370px; }
+.networkSummary { max-width: 58%; color: #8a7a65; font-size: 11px; line-height: 1.5; }
+.inspectorSection { flex: 0 0 auto; padding-bottom: 17px; }
+.inspectorSection + .inspectorSection { border-top: 1px solid #e5dccd; padding-top: 17px; }
+.inspectorSection:last-child { padding-bottom: 0; }
+.inspectorSection .metrics { margin-top: 12px; }
+.inspectorSection .updated { line-height: 1.65; margin-bottom: 0; }
+.sectionNote { color: #998873; font-size: 10px; white-space: nowrap; }
+.inspectorSection .inspectorTitle { font-size: 16px; }
+.profileOverview { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: 4px; }
+.profileRadar { display: block; width: 100%; height: 180px; overflow: visible; }
+.profileTable { width: 100%; border-collapse: collapse; color: #6f5e48; font-size: 11px; }
+.profileTable th, .profileTable td { padding: 5px 8px; border-bottom: 1px solid #ece4d7; text-align: left; font-weight: 400; }
+.profileTable thead th { color: #978670; background: #f4eee3; font-size: 10px; }
+.profileTable td { text-align: right; font-variant-numeric: tabular-nums; color: #42694c; }
+.profileTable thead th:last-child { text-align: right; }
+.profileCaption { margin: 8px 0 0; color: #9d8b75; font-size: 10px; }
+.selectedTopic { margin: 12px 0 6px; color: #3b6047; font-size: 13px; font-weight: 650; }
+.teacherFeedback { margin: 10px 0 0; padding: 10px 12px; border-left: 2px solid #94ac91; background: #f0f2e8; border-radius: 0 7px 7px 0; color: #665742; font-size: 11px; line-height: 1.75; }
+.teacherFeedback b { font-weight: 600; color: #507055; }
+.teacherFeedback p { margin-top: 5px; }
+.relatedTopics { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 10px; color: #968770; }
+.relatedTopics button { padding: 5px 7px; border: 1px solid #ddd4c3; border-radius: 5px; color: #6c5a44; background: #fffdf7; cursor: pointer; }
+.stageNote { margin-top: 9px; color: #96846a; font-size: 10px; }
+.adviceSteps { margin: 11px 0 0; padding-left: 20px; color: #6d5d47; font-size: 11px; line-height: 1.8; }
+.adviceSteps li + li { margin-top: 7px; }
+.inspector .primaryAction { width: 100%; background: #355b42; color: #fff9ed; border: 0; cursor: pointer; }
+.pathAction { display: flex; justify-content: center; align-items: center; gap: 5px; margin-top: 10px; color: #7f6d55; font-size: 11px; }
+.dataNotice { color: #a5673b; font-size: 11px; line-height: 1.6; }
+.graphEmpty { position: absolute; inset: 80px 24px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; text-align: center; color: #8a7962; font-size: 12px; }
+.graphEmpty h2 { color: #554631; font-size: 18px; }
+.graphEmpty a { color: #466d4e; border-bottom: 1px solid; }
+.searchEmpty { position: absolute; left: 20px; bottom: 72px; color: #9b5c44; font-size: 12px; }
+.node.nodeDragging { z-index: 10; transform: translate(-50%, -50%); cursor: grabbing; }
+@media (max-width: 1100px) {
+  .page:not(.compact) .content { grid-template-columns: minmax(0, 1fr) 310px; }
+  .page .headerActions { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .page .headerActions .search { width: 180px; }
+  .page .headerActions .selectWrap { max-width: 180px; min-width: 110px; }
+}
+
+@media (min-width: 1101px) {
+  .page:not(.compact) .content { grid-template-columns: minmax(0, 1fr) 420px; }
+  .profileOverview { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); align-items: center; gap: 10px; margin-top: 12px; }
+  .profileRadar { height: 174px; }
+  .profileTable th, .profileTable td { padding: 5px 3px; font-size: 10px; }
 }

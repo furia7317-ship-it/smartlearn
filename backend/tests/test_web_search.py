@@ -22,6 +22,7 @@ class TestChunkPlainText:
         chunks = web_search.chunk_plain_text(text, "src", size=300)
         assert 1 <= len(chunks) < 8  # 短段被聚合，不是每段一块
         assert all(c["metadata"]["source"] == "src" for c in chunks)
+        assert [c["metadata"]["sequence_index"] for c in chunks] == list(range(len(chunks)))
 
     def test_skips_tiny_fragments(self):
         text = "够长的一段正文内容用于测试分块逻辑是否正常工作。\n\n短"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Loader2, Pause, Play, UserRound } from "lucide-react";
+import { AlertTriangle, Bot, Contrast, Hand, Loader2, Pause, Play, UserRound } from "lucide-react";
 
 import { useOrchestratorContext } from "@/components/orchestrator-provider";
 import {
@@ -11,7 +11,10 @@ import {
   type AvatarPlatform,
 } from "@/lib/avatar";
 import { toSpeakableText } from "@/lib/speech-text";
+import { API_BASE } from "@/lib/api";
+import { playCloudSpeech, playSpeechBlob, requestMiniMaxSpeech } from "@/lib/cloud-speech";
 import { cn } from "@/lib/utils";
+import teacherStyles from "./desktop/teacher-workspace.module.css";
 
 type AvatarState = "idle" | "connecting" | "ready" | "error";
 
@@ -19,31 +22,32 @@ type AvatarState = "idle" | "connecting" | "ready" | "error";
  * 数字人讲解。
  *
  * - **安全默认**：后端不向渲染进程下发长期供应商凭据，只提供短期签名
- *   WebSocket URL；数字人不可用时回退 `speechSynthesis` 朗读。
+ *   WebSocket URL；数字人不可用时通过后端 MiniMax 朗读。
  *
  * studio 接线不变：仍只接收 `answer`。
  */
-export function DigitalHuman({ answer }: { answer: string }) {
-  const { mode } = useOrchestratorContext();
+export function DigitalHuman({ answer, variant = "studio" }: { answer: string; variant?: "studio" | "teacher" }) {
+  const { mode } = useOrchestratorContext((state) => ({
+    mode: state.mode,
+  }));
   const [speaking, setSpeaking] = useState(false);
-  const [ttsSupported, setTtsSupported] = useState(true);
+  const [preparingSpeech, setPreparingSpeech] = useState(false);
+  const [speechError, setSpeechError] = useState("");
   const [cfg, setCfg] = useState<AvatarConfig | null>(null);
   const [avatarState, setAvatarState] = useState<AvatarState>("idle");
   const [errMsg, setErrMsg] = useState("");
+  const [opacity, setOpacity] = useState(100);
 
   const platformRef = useRef<AvatarPlatform | null>(null);
   const startedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const fallbackTimer = useRef<number | undefined>(undefined);
+  const speechController = useRef<AbortController | null>(null);
 
   const rawText = (answer || "").trim();
   const text = toSpeakableText(rawText);
   // 用数字人 UI（配置就绪且未连接失败）；否则用语音兜底的占位形象
   const useAvatarUi = !!cfg && avatarState !== "error";
-
-  useEffect(() => {
-    setTtsSupported(typeof window !== "undefined" && "speechSynthesis" in window);
-  }, []);
 
   // 后端只返回公共元数据与短期签名 URL；未配置时 cfg=null → 走 TTS。
   useEffect(() => {
@@ -58,41 +62,42 @@ export function DigitalHuman({ answer }: { answer: string }) {
     };
   }, [mode]);
 
-  /* ── 浏览器 TTS 兜底 ── */
+  /* ── MiniMax TTS；合成失败时保留错误，不静默换成系统音色 ── */
   const ttsStop = useCallback(() => {
     window.clearTimeout(fallbackTimer.current);
-    try {
-      window.speechSynthesis?.cancel();
-    } catch {
-      /* 忽略 */
-    }
+    speechController.current?.abort();
+    speechController.current = null;
+    setPreparingSpeech(false);
+    setSpeaking(false);
   }, []);
 
   const ttsSpeak = useCallback(
-    (t: string) => {
+    async (t: string) => {
       ttsStop();
-      setSpeaking(true);
-      const estMs = Math.min(90000, Math.max(2500, t.length * 130));
-      fallbackTimer.current = window.setTimeout(() => setSpeaking(false), estMs);
+      setSpeechError("");
+      const controller = new AbortController();
+      speechController.current = controller;
       try {
-        const synth = window.speechSynthesis;
-        if (!synth) return;
-        const u = new SpeechSynthesisUtterance(t);
-        const voices = synth.getVoices?.() ?? [];
-        const v =
-          voices.find((x) => /zh[-_]?cn/i.test(x.lang)) ||
-          voices.find((x) => /^zh/i.test(x.lang)) ||
-          voices[0];
-        if (v) u.voice = v;
-        u.lang = v?.lang || "zh-CN";
-        u.onend = () => {
-          window.clearTimeout(fallbackTimer.current);
+        await playCloudSpeech(t, controller.signal, {
+          request: (part, signal) => requestMiniMaxSpeech(API_BASE, part, signal),
+          play: playSpeechBlob,
+          onPhase: (phase) => {
+            if (speechController.current !== controller) return;
+            setPreparingSpeech(phase === "loading");
+            setSpeaking(phase === "playing");
+          },
+        });
+      } catch (error) {
+        if (!controller.signal.aborted && speechController.current === controller) {
+          setSpeechError(error instanceof Error ? error.message : "MiniMax 语音暂时不可用，请重试");
+        }
+      } finally {
+        controller.abort();
+        if (speechController.current === controller) {
+          speechController.current = null;
+          setPreparingSpeech(false);
           setSpeaking(false);
-        };
-        synth.cancel();
-        synth.speak(u);
-      } catch {
-        /* 出错由兜底计时器收尾 */
+        }
       }
     },
     [ttsStop]
@@ -164,7 +169,7 @@ export function DigitalHuman({ answer }: { answer: string }) {
         }
       }
     }
-    ttsSpeak(text);
+    await ttsSpeak(text);
   }, [text, cfg, avatarState, connectAvatar, ttsSpeak]);
 
   const stop = useCallback(() => {
@@ -180,11 +185,8 @@ export function DigitalHuman({ answer }: { answer: string }) {
   useEffect(() => {
     return () => {
       window.clearTimeout(fallbackTimer.current);
-      try {
-        window.speechSynthesis?.cancel();
-      } catch {
-        /* 忽略 */
-      }
+      speechController.current?.abort();
+      speechController.current = null;
       const p = platformRef.current;
       if (p) {
         try {
@@ -200,9 +202,7 @@ export function DigitalHuman({ answer }: { answer: string }) {
   }, []);
 
   const statusLabel = !cfg
-    ? mode === "live"
-      ? "讯飞数字人未配置 · 用语音讲解"
-      : "演示语音 · 数字人需连后端"
+    ? "MiniMax 语音讲解"
     : avatarState === "connecting"
       ? "讯飞数字人连接中…"
       : avatarState === "ready"
@@ -210,6 +210,26 @@ export function DigitalHuman({ answer }: { answer: string }) {
         : avatarState === "error"
           ? "数字人连接失败 · 已用语音兜底"
           : "讯飞 2D 数字人 · 待讲解";
+
+  if (variant === "teacher") return <div className={teacherStyles.digitalHuman}>
+    <header><h2><Bot size={22} />数字人交互</h2><span data-ready={avatarState === "ready"}>{avatarState === "connecting" ? "连接中" : avatarState === "ready" ? "已连接" : "未连接"}</span></header>
+    <div className={teacherStyles.humanStage}>
+      {useAvatarUi && <div ref={containerRef} className={teacherStyles.humanVideo} style={{ opacity: opacity / 100 }} />}
+      {avatarState !== "ready" && <div className={teacherStyles.humanIdle}>
+        {avatarState === "connecting" ? <Loader2 className="animate-spin" size={32} /> : <UserRound size={42} strokeWidth={1.1} />}
+        <p>{avatarState === "connecting" ? "数字人正在连接…" : cfg ? "准备好，便开始讲解" : "让知识，有声有色"}</p>
+        <small>{cfg ? "连接数字人后可播放讲解" : "数字人暂未连接，可先听语音讲解"}</small>
+      </div>}
+      {speaking && <span className={teacherStyles.speakingBadge}>正在讲解</span>}
+      {preparingSpeech && <span className={teacherStyles.speakingBadge}>正在准备语音…</span>}
+    </div>
+    <label className={teacherStyles.opacityControl}><span><Contrast size={15} />透明度</span><input type="range" aria-label="数字人透明度" min="20" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} disabled={avatarState !== "ready"} /></label>
+    {avatarState === "error" && <p className={teacherStyles.humanError} role="status">数字人暂时无法连接，已切换为语音讲解。</p>}
+    {speechError && <p className={teacherStyles.humanError} role="alert">{speechError}</p>}
+    <div className={teacherStyles.humanActions}><button onClick={() => void speak()} disabled={!text || speaking || preparingSpeech || avatarState === "connecting"}>
+      {avatarState === "connecting" ? <Loader2 className="animate-spin" size={15} /> : <Play size={15} />} {cfg && avatarState !== "error" ? "启动数字人" : "朗读当前回答"}
+    </button><button onClick={stop} disabled={!speaking && !preparingSpeech}><Hand size={15} />打断</button></div>
+  </div>;
 
   return (
     <div className="flex h-full flex-col">
@@ -278,13 +298,13 @@ export function DigitalHuman({ answer }: { answer: string }) {
           {rawText || "还没有可讲解的回答——先在左侧让 AI 答疑生成一段讲解，再点「讲解当前回答」。"}
         </div>
         <button
-          onClick={speaking ? stop : speak}
+          onClick={speaking || preparingSpeech ? stop : speak}
           disabled={!text || avatarState === "connecting"}
           className={cn(
             "flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
             !text || avatarState === "connecting"
               ? "cursor-not-allowed bg-muted text-muted-foreground"
-              : speaking
+              : speaking || preparingSpeech
                 ? "bg-danger/10 text-danger hover:bg-danger/15"
                 : "bg-primary text-primary-foreground hover:opacity-90"
           )}
@@ -293,7 +313,7 @@ export function DigitalHuman({ answer }: { answer: string }) {
             <>
               <Loader2 className="size-4 animate-spin" /> 连接数字人…
             </>
-          ) : speaking ? (
+          ) : speaking || preparingSpeech ? (
             <>
               <Pause className="size-4" /> 停止讲解
             </>
@@ -303,11 +323,7 @@ export function DigitalHuman({ answer }: { answer: string }) {
             </>
           )}
         </button>
-        {!ttsSupported && !cfg && (
-          <p className="text-center text-[11px] text-warning">
-            当前环境无语音合成；桌面端（Electron）会用系统中文语音朗读。
-          </p>
-        )}
+        {speechError && <p className="text-center text-[11px] text-warning" role="alert">{speechError}</p>}
       </div>
     </div>
   );

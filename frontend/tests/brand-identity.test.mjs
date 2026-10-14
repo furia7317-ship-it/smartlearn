@@ -13,7 +13,7 @@ test("web and desktop surfaces expose the 学枢 brand", () => {
   const splash = read("electron/splash.html");
 
   assert.match(metadata, /title: "学枢 — AI 个性化学习平台"/);
-  assert.match(desktopShell, />学枢</);
+  assert.match(desktopShell, /<span className="desktop-brand__title">学枢<\/span>/);
   assert.match(desktopShell, />XUESHU</);
   assert.match(webBrand, />学枢</);
   assert.match(marketing, /© 2026 学枢 Xueshu/);
@@ -32,7 +32,7 @@ test("desktop package uses the mascot icon and migrates the legacy data director
   assert.match(builder, /productName: 学枢/);
   assert.match(builder, /artifactName: 学枢-一体安装版-\$\{version\}\.exe/);
   assert.match(builder, /icon: public\/brand\/xueshu-app-icon\.png/);
-  assert.match(main, /const PRODUCT_NAME = "学枢"/);
+  assert.match(main, /const PRODUCT_NAME = DEMO_MANIFEST \? DEMO_MANIFEST\.product_name : "学枢"/);
   assert.match(main, /migrateLegacyUserData\(\)/);
   assert.ok(existsSync(icon));
   assert.ok(statSync(icon).size > 100_000);

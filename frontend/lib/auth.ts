@@ -3,6 +3,7 @@ import { API_BASE, markBackendReachable } from "@/lib/api";
 export interface AuthUser {
   id: string;
   login: string;
+  role: "student";
   display_name: string;
   grade: string;
   major: string;
@@ -11,6 +12,7 @@ export interface AuthUser {
   mid_term_goal: string;
   short_term_goal: string;
   onboarding_completed: boolean;
+  guide_completed: boolean;
 }
 
 export interface OnboardingInput {
@@ -44,29 +46,41 @@ export class AuthRequestError extends Error {
   }
 }
 
+const AUTH_REQUEST_TIMEOUT_MS = 8_000;
+
 async function authRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}/api/auth${path}`, {
-    ...init,
-    credentials: "include",
-    cache: "no-store",
-    headers: {
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
-    },
-  });
-  markBackendReachable();
-  if (!response.ok) {
-    let message = response.status === 401 ? "登录状态已失效" : `请求失败 HTTP ${response.status}`;
-    try {
-      const body = (await response.json()) as { detail?: string | { message?: string } };
-      if (typeof body.detail === "string") message = body.detail;
-      else if (body.detail?.message) message = body.detail.message;
-    } catch {
-      // Keep the HTTP fallback when the backend did not return JSON.
+  const controller = new AbortController();
+  const relayAbort = () => controller.abort();
+  const timeout = globalThis.setTimeout(() => controller.abort(), AUTH_REQUEST_TIMEOUT_MS);
+  init?.signal?.addEventListener("abort", relayAbort, { once: true });
+  try {
+    const response = await fetch(`${API_BASE}/api/auth${path}`, {
+      ...init,
+      signal: controller.signal,
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...init?.headers,
+      },
+    });
+    markBackendReachable();
+    if (!response.ok) {
+      let message = response.status === 401 ? "登录状态已失效" : `请求失败 HTTP ${response.status}`;
+      try {
+        const body = (await response.json()) as { detail?: string | { message?: string } };
+        if (typeof body.detail === "string") message = body.detail;
+        else if (body.detail?.message) message = body.detail.message;
+      } catch {
+        // Keep the HTTP fallback when the backend did not return JSON.
+      }
+      throw new AuthRequestError(response.status, message);
     }
-    throw new AuthRequestError(response.status, message);
+    return response.json() as Promise<T>;
+  } finally {
+    globalThis.clearTimeout(timeout);
+    init?.signal?.removeEventListener("abort", relayAbort);
   }
-  return response.json() as Promise<T>;
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
@@ -115,6 +129,14 @@ export function saveOnboarding(input: OnboardingInput): Promise<AuthUser> {
   });
 }
 
-export async function logoutAccount(): Promise<void> {
-  await authRequest<{ ok: boolean }>("/logout", { method: "POST" });
+export function saveGuideCompletion(): Promise<AuthUser> {
+  return authRequest<AuthUser>("/guide", { method: "PUT" });
+}
+
+export async function logoutAccount(signal?: AbortSignal): Promise<void> {
+  await authRequest<{ ok: boolean }>("/logout", {
+    method: "POST",
+    signal,
+    keepalive: true,
+  });
 }

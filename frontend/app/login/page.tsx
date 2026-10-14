@@ -2,14 +2,16 @@
 
 import { useState, type FormEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Eye, EyeOff, LoaderCircle, LockKeyhole, UserRound } from "lucide-react";
-import Image from "next/image";
+import { Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
+import { SiteFiling } from "@/components/site-filing";
 import { AuthRequestError } from "@/lib/auth";
-import { cn } from "@/lib/utils";
+import { WelcomeAnnouncement } from "@/components/welcome/welcome-announcement";
+import { DEMO_ACCOUNT } from "@/lib/welcome";
+import styles from "./login.module.css";
 
 
 type AuthMode = "login" | "register";
@@ -25,6 +27,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [sceneReady, setSceneReady] = useState(false);
 
   const switchMode = (nextMode: AuthMode) => {
     setMode(nextMode);
@@ -52,10 +55,10 @@ export default function LoginPage() {
     setSubmitting(true);
     setError("");
     try {
-      await (mode === "login"
+      const signedIn = await (mode === "login"
         ? login(normalizedAccount, password)
         : register(normalizedAccount, password));
-      router.replace("/desktop");
+      router.replace(signedIn.onboarding_completed ? "/desktop" : "/onboarding");
     } catch (caught) {
       setError(caught instanceof AuthRequestError ? caught.message : "账户服务暂时不可用，请稍后重试");
     } finally {
@@ -64,41 +67,44 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="relative grid min-h-dvh place-items-center overflow-hidden bg-[#f5efe3] px-4 py-10 text-[#2d261b]">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[#8b5b18]" />
+    <main className={styles.scene}>
+      <header className={styles.masthead}><span className={styles.seal}>学枢</span><span>AI 个性化学习平台</span></header>
       <motion.section
-        initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+        initial={reduceMotion ? false : { opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-[430px]"
+        transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+        onAnimationComplete={() => setSceneReady(true)}
+        className={styles.frame}
         aria-labelledby="auth-title"
       >
-        <header className="mb-6 text-center">
-          <Image
-            src="/brand/xueshu-app-icon.png"
-            alt=""
-            width={48}
-            height={48}
-            priority
-            className="mx-auto size-12 rounded-xl border border-[#5f431b]/20 shadow-sm"
-          />
-          <h1 id="auth-title" className="mt-3 text-2xl font-semibold tracking-normal">学枢</h1>
-          <p className="mt-1 text-sm text-[#756a59]">登录后继续你的学习安排</p>
-        </header>
-
-        <div className="rounded-lg border border-[#d8cbb7] bg-[#fffdf8] p-5 shadow-[0_18px_55px_rgba(58,43,23,0.09)] sm:p-6">
-          <div className="grid grid-cols-2 rounded-md bg-[#eee5d6] p-1" role="tablist" aria-label="账户操作">
+        <div className={styles.introduction}>
+          <p className={styles.kicker}>一方书房 · 一程新知</p>
+          <div className={styles.brandTitle}><h1 id="auth-title">学枢</h1><span>学而有方</span></div>
+          <p className={styles.statement}>把每一次好奇，<br />写成自己的学问。</p>
+          <p className={styles.introNote}>从一份学习计划，到真正掌握一个知识点。<br />让智能教师陪你，把理解慢慢变成能力。</p>
+          <div className={styles.inscription}><span>知有所循</span><i /><span>学有所成</span></div>
+        </div>
+        <div className={styles.accountPanel}>
+          <div className={styles.tabs} role="tablist" aria-label="账户操作">
             {(["login", "register"] as const).map((item) => (
               <button
                 key={item}
                 type="button"
                 role="tab"
+                id={`auth-tab-${item}`}
+                aria-controls="auth-form"
                 aria-selected={mode === item}
+                tabIndex={mode === item ? 0 : -1}
+                disabled={submitting}
                 onClick={() => switchMode(item)}
-                className={cn(
-                  "h-9 rounded-[5px] text-sm font-medium transition-colors",
-                  mode === item ? "bg-[#fffdf8] text-[#332512] shadow-sm" : "text-[#756a59] hover:text-[#332512]",
-                )}
+                onKeyDown={(event) => {
+                  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                  event.preventDefault();
+                  const nextMode = event.key === "Home" ? "login" : event.key === "End" ? "register" : item === "login" ? "register" : "login";
+                  switchMode(nextMode);
+                  document.getElementById(`auth-tab-${nextMode}`)?.focus();
+                }}
+                className={styles.tab}
               >
                 {item === "login" ? "登录" : "注册"}
               </button>
@@ -108,45 +114,51 @@ export default function LoginPage() {
           <AnimatePresence mode="wait" initial={false}>
             <motion.form
               key={mode}
+              id="auth-form"
+              role="tabpanel"
+              aria-labelledby={`auth-tab-${mode}`}
               onSubmit={submit}
               initial={reduceMotion ? false : { opacity: 0, y: 7 }}
               animate={{ opacity: 1, y: 0 }}
               exit={reduceMotion ? undefined : { opacity: 0, y: -5 }}
               transition={{ duration: 0.18 }}
-              className="mt-5 space-y-4"
+              className={styles.form}
             >
-              <label className="block text-sm font-medium">
+              <div className={styles.formHeading}>
+                <h2>{mode === "login" ? "欢迎回到书房" : "开启你的学习之旅"}</h2>
+                <p>{mode === "login" ? "登录账号，继续上次的学习。" : "创建独立账号，从你的目标开始。"}</p>
+              </div>
+              <label className={styles.field}>
                 用户名或邮箱
-                <span className="relative mt-1.5 block">
-                  <UserRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8a7c67]" aria-hidden />
+                <span className={styles.inputWrap}>
                   <input
                     value={account}
                     onChange={(event) => setAccount(event.target.value)}
                     autoComplete="username"
-                    autoFocus
+                    disabled={submitting}
                     placeholder="输入用户名或邮箱"
-                    className="h-11 w-full rounded-md border border-[#d8cbb7] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[#8b5b18] focus:ring-2 focus:ring-[#8b5b18]/15"
+                    className={styles.input}
                   />
                 </span>
               </label>
 
-              <label className="block text-sm font-medium">
+              <label className={styles.field}>
                 密码
-                <span className="relative mt-1.5 block">
-                  <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8a7c67]" aria-hidden />
+                <span className={styles.inputWrap}>
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     autoComplete={mode === "login" ? "current-password" : "new-password"}
-                    placeholder="至少 8 个字符"
-                    className="h-11 w-full rounded-md border border-[#d8cbb7] bg-white pl-10 pr-11 text-sm outline-none transition focus:border-[#8b5b18] focus:ring-2 focus:ring-[#8b5b18]/15"
+                    disabled={submitting}
+                    placeholder={mode === "login" ? "输入登录密码" : "设置至少 8 个字符的密码"}
+                    className={`${styles.input} ${styles.passwordInput}`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((visible) => !visible)}
                     aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                    className="absolute right-1.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-[#756a59] hover:bg-[#eee5d6]"
+                    className={styles.passwordToggle}
                   >
                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
@@ -154,33 +166,45 @@ export default function LoginPage() {
               </label>
 
               {mode === "register" && (
-                <label className="block text-sm font-medium">
+                <label className={styles.field}>
                   确认密码
                   <input
                     type={showPassword ? "text" : "password"}
                     value={confirmation}
                     onChange={(event) => setConfirmation(event.target.value)}
                     autoComplete="new-password"
+                    disabled={submitting}
                     placeholder="再次输入密码"
-                    className="mt-1.5 h-11 w-full rounded-md border border-[#d8cbb7] bg-white px-3 text-sm outline-none transition focus:border-[#8b5b18] focus:ring-2 focus:ring-[#8b5b18]/15"
+                    className={styles.input}
                   />
                 </label>
               )}
 
               {(error || serviceError) && (
-                <p role="alert" className="rounded-md border border-[#b94a48]/25 bg-[#b94a48]/7 px-3 py-2 text-xs leading-relaxed text-[#983f3d]">
+                <p role="alert" className={styles.error}>
                   {error || serviceError}
                 </p>
               )}
 
-              <Button type="submit" disabled={submitting} className="h-11 w-full bg-[#3a2b17] text-[#fffaf0] hover:bg-[#4a371d]">
+              <Button type="submit" disabled={submitting} className={styles.submit}>
                 {submitting && <LoaderCircle className="size-4 animate-spin" aria-hidden />}
                 {submitting ? (mode === "login" ? "正在登录" : "正在创建账户") : (mode === "login" ? "登录" : "创建账户")}
               </Button>
             </motion.form>
           </AnimatePresence>
+          <p className={styles.formFootnote}>
+            {mode === "login" ? <>
+              初次来到学枢？
+              <button type="button" className={styles.registerLink} disabled={submitting} onClick={() => switchMode("register")}>注册账号</button>
+            </> : "你的学习记录与知识画像，会随学习逐步积累。"}
+          </p>
         </div>
       </motion.section>
+      <footer className={styles.footer}>
+        <span>学枢 · 让知识成为自己的力量</span>
+        <SiteFiling />
+        <WelcomeAnnouncement ready={sceneReady || Boolean(reduceMotion)} onDemo={() => { switchMode("login"); setAccount(DEMO_ACCOUNT.login); setPassword(DEMO_ACCOUNT.password); setShowPassword(false); }} />
+      </footer>
     </main>
   );
 }

@@ -1,0 +1,39 @@
+.scene { min-height: 100dvh; padding: 48px 35px; display: grid; place-items: center; color: #384932; background: linear-gradient(#f6f0e9bc, #f6f0e9ce), url('/brand/path/path-learning-landscape-v1.webp') center / cover fixed; overflow-x: clip; }
+.stage { width: 100%; }
+.setup { width: min(1130px, 100%); margin: auto; }
+.header { display: flex; justify-content: space-between; align-items: end; gap: 25px; padding: 0 4px; margin-bottom: 28px; }
+.header > div > span { font-size: 11px; letter-spacing: .17em; color: #9a7f59; }
+.header h1 { font: 32px/1.5 var(--font-display), serif; margin: 9px 0 0; }
+.header button { color: #8d7a5b; font-size: 12px; padding-bottom: 8px; cursor: pointer; }
+.setupFrame { display: grid; grid-template-columns: 340px minmax(0, 1fr); border: 1px solid #cbb998; box-shadow: 0 20px 60px #695a3612; background: #fcf9f0; }
+.journey { display: flex; flex-direction: column; position: relative; padding: 42px 36px; background: linear-gradient(180deg, #e9e8dcf2, #e9e8dcc7), url('/brand/path/path-learning-landscape-v1.webp') 25% bottom / auto 100%; border-right: 1px solid #cbb99880; }
+.journey .eyebrow { font-size: 10px; letter-spacing: .09em; color: #97815f; margin: 0 0 15px; }
+.journey h2 { font: 27px/1.8 var(--font-display), serif; margin: 0 0 14px; color: #3d553c; }
+.journey > p { font-size: 12px; line-height: 2; color: #8b806b; margin: 0; }
+.journey ol { list-style: none; padding: 0; margin: 30px 0; display: grid; gap: 25px; }
+.journey li { display: flex; align-items: center; gap: 15px; color: #8e8b78; }
+.journey li > span { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #b8b69e; border-radius: 50%; font: 10px ui-monospace, monospace; }
+.journey li strong { display: block; font-size: 13px; font-weight: 500; }
+.journey li small { display: block; font-size: 10px; margin-top: 5px; opacity: .7; }
+.journey li[data-active='true'] { color: #35563d; }
+.journey li[data-active='true'] > span { background: #3d5a41; border-color: #3d5a41; color: #f7f0de; box-shadow: 0 0 0 4px #3d5a4110; }
+.journey li[data-complete='true'] > span { border-color: #6e875b; color: #6e875b; }
+.journey .journeyNote { font-size: 10px; margin-top: auto; padding-top: 12px; color: #978b74; }
+.form { min-width: 0; display: flex; flex-direction: column; }
+.formBody { padding: 43px 42px 28px; min-height: 490px; flex: 1; }
+.formBody h2 { font: 23px/1.6 var(--font-display), serif; color: #344a33; }
+.formBody h2 + p { font-size: 12px; line-height: 1.9; margin-top: 6px; color: #9b8b70; }
+.formBody fieldset { margin-top: 26px; }
+.formBody label:has(input[type='radio']:checked) { background: #3b5a42; border-color: #3b5a42; }
+.formBody label:has(input[type='checkbox']:checked) { background: #eff0e5; border-color: #6a805b; }
+.formBody label:has(input[type='checkbox']:checked) > span:first-of-type { background: #3b5a42; border-color: #3b5a42; }
+.formBody label:has(input:focus-visible) { outline: 2px solid #a68954; outline-offset: 3px; }
+.formBody textarea { border-radius: 3px; background: #fffdf8; }
+.formFooter { min-height: 86px; padding: 18px 42px; border-top: 1px solid #d3c6ad70; display: flex; gap: 12px; align-items: center; }
+.next { min-width: 115px; height: 42px; background: #34533d; border-radius: 3px; color: #fff8e9; }
+.next:hover { background: #25412e; }
+.setupNote { text-align: center; color: #9e8c6c; font-size: 11px; margin: 28px 0 0; }
+.setupNote > span { margin: 0 16px; color: #c2b295; }
+@media (min-width: 721px) and (max-height: 850px) { .scene { padding: 28px 30px; } .header { margin-bottom: 20px; } .header h1 { font-size: 28px; } .journey { padding-top: 30px; padding-bottom: 30px; } .journey h2 { font-size: 24px; } .journey ol { margin: 22px 0; gap: 18px; } .formBody { min-height: 430px; padding-top: 30px; padding-bottom: 24px; } .formFooter { min-height: 74px; } .setupNote { margin-top: 20px; } }
+@media (max-width: 950px) { .setupFrame { grid-template-columns: 265px minmax(0,1fr); } .journey { padding: 34px 25px; } .journey h2 { font-size: 23px; } .formBody { padding: 35px 26px; } .formFooter { padding: 18px 26px; } }
+@media (max-width: 720px) { .scene { padding: 28px 15px; } .header h1 { font-size: 25px; } .header button { font-size: 10px; } .setupFrame { grid-template-columns: 1fr; } .journey { padding: 20px 23px; border-right: 0; border-bottom: 1px solid #cbb99880; } .journey h2, .journey > p, .journey .eyebrow, .journey .journeyNote { display: none; } .journey ol { display: flex; justify-content: space-between; margin: 0; gap: 12px; } .journey li { gap: 7px; } .journey li small { display: none; } .journey li strong { font-size: 11px; } .journey li > span { width: 26px; height: 26px; } .formBody { min-height: 390px; padding: 28px 22px; } .formBody h2 { font-size: 20px; } .formFooter { padding: 16px 22px; } .setupNote { font-size: 10px; } .setupNote > span { margin: 0 6px; } }

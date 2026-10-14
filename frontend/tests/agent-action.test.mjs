@@ -23,6 +23,10 @@ test("opening existing material takes precedence over generation intent", () => 
   assert.equal(isResourceOpenIntent("请解释怎么打开资料"), false);
   assert.equal(hasResourceTypeHint("打开数据结构入门学习视频"), true);
   assert.equal(hasResourceTypeHint("打开资源中心里的东西"), false);
+  assert.equal(isResourceOpenIntent("你能帮我打开资源中心吗"), false);
+  assert.equal(isResourceOpenIntent("打开资源中心并说明怎么使用"), false);
+  assert.equal(wantsResourceGeneration("打开资源生成页面"), false);
+  assert.equal(isResourceOpenIntent("不要打开讲义"), false);
 });
 
 test("fallback action only selects a real ready resource", () => {

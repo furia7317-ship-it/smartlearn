@@ -1,6 +1,14 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { appHelpAnswer, isAppNavigationRequest, navigateToAppTarget, parseAppNavigation } from "@/lib/app-navigation";
+import { readCollaboration } from "@/lib/collaboration";
+import { mergeAbilityEvidence } from "@/lib/ability-path";
+import { normalizeStoredMessages, conversationTitle, createConversationId, upsertConversation, buildConversationStateSnapshot } from "@/lib/conversation-state";
+import { useConversationPersistence } from "@/hooks/use-conversation-persistence";
+import { useTrainingEvidence } from "@/hooks/use-training-evidence";
+import { useLearningData } from "@/hooks/use-learning-data";
 
 import {
   cancelAgentRun,
@@ -16,7 +24,6 @@ import {
   hasResourceTypeHint,
   isResourceOpenIntent,
   readyResourceCandidates,
-  wantsResourceGeneration,
 } from "@/lib/agent-action";
 import {
   acceptsBoundRun,
@@ -35,6 +42,7 @@ import {
 } from "@/lib/conversation-sessions";
 import {
   getConversationState,
+  getConversationSync,
   saveConversationState,
   type StoredConversationState,
 } from "@/lib/conversation-store";
@@ -95,6 +103,7 @@ import {
   scheduleSnapshotToPath as scheduleToPath,
 } from "@/lib/resource-plan-recovery";
 import { createReasoningPresentationQueue } from "@/lib/reasoning-presentation";
+import { normalizeAgentProgress } from "@/lib/agent-progress";
 import { masteryTarget, mergeAssessmentTags } from "@/lib/profile-assessment";
 import { getStudentId } from "@/lib/student-identity";
 import {
@@ -107,7 +116,7 @@ import {
   normalizeTeacherPersona,
   type TeacherPersona,
 } from "@/lib/teacher-persona";
-import { isValidLearningBaseline, needsLearningBaseline } from "@/lib/learning-baseline";
+import { isValidLearningBaseline } from "@/lib/learning-baseline";
 import { createMarketPathRecord, type MarketPathSnapshot } from "@/lib/learning-market";
 import {
   confirmedLearningPathAnswers,
@@ -137,6 +146,7 @@ import type {
   ResourceItem,
   ResourceType,
   TutorAttachment,
+  TutorPageContext,
 } from "@/lib/types";
 import {
   buildWatchedVideoStep,
@@ -157,6 +167,8 @@ export interface TaskEvidenceRecord {
   content: string;
   completedAt: string;
   passed?: boolean;
+  score?: number;
+  verifiedAt?: string;
 }
 
 /** SQLite workspace snapshot（不包含瞬态 running/phase/agents/logs）。 */
@@ -257,14 +269,11 @@ const TUTOR_STEPS: Record<string, string> = {
   answer: "组织回答",
   // agent harness（/api/chat 工具调用）进度
   think: "理解问题",
+  voice_tutor: "语音教师",
   tool: "调用工具",
   generate_learning_material: "生成学习资料",
   search_knowledge_base: "检索知识库",
 };
-
-function wantsResource(text: string): boolean {
-  return wantsResourceGeneration(text);
-}
 
 function mergeResourceLists(
   persisted: readonly ResourceItem[],
@@ -298,120 +307,6 @@ function videoTopic(text: string): string {
   return cleaned || text.trim();
 }
 
-function normalizeStoredMessages(messages: ChatMessage[]): ChatMessage[] {
-  return messages.map((message) => {
-    let next = message;
-    if (
-      message.role === "assistant" &&
-      message.kind === "text" &&
-      message.content.startsWith("本轮协同完成：生成")
-    ) {
-      next = {
-        ...message,
-        content: message.content
-          .replace("本轮协同完成：", "生成资料已更新到学习路径和资源中心：")
-          .replace(
-            "右侧「协同」页有完整事件流，继续追问可进入即时辅导。",
-            "你可以去「学习路径」按每天任务学习，或在「资源中心」查看具体资料。"
-          ),
-      };
-    }
-    if (
-      message.role === "assistant" &&
-      message.kind === "text" &&
-      /error code:\s*402/i.test(message.content) &&
-      /insufficient balance/i.test(message.content)
-    ) {
-      next = {
-        ...message,
-        content: "模型服务额度不足，当前无法完成需要模型推理的问答。请补充额度后重试。",
-      };
-    }
-    return {
-      ...next,
-      streaming: false,
-      reasoning: undefined,
-      trace: undefined,
-    };
-  }).filter(
-    (message) =>
-      message.kind !== "text" ||
-      message.content.trim().length > 0 ||
-      Boolean(message.runId || message.planId),
-  );
-}
-
-function conversationTitle(
-  messages: ChatMessage[],
-  kind: ConversationKind = "general",
-  resourceTitle = "",
-): string {
-  if (kind === "resource_qa") {
-    const title = resourceTitle.trim() || inferResourceTitle(messages) || "学习资料";
-    return `资料问答 · ${title}`;
-  }
-  const title = messages.find((message) => message.role === "user")?.content.trim();
-  if (!title) return "新会话";
-  return title.length > 26 ? `${title.slice(0, 26)}…` : title;
-}
-
-function createConversationId(): string {
-  return `conversation_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function upsertConversation(
-  history: ConversationSession[],
-  session: ConversationSession,
-): ConversationSession[] {
-  return [session, ...history.filter((item) => item.id !== session.id)]
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .slice(0, 100);
-}
-
-function buildConversationStateSnapshot({
-  messages,
-  conversationHistory,
-  activeConversationId,
-  activeConversationTitle,
-  activeConversationUpdatedAt,
-  activeTeacher,
-  activeConversationKind,
-  activeResourceId,
-  activeResourceTitle,
-  activeResourceContext,
-}: {
-  messages: ChatMessage[];
-  conversationHistory: ConversationSession[];
-  activeConversationId: string;
-  activeConversationTitle: string;
-  activeConversationUpdatedAt: number;
-  activeTeacher: TeacherPersona;
-  activeConversationKind: ConversationKind;
-  activeResourceId: string;
-  activeResourceTitle: string;
-  activeResourceContext: string;
-}): StoredConversationState {
-  const active: ConversationSession = {
-    id: activeConversationId,
-    title:
-      activeConversationTitle.trim() ||
-      conversationTitle(messages, activeConversationKind, activeResourceTitle),
-    updatedAt: activeConversationUpdatedAt,
-    messages: normalizeStoredMessages(messages),
-    teacher: activeTeacher,
-    kind: activeConversationKind,
-    resourceId: activeResourceId,
-    resourceTitle: activeResourceTitle,
-    resourceContext: activeResourceContext,
-  };
-  return {
-    activeConversationId,
-    sessions: [active, ...conversationHistory.filter((session) => session.id !== activeConversationId)]
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 100),
-  };
-}
-
 export type PendingLearningPath = LearningPathRunState;
 
 export interface PendingSoftwareAction {
@@ -433,6 +328,7 @@ const PENDING_LEARNING_PATH_KEY = "sl_pending_learning_path_v1";
  * 后端不可达时进入 offline 状态，只提示连接问题，不合成脚本数据。
  */
 export function useOrchestrator() {
+  const router = useRouter();
   const [mode, setMode] = useState<OrchestratorMode>(() => {
     const cached = getCachedBackendStatus();
     return cached === null ? "checking" : cached ? "live" : "offline";
@@ -484,6 +380,8 @@ export function useOrchestrator() {
   const [pendingSoftwareAction, setPendingSoftwareAction] = useState<PendingSoftwareAction | null>(null);
 
   const activeConversationIdRef = useRef(activeConversationId);
+  const messagesRef = useRef(messages);
+  const conversationHistoryRef = useRef(conversationHistory);
   const logIdRef = useRef(0);
   const msgIdRef = useRef(0);
   const softwareActionIdRef = useRef(0);
@@ -501,12 +399,19 @@ export function useOrchestrator() {
   const plansRef = useRef(plans);
   const resourcesRef = useRef(resources);
   const saveTimerRef = useRef<number | undefined>(undefined);
-  const conversationSaveTimerRef = useRef<number | undefined>(undefined);
   const workspaceVersionRef = useRef(0);
   const workspaceSaveChainRef = useRef<Promise<void>>(Promise.resolve());
   const [conversationSyncReady, setConversationSyncReady] = useState(false);
+  const [clearingConversations, setClearingConversations] = useState(false);
+  const clearingConversationsRef = useRef(false);
   // 会话回灌完成前不落盘，避免用初始空状态覆盖已有存档。
   const [hydrated, setHydrated] = useState(false);
+  const { evidence: trainingEvidence, error: trainingEvidenceError } = useTrainingEvidence(hydrated && mode === "live");
+  const learningData = useLearningData(hydrated && mode === "live");
+  const publishedProfile = useMemo(() => {
+    const dimensions = learningData.data?.snapshot.dimensions;
+    return learningData.data?.revision ? dimensions ?? [] : profile;
+  }, [learningData.data?.revision, learningData.data?.snapshot.dimensions, profile]);
   const pendingLearningPath = pendingLearningPaths[activeConversationId] ?? null;
   const setPendingLearningPathForConversation = useCallback((
     conversationId: string,
@@ -604,6 +509,14 @@ export function useOrchestrator() {
   }, [activeConversationId]);
 
   useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    conversationHistoryRef.current = conversationHistory;
+  }, [conversationHistory]);
+
+  useEffect(() => {
     for (const message of messages) {
       messageConversationRef.current.set(message.id, activeConversationId);
     }
@@ -663,14 +576,21 @@ export function useOrchestrator() {
     return true;
   }, []);
 
-  // 启动时探测后端；后端不可达时不再降级为脚本演示，只进入离线提示状态。
+  // Recover after the backend restarts, including when it was down at startup.
   useEffect(() => {
     let cancelled = false;
-    checkBackend().then((ok) => {
+    const check = () => { void checkBackend().then((ok) => {
       if (!cancelled) setMode(ok ? "live" : "offline");
-    });
+    }); };
+    check();
+    const retry = window.setInterval(check, 15_000);
+    window.addEventListener("online", check);
+    window.addEventListener("conversation-sync-retry", check);
     return () => {
       cancelled = true;
+      window.clearInterval(retry);
+      window.removeEventListener("online", check);
+      window.removeEventListener("conversation-sync-retry", check);
     };
   }, []);
 
@@ -1019,12 +939,35 @@ export function useOrchestrator() {
     resourceExecution,
   ]);
 
+  const conversationSnapshot = useMemo(() => buildConversationStateSnapshot({
+    messages, conversationHistory, activeConversationId, activeConversationTitle,
+    activeConversationUpdatedAt, activeTeacher, activeConversationKind,
+    activeResourceId, activeResourceTitle, activeResourceContext,
+  }), [messages, conversationHistory, activeConversationId, activeConversationTitle,
+    activeConversationUpdatedAt, activeTeacher, activeConversationKind,
+    activeResourceId, activeResourceTitle, activeResourceContext]);
+
+  const importRemoteConversations = useCallback((state: StoredConversationState, aliases: Record<string, string>) => {
+    if (clearingConversationsRef.current) return;
+    // Do not replace local messages while an agent is streaming. New remote
+    // sessions can join the history; divergent versions are already durable.
+    setConversationHistory((history) => {
+      const known = new Set([activeConversationIdRef.current, ...history.map((s) => s.id),
+        ...Object.values(aliases), ...getConversationSync().getPendingDeletions()]);
+      const additions = state.sessions.filter((session) => !known.has(session.id));
+      return additions.length ? [...history, ...additions].sort((a, b) => b.updatedAt - a.updatedAt) : history;
+    });
+  }, []);
+
+  useConversationPersistence(
+    hydrated && conversationSyncReady && !clearingConversations,
+    conversationSnapshot,
+    importRemoteConversations,
+    mode === "live",
+  );
+
   useEffect(() => {
     if (!hydrated || mode === "checking" || conversationSyncReady) return;
-    if (mode === "offline") {
-      setConversationSyncReady(true);
-      return;
-    }
     let cancelled = false;
     const currentLocalState = buildConversationStateSnapshot({
       messages,
@@ -1090,14 +1033,14 @@ export function useOrchestrator() {
     void (async () => {
       const localState = normalizeState(currentLocalState);
       try {
-        const serverState = normalizeState(await getConversationState());
+        const serverState = normalizeState(await getConversationState(mode === "live"));
         if (cancelled) return;
         const hasMigratedLocalConversation = localState.sessions.some(
           (session) => session.messages.length > 0,
         );
         if (serverState.sessions.length === 0 && hasMigratedLocalConversation) {
           applyState(localState);
-          await saveConversationState(localState);
+          if (mode === "live") await saveConversationState(localState);
         } else if (serverState.sessions.length > 0) {
           applyState(serverState);
         }
@@ -1128,40 +1071,7 @@ export function useOrchestrator() {
     plans,
   ]);
 
-  useEffect(() => {
-    if (!hydrated || mode !== "live" || !conversationSyncReady) return;
-    window.clearTimeout(conversationSaveTimerRef.current);
-    const state = buildConversationStateSnapshot({
-      messages,
-      conversationHistory,
-      activeConversationId,
-      activeConversationTitle,
-      activeConversationUpdatedAt,
-      activeTeacher,
-      activeConversationKind,
-      activeResourceId,
-      activeResourceTitle,
-      activeResourceContext,
-    });
-    conversationSaveTimerRef.current = window.setTimeout(() => {
-      void saveConversationState(state).catch(() => undefined);
-    }, 500);
-    return () => window.clearTimeout(conversationSaveTimerRef.current);
-  }, [
-    activeConversationId,
-    activeConversationTitle,
-    activeConversationKind,
-    activeConversationUpdatedAt,
-    activeResourceContext,
-    activeResourceId,
-    activeResourceTitle,
-    activeTeacher,
-    conversationHistory,
-    conversationSyncReady,
-    hydrated,
-    messages,
-    mode,
-  ]);
+
 
   const markProfileUpdate = useCallback((source: string) => {
     setProfileUpdatedAt(new Date().toISOString());
@@ -2201,8 +2111,8 @@ export function useOrchestrator() {
         JSON.stringify({ ...pendingLearningPath, stage: "confirming", error: undefined }),
       );
     }
-    window.location.assign("/desktop/kb/");
-  }, [pendingLearningPath]);
+    router.push("/desktop/kb/");
+  }, [pendingLearningPath, router]);
 
   const cancelLearningPath = useCallback(() => {
     if (!canCancelPlanning(pendingLearningPath)) return;
@@ -2524,13 +2434,22 @@ export function useOrchestrator() {
       displayQuestion = question,
       historyOverride?: ChatMessage[],
       attachments: TutorAttachment[] = [],
+      pageContext?: TutorPageContext,
+      responseMode: "text" | "voice" = "text",
     ) => {
       const ownerConversationId = activeConversationIdRef.current;
       const ownerTeacher = activeTeacher;
       const ctrl = new AbortController();
       setRunning(true);
       setHasRunMain(true);
-      const history = (historyOverride ?? messages)
+      const scopedMessages = historyOverride ?? (
+        ownerConversationId === activeConversationIdRef.current
+          ? messagesRef.current
+          : conversationHistoryRef.current.find(
+              (session) => session.id === ownerConversationId,
+            )?.messages ?? []
+      );
+      const history = scopedMessages
         .filter(
           (message) =>
             message.kind === "text" &&
@@ -2560,7 +2479,10 @@ export function useOrchestrator() {
         });
       }
       setPhase("tutoring");
-      setAgent("tutor", { status: "working", detail: "正在思考并组织回答" });
+      setAgent("tutor", {
+        status: "working",
+        detail: responseMode === "voice" ? "正在快速回复" : "正在思考并组织回答",
+      });
 
       // 提前建立助手消息，让后端 run_id、公开事件和最终正文始终绑定到同一条回答。
       const msgId = addMessageToConversation(
@@ -2586,8 +2508,8 @@ export function useOrchestrator() {
       const runActive = () => tutorRunsRef.current.get(ownerConversationId) === control;
       let sourceCount = 0;
       let terminalMessage = false;
+      let pageActionHandled = false;
       let presentationQueue = Promise.resolve();
-      const presentedReasoning = new Map<string, string>();
       const enqueuePresentation = (
         apply: () => void,
         delayMs = 0,
@@ -2598,49 +2520,6 @@ export function useOrchestrator() {
           if (delayMs > 0) await sleep(delayMs);
         });
       };
-      const enqueueTraceEvent = (data: Record<string, unknown>) => {
-        if (data.event_type !== "reasoning") {
-          enqueuePresentation(() => ingestRunEvent(msgId, data));
-          return;
-        }
-        const spanKey = String(data.span_id ?? data.event_id ?? "reasoning");
-        const previous = presentedReasoning.get(spanKey) ?? "";
-        const delta = typeof data.reasoning_delta === "string"
-          ? data.reasoning_delta
-          : "";
-        const complete = typeof data.reasoning_text === "string"
-          ? data.reasoning_text
-          : "";
-        const target = complete || `${previous}${delta}`;
-        if (!target.startsWith(previous)) {
-          presentedReasoning.set(spanKey, target);
-          enqueuePresentation(() => ingestRunEvent(msgId, data));
-          return;
-        }
-        const remaining = target.slice(previous.length);
-        let emitted = previous;
-        for (let index = 0; index < remaining.length; index += 6) {
-          const piece = remaining.slice(index, index + 6);
-          emitted += piece;
-          const visible = emitted;
-          const presentationEvent = {
-            ...data,
-            event_id: `${String(data.event_id ?? spanKey)}:presentation:${visible.length}`,
-            status: data.status === "completed" ? "running" : data.status,
-            reasoning_text: undefined,
-            reasoning_delta: piece,
-            decision_summary: visible,
-          };
-          enqueuePresentation(
-            () => ingestRunEvent(msgId, presentationEvent),
-            40,
-          );
-        }
-        presentedReasoning.set(spanKey, target);
-        if (data.status === "completed") {
-          enqueuePresentation(() => ingestRunEvent(msgId, data));
-        }
-      };
       try {
         await streamSSE(
           "/api/chat",
@@ -2650,12 +2529,43 @@ export function useOrchestrator() {
             message: question,
             history,
             attachments,
+            page_context: pageContext ? {
+              module: pageContext.module?.trim().slice(0, 80) || "",
+              title: pageContext.title?.trim().slice(0, 180) || "",
+              detail: pageContext.detail?.trim().slice(0, 1200) || "",
+              entity_id: pageContext.entityId?.trim().slice(0, 120) || "",
+            } : undefined,
             teacher_persona: ownerTeacher,
+            response_mode: responseMode,
+            collaboration: readCollaboration(),
           },
           ({ event, data }) => {
             if (!runActive()) return;
+            if (
+              responseMode === "voice"
+              && ["trace", "run_event", "progress", "context_budget", "sources"].includes(event)
+            ) return;
             if (event === "trace" || event === "run_event") {
-              enqueueTraceEvent(data);
+              // Execution events must not wait behind answer or summary animations.
+              ingestRunEvent(msgId, data);
+            } else if (event === "app_action") {
+              if (!pageActionHandled && ownerConversationId === activeConversationIdRef.current
+                && data.type === "open_page" && isAppNavigationRequest(question)) {
+                pageActionHandled = navigateToAppTarget(data.target, router);
+              }
+            } else if (event === "resource_plan") {
+              const record = data as unknown as ResourcePlanRecord;
+              if (record.plan?.plan_id && record.execution) {
+                planConversationRef.current.set(record.plan.plan_id, ownerConversationId);
+                storeAcceptedPlanSnapshot(record);
+                patchMessage(msgId, { planId: record.plan.plan_id });
+                if (ownerConversationId === activeConversationIdRef.current) {
+                  const recovered = recoverResourcePlanRecord(record, resourcesRef.current);
+                  resourcesRef.current = recovered.resources;
+                  setResources(recovered.resources);
+                  if (recovered.path.length) setPath(recovered.path);
+                }
+              }
             } else if (event === "context_budget") {
               const used = Number(data.estimated_input_tokens ?? 0);
               const budget = Number(data.input_budget ?? 0);
@@ -2666,6 +2576,8 @@ export function useOrchestrator() {
                 "ok",
               );
             } else if (event === "progress") {
+              const progress = normalizeAgentProgress(data);
+              if (progress) patchMessage(msgId, { progress });
               const step = TUTOR_STEPS[(data.agent as string) ?? ""] ?? (data.agent as string);
               const detail = (data.detail as string) ?? "";
               if ((data.status as string) === "started" || detail) {
@@ -2677,7 +2589,7 @@ export function useOrchestrator() {
             } else if (event === "delta") {
               enqueuePresentation(
                 () => appendMessage(msgId, (data.text as string) ?? ""),
-                8,
+                responseMode === "voice" ? 0 : 8,
               );
             } else if (event === "answer_reset") {
               enqueuePresentation(
@@ -2758,10 +2670,11 @@ export function useOrchestrator() {
       finishMessage,
       ingestRunEvent,
       log,
-      messages,
       patchMessage,
       setAgent,
       syncRunningState,
+      storeAcceptedPlanSnapshot,
+      router,
     ]
   );
 
@@ -2966,10 +2879,40 @@ export function useOrchestrator() {
   }, []);
 
   const send = useCallback(
-    (text: string, attachments: TutorAttachment[] = []) => {
+    (
+      text: string,
+      attachments: TutorAttachment[] = [],
+      pageContext?: TutorPageContext,
+      responseMode: "text" | "voice" = "text",
+    ) => {
       const trimmed = text.trim();
       if ((!trimmed && attachments.length === 0) || conversationRunning || mode === "checking") return;
       const question = trimmed || "请阅读这些附件并解答其中的问题，给出关键步骤、结论和必要的逐题解析。";
+      // Product navigation and built-in help do not need an LLM or course retrieval.
+      // Keep this ahead of voice/resource intent, so opening a page never creates material.
+      if (attachments.length === 0) {
+        const destination = parseAppNavigation(question);
+        if (destination && navigateToAppTarget(destination.id, router)) {
+          addMessage("user", "text", question);
+          addMessage("assistant", "text", `正在为你打开「${destination.title}」。`);
+          return;
+        }
+        const help = appHelpAnswer(question);
+        if (help && responseMode !== "voice") {
+          addMessage("user", "text", question);
+          addMessage("assistant", "text", help);
+          return;
+        }
+      }
+      if (responseMode === "voice") {
+        if (mode === "offline") {
+          addMessage("user", "text", question);
+          addMessage("assistant", "text", "后端未连接，暂时无法进行语音答疑。" );
+          return;
+        }
+        void runTutorLive(question, question, undefined, attachments, pageContext, "voice");
+        return;
+      }
       if (attachments.length > 0) {
         if (mode === "offline") {
           const messageId = addMessage("user", "text", question);
@@ -2979,7 +2922,7 @@ export function useOrchestrator() {
           addMessage("assistant", "text", "后端未连接，暂时无法解析附件。请启动本地后端后重新发送。" );
           return;
         }
-        void runTutorLive(question, question, undefined, attachments);
+        void runTutorLive(question, question, undefined, attachments, pageContext);
         return;
       }
       // “打开/查看/播放资料”是软件动作，优先级高于资料生成和普通答疑。
@@ -3002,13 +2945,11 @@ export function useOrchestrator() {
         return;
       }
       // 明确要生成资料才走多智能体资源管线；普通首轮问答也直接交给 /api/chat。
-      const generate = wantsResource(question);
-      if (generate && needsLearningBaseline(question)) {
-        requestLearningPath(question);
-      } else if (generate) void createPlanForRequest(question);
-      else void runTutorLive(question);
+      // Free-form intent and mixed requests belong to the main Agent. The
+      // explicit learning-path form retains its existing learner setup flow.
+      void runTutorLive(question, question, undefined, [], pageContext);
     },
-    [addMessage, conversationRunning, createPlanForRequest, mode, patchMessage, requestLearningPath, runResourceOpenAction, runTutorLive, runVideoSearch]
+    [addMessage, conversationRunning, mode, patchMessage, router, runResourceOpenAction, runTutorLive, runVideoSearch]
   );
 
   /**
@@ -3031,6 +2972,7 @@ export function useOrchestrator() {
     let waitingForTutorTerminal = false;
     const tutorControl = tutorRunsRef.current.get(ownerConversationId);
     const tutorMessageId = tutorControl?.messageId;
+    if (tutorMessageId) patchMessage(tutorMessageId, { cancellationRequested: true });
     const tutorRunId = tutorMessageId
       ? messageRunBindingsRef.current.get(tutorMessageId)
       : undefined;
@@ -3097,6 +3039,7 @@ export function useOrchestrator() {
   }, [
     conversationRunning,
     finishMessage,
+    patchMessage,
     setPendingLearningPathForConversation,
     storeAcceptedPlanSnapshot,
     syncRunningState,
@@ -3139,13 +3082,14 @@ export function useOrchestrator() {
       kind: TaskEvidenceRecord["kind"] = "written_response",
       markComplete = true,
       passed = markComplete,
+      score?: number,
     ) => {
       const normalized = content.replace(/\s+/g, " ").trim();
       if (!key || normalized.length < 2) return;
       const completedAt = new Date().toISOString();
       setTaskEvidence((previous) => ({
         ...previous,
-        [key]: { kind, content: normalized.slice(0, 2000), completedAt, passed },
+        [key]: mergeAbilityEvidence(previous[key], { kind, content: normalized.slice(0, 2000), completedAt, passed, score }),
       }));
       if (markComplete) {
         setCompletedMaterials((previous) =>
@@ -3190,15 +3134,15 @@ export function useOrchestrator() {
       setProfile((previous) => applyPracticeProfile(previous, submission));
       markProfileUpdate("练习批改");
       const evidence = `已提交《${resource.title}》：${submission.correctCount}/${submission.total} 题正确，得分 ${submission.score}`;
-      recordTaskEvidence(resourceCompletionKey(resource.id), evidence, "quiz_submission");
+      const verificationPassed = submission.score >= QUIZ_PASS_SCORE;
+      recordTaskEvidence(resourceCompletionKey(resource.id), evidence, "quiz_submission", true, verificationPassed, submission.score);
 
       let targetKey = learningTaskKey;
       if (!targetKey) {
         const candidates: { key: string; exact: boolean }[] = [];
         path.forEach((step, stageIndex) => {
           (step.steps ?? []).forEach((task, taskIndex) => {
-            const key = taskCompletionKey(stageIndex, taskIndex);
-            if (completedMaterials.includes(key)) return;
+            const key = task.completion_key ?? taskCompletionKey(stageIndex, taskIndex);
             const practiceTask =
               task.kind === "practice" ||
               task.resource_types.includes("quiz") ||
@@ -3210,9 +3154,11 @@ export function useOrchestrator() {
             });
           });
         });
-        targetKey = candidates.find((candidate) => candidate.exact)?.key ?? candidates[0]?.key;
+        const exactCandidates = candidates.filter((candidate) => candidate.exact);
+        // Shared quizzes need the explicit node/task context; never credit an unrelated task.
+        targetKey = exactCandidates.length === 1 ? exactCandidates[0].key : undefined;
       }
-      if (targetKey) recordTaskEvidence(targetKey, evidence, "quiz_submission");
+      if (targetKey) recordTaskEvidence(targetKey, evidence, "quiz_submission", true, verificationPassed, submission.score);
 
       const stageMatch = targetKey?.match(/^(\d+):task:(\d+)$/);
       const stageIndex = stageMatch ? Number(stageMatch[1]) : -1;
@@ -3238,7 +3184,7 @@ export function useOrchestrator() {
         });
       }
     },
-    [completedMaterials, markProfileUpdate, path, recordTaskEvidence]
+    [markProfileUpdate, path, recordTaskEvidence]
   );
 
   const recordCodePractice = useCallback((input: {
@@ -3283,6 +3229,7 @@ export function useOrchestrator() {
     messageRunBindingsRef.current.clear();
     messageTraceSequenceRef.current.clear();
     replayedRunIdsRef.current.clear();
+    messagesRef.current = [];
     setMessages([]);
     setAgentRunStore(createAgentRunStore());
     setFocusedRunByConversation({});
@@ -3299,13 +3246,13 @@ export function useOrchestrator() {
 
   /** Switch the visible conversation without cancelling background plans. */
   const clearConversationSurface = useCallback(() => {
+    messagesRef.current = [];
     setMessages([]);
     setHasRunMain(false);
     setActiveConversationUpdatedAt(Date.now());
   }, []);
 
   const archiveActiveConversation = useCallback(() => {
-    if (messages.length === 0) return;
     const snapshot: ConversationSession = {
       id: activeConversationId,
       title:
@@ -3405,7 +3352,7 @@ export function useOrchestrator() {
     clearConversationSurface();
     activeConversationIdRef.current = target.id;
     setActiveConversationId(target.id);
-    setActiveConversationTitle(target.title);
+    setActiveConversationTitle(target.title === "新会话" ? "" : target.title);
     setActiveConversationUpdatedAt(target.updatedAt);
     setActiveTeacher(normalizeTeacherPersona(target.teacher));
     setActiveConversationKind(target.kind);
@@ -3429,6 +3376,7 @@ export function useOrchestrator() {
       return Number.isFinite(value) ? Math.max(maximum, value) : maximum;
     }, 0);
     msgIdRef.current = Math.max(msgIdRef.current, targetMaxId);
+    messagesRef.current = restoredMessages;
     setMessages(restoredMessages);
     setHasRunMain(target.messages.length > 0);
   }, [
@@ -3441,13 +3389,16 @@ export function useOrchestrator() {
   /** Delete one complete conversation while preserving shared learning outputs. */
   const deleteConversation = useCallback((conversationId: string) => {
     if (running) return;
+    getConversationSync().deleteSession(conversationId);
     setConversationHistory((history) =>
       history.filter((session) => session.id !== conversationId),
     );
     if (conversationId !== activeConversationId) return;
     clearMessages();
     setPendingLearningPathForConversation(conversationId, null);
-    setActiveConversationId(createConversationId());
+    const nextConversationId = createConversationId();
+    activeConversationIdRef.current = nextConversationId;
+    setActiveConversationId(nextConversationId);
     setActiveConversationTitle("");
     setActiveConversationUpdatedAt(Date.now());
     setActiveConversationKind("general");
@@ -3455,6 +3406,31 @@ export function useOrchestrator() {
     setActiveResourceTitle("");
     setActiveResourceContext("");
   }, [activeConversationId, clearMessages, running, setPendingLearningPathForConversation]);
+
+  const clearAllConversations = useCallback(async () => {
+    if (running || clearingConversationsRef.current) throw new Error("请等待当前任务完成后再清除会话");
+    if (mode !== "live") throw new Error("请连接学习服务后再清除账号会话");
+    clearingConversationsRef.current = true;
+    setClearingConversations(true);
+    const client = getConversationSync();
+    try {
+      await client.clearAll();
+      if (client !== getConversationSync()) return;
+      clearMessages();
+      setConversationHistory([]);
+      const conversationId = createConversationId();
+      activeConversationIdRef.current = conversationId;
+      setActiveConversationId(conversationId);
+      setActiveConversationTitle("");
+      setActiveConversationKind("general");
+      setActiveResourceId("");
+      setActiveResourceTitle("");
+      setActiveResourceContext("");
+    } finally {
+      clearingConversationsRef.current = false;
+      setClearingConversations(false);
+    }
+  }, [clearMessages, mode, running]);
 
   const renameConversation = useCallback((conversationId: string, title: string) => {
     const nextTitle = title.trim().replace(/\s+/g, " ").slice(0, 40);
@@ -3914,16 +3890,24 @@ export function useOrchestrator() {
     openConversation,
     renameConversation,
     deleteConversation,
+    clearAllConversations,
+    clearingConversations,
     agentRunStore,
     activeAgentRun,
     focusMessageRun,
     agents,
     logs,
     resources,
-    profile,
+    profile: publishedProfile,
     tags,
-    profileUpdatedAt,
-    profileSources,
+    profileUpdatedAt: learningData.data?.updatedAt || profileUpdatedAt,
+    profileSources: learningData.data?.revision ? ["学习数据管家"] : profileSources,
+    learningData: learningData.data,
+    learningDataError: learningData.error,
+    refreshLearningData: learningData.refresh,
+    refreshingLearningData: learningData.refreshing,
+    trainingEvidence,
+    trainingEvidenceError,
     path,
     pathScheduleAnchor,
     subjectPaths,
@@ -3947,6 +3931,7 @@ export function useOrchestrator() {
     conversationSwitchLocked: false,
     hasRunMain,
     hydrated,
+    conversationSyncReady,
     practiceAttempts,
     adjustments,
     completedMaterials,
@@ -3995,4 +3980,3 @@ export function useOrchestrator() {
     cancelPlan,
   };
 }
-

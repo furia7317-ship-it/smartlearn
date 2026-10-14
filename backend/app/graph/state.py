@@ -59,6 +59,8 @@ class PlannedResourceState(TypedDict):
     knowledge_gate_enforced: bool
     # ``custom:<id>`` → 用户自建智能体定义；图内不查库，由管线入口预加载。
     custom_agents: dict[str, dict[str, Any]]
+    procedure_skills: dict[str, list[dict[str, Any]]]
+    skill_review_history: dict[str, list[dict[str, Any]]]
 
 
 class ExamState(TypedDict):
@@ -70,6 +72,7 @@ class ExamState(TypedDict):
     weak_points: list[str]
     kb_context: list[dict[str, Any]]
     composition: dict[str, Any]
+    requested_composition: dict[str, int]
     paper_type: str
     questions: list[dict[str, Any]]
     exam_id: str

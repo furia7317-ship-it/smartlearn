@@ -1,0 +1,618 @@
+.page {
+  height: 100%;
+  overflow-y: auto;
+  color: #302e27;
+  background-color: #f7f3eb;
+  background-image: linear-gradient(110deg, rgb(247 243 235 / .68), rgb(247 243 235 / .8) 48%, rgb(247 243 235 / .56)), url("/brand/backgrounds/mountain-journey.webp");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  font: 400 14px/1.65 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+}
+
+.frame {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 28px var(--desktop-content-inset, 16px) 34px;
+}
+
+.hero,
+.featureCard,
+.marketCard,
+.journey {
+  border: 1px solid #ddd3c2;
+  background: #fbf6ec;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .46), 0 4px 14px rgb(67 53 32 / .035);
+}
+
+.hero {
+  position: relative;
+  min-height: 350px;
+  overflow: hidden;
+  border-radius: 10px;
+  isolation: isolate;
+}
+
+.heroImage {
+  z-index: 0;
+  object-fit: cover;
+  object-position: center 58%;
+}
+
+.hero::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(250 244 232 / .82), rgb(250 244 232 / .48) 38%, rgb(250 244 232 / 0) 68%);
+  content: "";
+  pointer-events: none;
+}
+
+.heroContent {
+  position: relative;
+  z-index: 2;
+  width: min(56%, 580px);
+  padding: 54px 0 44px 40px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
+  color: #af493c;
+  font: 650 12px/1 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+  letter-spacing: .12em;
+}
+
+.eyebrow::before,
+.eyebrow::after {
+  display: block;
+  width: 20px;
+  height: 1px;
+  background: #bd776c;
+  content: "";
+}
+
+.eyebrow::before {
+  width: 11px;
+}
+
+.hero h1 {
+  margin-top: 28px;
+  color: #201c18;
+  font: 700 clamp(34px, 3.15vw, 46px)/1.25 var(--font-display);
+  letter-spacing: .045em;
+}
+
+.heroContent p {
+  margin-top: 22px;
+  color: #615b4f;
+  font: 400 16px/1.8 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+}
+
+.heroAction,
+.featureAction {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  border: 1px solid #345b46;
+  border-radius: 6px;
+  color: #fffaf2;
+  background: #345b46;
+  box-shadow: 0 3px 8px rgb(36 63 45 / .1);
+  font: 600 14px/1.4 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+  transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+.heroAction {
+  min-width: 158px;
+  margin-top: 28px;
+}
+
+.heroAction:hover,
+.heroAction:focus-visible,
+.featureAction:hover,
+.featureAction:focus-visible {
+  filter: brightness(.95);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 12px rgb(36 63 45 / .16);
+}
+
+.heroAction:active,
+.featureAction:active {
+  transform: translateY(0) scale(.98);
+  box-shadow: 0 1px 4px rgb(36 63 45 / .12);
+}
+
+.heroAction:focus-visible,
+.featureAction:focus-visible,
+.marketHeader a:focus-visible,
+.marketItem:focus-visible,
+.marketAction:focus-visible {
+  outline: 3px solid rgb(52 91 70 / .3);
+  outline-offset: 3px;
+}
+
+.heroAction svg,
+.featureAction svg,
+.marketAction svg {
+  width: 17px;
+  height: 17px;
+  transition: transform 180ms ease;
+}
+
+.heroAction:is(:hover, :focus-visible) svg,
+.featureAction:is(:hover, :focus-visible) svg,
+.marketAction:is(:hover, :focus-visible) svg,
+.marketHeader a:is(:hover, :focus-visible) svg {
+  transform: translateX(3px);
+}
+
+.heroSeal {
+  position: absolute;
+  z-index: 2;
+  top: 34px;
+  right: 43px;
+  width: 35px;
+  height: 59px;
+  object-fit: cover;
+}
+
+.discoveryGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.featureCard {
+  position: relative;
+  min-height: 405px;
+  overflow: hidden;
+  border-radius: 10px;
+  isolation: isolate;
+  transition: border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.featureCard:is(:hover, :focus-within) {
+  border-color: #b6c0a9;
+  box-shadow: 0 7px 18px rgb(49 66 43 / .08);
+}
+
+/* Keep the illustration visible while giving its overlaid copy a quiet surface. */
+.featureCard::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(250 244 232 / .9), rgb(250 244 232 / .5) 44%, rgb(250 244 232 / 0) 76%);
+  content: "";
+  pointer-events: none;
+}
+
+.featureImage {
+  z-index: 0;
+  object-fit: cover;
+  object-position: center center;
+  transition: transform 260ms ease, filter 220ms ease;
+}
+
+.featureCard:is(:hover, :focus-within) .featureImage {
+  filter: contrast(1.02);
+  transform: scale(1.01);
+}
+
+.featureContent {
+  position: relative;
+  z-index: 2;
+  width: 58%;
+  padding: 28px 0 28px 28px;
+}
+
+.recommendBadge {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 3px;
+  color: #fff8ef;
+  background: #ad3e31;
+  box-shadow: 0 3px 8px rgb(86 39 30 / .12);
+  font: 600 12px/1 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+}
+
+.featureKicker {
+  display: block;
+  margin-top: 24px;
+  color: #686253;
+  font: 500 12px/1 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+  letter-spacing: .08em;
+}
+
+.featureContent h2 {
+  margin-top: 18px;
+  color: #28211b;
+  font: 700 34px/1.2 var(--font-display);
+  letter-spacing: .075em;
+}
+
+.featureContent p {
+  margin-top: 20px;
+  color: #61594c;
+  font: 400 14px/1.8 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+}
+
+.featureTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.featureTags li {
+  position: relative;
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid #dcd1bd;
+  border-radius: 999px;
+  color: #795831;
+  background: rgb(250 244 231 / .92);
+  font: 500 12px/1 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+}
+
+.featureTags li + li {
+  margin-left: 7px;
+}
+
+.featureTags li + li::before {
+  position: absolute;
+  left: -13px;
+  color: #aa4a3b;
+  content: "•";
+}
+
+.featureAction {
+  min-width: 174px;
+  min-height: 44px;
+  margin-top: 40px;
+}
+
+.featureCaption {
+  position: absolute;
+  z-index: 2;
+  right: 22px;
+  bottom: 24px;
+  max-width: 42%;
+  padding: 10px 12px;
+  border-radius: 5px;
+  background: rgb(250 245 233 / .88);
+  text-align: right;
+}
+
+.featureCaption strong,
+.featureCaption span {
+  display: block;
+}
+
+.featureCaption strong {
+  color: #27201a;
+  font: 650 19px/1.4 var(--font-display);
+  letter-spacing: .06em;
+}
+
+.featureCaption span {
+  margin-top: 9px;
+  color: #5f5143;
+  font: 400 12px/1.65 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+}
+
+.marketCard {
+  min-height: 405px;
+  padding: 26px 24px 22px;
+  border-radius: 10px;
+}
+
+.marketHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.marketHeader h2 {
+  color: #332a22;
+  font: 700 18px/1.2 var(--font-display);
+  letter-spacing: .045em;
+}
+
+.marketHeader a {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #33705c;
+  font: 600 12px/1.4 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+  white-space: nowrap;
+}
+
+.marketHeader a svg {
+  width: 15px;
+  height: 15px;
+  transition: transform 180ms ease;
+}
+
+.marketList {
+  margin-top: 12px;
+}
+
+.marketItem {
+  display: grid;
+  min-height: 99px;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding-block: 14px;
+  border-bottom: 1px solid #e5ddce;
+  transition: background-color 180ms ease, transform 180ms ease;
+  animation: itemReveal 240ms ease-out backwards;
+}
+
+.marketItem:nth-child(2) { animation-delay: 35ms; }
+.marketItem:nth-child(3) { animation-delay: 70ms; }
+
+.marketItem:hover,
+.marketItem:focus-visible {
+  background: rgb(239 229 210 / .34);
+  transform: translateX(2px);
+}
+
+.marketItem:active {
+  transform: translateX(0);
+}
+
+.marketItem img {
+  width: 96px;
+  height: 78px;
+  border: 1px solid #ddd3c0;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.marketCopy {
+  min-width: 0;
+}
+
+.marketCopy strong,
+.marketCopy small,
+.marketCopy > span {
+  display: block;
+}
+
+.marketCopy strong {
+  overflow: hidden;
+  color: #3f342a;
+  font: 600 14px/1.5 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketCopy small {
+  width: max-content;
+  margin-top: 7px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  color: #736a5a;
+  background: #eee7dc;
+  font: 400 12px/1.2 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+}
+
+.marketCopy > span {
+  overflow: hidden;
+  margin-top: 7px;
+  color: #716957;
+  font: 400 12px/1.6 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lessonCount {
+  color: #81735f;
+  font: 400 12px/1.4 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+  white-space: nowrap;
+}
+
+.marketAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 18px;
+  color: #345b46;
+  font: 600 14px/1.4 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+  letter-spacing: .035em;
+}
+
+.journey {
+  position: relative;
+  min-height: 210px;
+  overflow: hidden;
+  margin-top: 24px;
+  border-radius: 10px;
+  isolation: isolate;
+}
+
+.journeyImage {
+  z-index: 0;
+  object-fit: cover;
+  object-position: center 58%;
+}
+
+.journey figcaption {
+  position: absolute;
+  z-index: 2;
+  top: 28px;
+  left: 30px;
+  display: grid;
+  gap: 7px;
+  padding: 12px 16px;
+  border: 1px solid rgb(197 174 139 / .7);
+  border-radius: 5px;
+  background: rgb(255 250 240 / .94);
+  box-shadow: 0 7px 20px rgb(70 48 26 / .08);
+}
+
+.journey figcaption span {
+  color: #a64a39;
+  font: 650 12px/1 var(--desk-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+  letter-spacing: .13em;
+}
+
+.journey figcaption strong {
+  color: #382e24;
+  font: 680 18px/1.2 var(--font-display);
+  letter-spacing: .065em;
+}
+
+/* Only the small course list enters; route transitions own the page itself. */
+@keyframes itemReveal {
+  from {
+    opacity: .6;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1180px) {
+  .hero {
+    min-height: 340px;
+  }
+
+  .heroImage {
+    object-position: 62% center;
+    opacity: .84;
+  }
+
+  .heroContent {
+    width: min(66%, 560px);
+  }
+
+  .discoveryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .featureCard,
+  .marketCard {
+    min-height: 405px;
+  }
+}
+
+@media (max-width: 720px) {
+  .frame {
+    padding-block: 16px 28px;
+  }
+
+  .hero {
+    min-height: 360px;
+  }
+
+  .heroImage {
+    object-position: 65% center;
+    opacity: .68;
+  }
+
+  .heroContent {
+    width: 90%;
+    padding: 46px 0 36px 24px;
+  }
+
+  .hero h1 {
+    font-size: clamp(28px, 6vw, 36px);
+  }
+
+  .heroContent p {
+    font-size: 14px;
+  }
+
+  .heroSeal {
+    top: 20px;
+    right: 20px;
+  }
+
+  .featureCard {
+    min-height: 520px;
+  }
+
+  .featureImage {
+    object-position: 65% center;
+    opacity: .72;
+  }
+
+  .featureContent {
+    width: 84%;
+    padding-left: 22px;
+    padding-bottom: 120px;
+  }
+
+  .featureCaption {
+    right: 20px;
+    bottom: 24px;
+    max-width: calc(100% - 40px);
+  }
+
+  .marketCard {
+    padding-inline: 16px;
+  }
+
+  .marketHeader h2 {
+    font-size: 17px;
+  }
+
+  .marketItem {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .marketItem img {
+    width: 92px;
+    height: 68px;
+  }
+
+  .lessonCount {
+    display: none;
+  }
+
+  .journey {
+    min-height: 190px;
+  }
+
+  .journey figcaption {
+    top: 18px;
+    left: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .page *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .heroAction,
+  .featureAction,
+  .heroAction svg,
+  .featureAction svg,
+  .marketHeader a svg,
+  .marketAction svg,
+  .marketItem,
+  .featureImage {
+    transform: none !important;
+  }
+}

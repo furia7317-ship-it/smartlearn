@@ -55,16 +55,30 @@ def _max_planning_attempts(continuous_retry: bool) -> int:
 
     return 3 if continuous_retry else 2
 
+KNOWLEDGE_STRUCTURE_PROMPT = """路径必须有“章节 → 知识点”的结构：每天的 title 是该学习单元/章节标题，在 knowledge_nodes 中展开本章 2—6 个具体知识点，每个知识点包含计划内唯一的稳定 id、title 与 objective。已经足够细的单点内容允许仅 1 个知识点，不为凑数拆成资料类型或学习动作。
+knowledge_relations 用知识点 id 描述真实关系：from、to、kind（prerequisite 为先学知识，related 为对比/应用/关联）、label（简短说明）。同一章节可以有多个并列根节点、分叉和汇合；不要机械地把所有知识点首尾串成一条直线。没有依据的关系不编造。
+允许引用其他章节已定义的知识点 id，表达跨章节的前置和关联；不要引用未定义的 id。
+knowledge_nodes 是课程内容结构，不复制资料生成任务。讲义、题库仍可覆盖本章多个知识点；task_keys 没有明确对应时留空，系统会明确展示章节共用任务，不虚报知识点独立掌握率。"""
+
 SYSTEM_PROMPT = """你是学习项目规划智能体。输出严格 JSON，不输出 Markdown。
 若请求包含 learning_path_preferences，必须将其作为硬约束：目标、天数、每日分钟数和资料类型都要反映在计划中。
 
 根据用户目标、学习画像和真实知识库片段，安排每天的知识点、学习目标和资料任务。
+学习路径以能力节点组织：title 写可理解的具体能力，objective 写学完能做什么，completion_criteria 写独立验证要求。
+module 表示所属模块；node_kind 区分 main 主线、reinforcement 补强、extension 拓展、milestone 阶段验收。
+prerequisites 必须引用计划中真实存在的节点标题，只填确实需要先验证通过的能力；建议先学的内容放 recommended_prerequisites。
+prerequisite_mode 为 all 时全部通过，为 any 时任选一条通过，不设计永久互斥。没有前置要求时填空列表。
+minutes 是预估工作量而非固定日期，progress_weight 不随学生速度改变。不要把媒体类型本身作为能力分支。
 禁止使用“基础定位、核心框架、方法拆解、实战应用、综合检测”等泛化标题。
 每份资料必须有任务专属大纲 sections、必须覆盖点 must_cover 和质量标准 quality_criteria。
+严格遵守用户要求的范围：一份入门讲义只规划一份任务；要求一个示例时，不扩张成多个完整实现或额外课程。
+must_cover 使用简短的知识点或可核验的行为要求，不规定正文必须逐字复述的长句，不增加用户未要求的实现细节。
 quality_criteria 只使用可自动验收的维度：数量、定义/知识点覆盖、示例或类比、对比与复杂度、选型场景、代码可运行与异常边界、题目答案解析、结构层级、时长页数、来源引用；不要写“竞赛级”“高质量”等无法客观验证的措辞。
 用户要求 N 道题时，题目必须放在一个测验资料的 questions 中，不要将每道题拆成独立资料；quality_criteria 必须明确写出 N 道题。
+严格遵循 draft_schema：constraints.days 与 days 数量一致，daily_minutes 和每天 minutes 至少15；
+单份资料也使用 D1，day.task_keys 必须引用 tasks 中实际存在的 key。objective、section.goal 至少4个字，target_words 至少50。
 学习路径中，每个学习日都必须为用户勾选的每一种资料类型创建独立任务；不要虚构未提供的 source_id。
-"""
+""" + KNOWLEDGE_STRUCTURE_PROMPT
 
 
 class PlanBuildError(RuntimeError):
@@ -277,7 +291,7 @@ def bind_plan_task_sources(
     about Huffman trees, sorting, or dynamic programming.  The previous
     implementation assigned the same first three broad snippets to every task,
     which made valid task output fail semantic review and made retries repeat
-    the same mistake.  This execution-time pass keeps the gate as a fallback
+    the same mistake.  This execution-time pass keeps the gate context as a safety net
     while giving each generator and reviewer a focused, identical source set.
     """
 
@@ -291,6 +305,7 @@ def bind_plan_task_sources(
     source_limit = max(1, min(int(sources_per_task), 10))
 
     for task in plan.tasks:
+        canonical_hints: list[str] = []
         try:
             query = _task_knowledge_query(task)
             canonical_hints = list(
@@ -314,15 +329,15 @@ def bind_plan_task_sources(
                     retrieved.extend(retriever(query, student_id, source_limit) or [])
             else:
                 # Query the canonical chapter directly.  Sending the whole
-                # title ("思维导图", "最小生成树") to the lexical fallback
+                # title ("思维导图", "最小生成树") to lexical candidate ranking
                 # accidentally matched the one-character chapter names 图/树
                 # and reintroduced unrelated evidence.
                 focused_query = canonical_hints[0] if canonical_hints else query
                 retrieved = retriever(focused_query, student_id, source_limit) or []
-        except Exception:  # the already-passed broad gate remains the safe fallback
+        except Exception:  # the already-passed broad gate remains the safe evidence source
             retrieved = []
         lexical_scores = [
-            float(item.get("fallback_score") or 0)
+            float(item.get("lexical_score") or 0)
             for item in retrieved
             if isinstance(item, dict) and item.get("retrieval_source") in {"markdown", "hybrid"}
         ]
@@ -336,8 +351,48 @@ def bind_plan_task_sources(
                 for item in retrieved
                 if isinstance(item, dict)
                 and item.get("retrieval_source") in {"markdown", "hybrid"}
-                and float(item.get("fallback_score") or 0) >= 100
+                and float(item.get("lexical_score") or 0) >= 100
             ]
+        if canonical_hints:
+            # Chapter names establish the document scope, not the final
+            # evidence.  A query such as "树与二叉树" can return only a
+            # heading and definitions, omitting the traversal section that
+            # the generator and reviewer actually need.
+            def document_key(item: dict[str, Any]) -> str:
+                metadata = item.get("metadata") or {}
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                return str(metadata.get("source") or metadata.get("title") or item.get("title") or "")
+
+            chapter_documents = list(dict.fromkeys(
+                document_key(item)
+                for item in retrieved
+                if isinstance(item, dict) and document_key(item)
+            ))
+            try:
+                focused = list(retriever(query, student_id, source_limit) or [])
+            except Exception:
+                focused = []
+            # Preserve the chapter guard against generic format words (for
+            # example 思维导图 matching 图), while retaining lower-scoring
+            # detailed chunks from the same authoritative document.
+            focused = [
+                item for item in focused
+                if isinstance(item, dict)
+                and (not chapter_documents or document_key(item) in chapter_documents)
+            ]
+            retrieved = focused + list(retrieved)
+            if len(canonical_hints) > 1 and len(chapter_documents) > 1:
+                buckets = [
+                    [item for item in retrieved if document_key(item) == chapter]
+                    for chapter in chapter_documents
+                ]
+                retrieved = [
+                    bucket[offset]
+                    for offset in range(max(map(len, buckets)))
+                    for bucket in buckets
+                    if offset < len(bucket)
+                ]
         scoped_by_id: dict[str, dict[str, Any]] = {}
         for item in retrieved:
             if not isinstance(item, dict) or not item.get("id") or not item.get("content"):
@@ -632,9 +687,12 @@ def apply_learning_path_preferences(
 
 
 def _invoke_compact_json(model: Any, payload: dict[str, Any]) -> dict[str, Any]:
+    system_prompt = "Return only compact JSON. Do not include explanations."
+    if payload.get("phase") == "long_plan_skeleton":
+        system_prompt += "\n" + KNOWLEDGE_STRUCTURE_PROMPT
     response = model.invoke(
         [
-            {"role": "system", "content": "Return only compact JSON. Do not include explanations."},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False, default=str)},
         ]
     )
@@ -788,6 +846,12 @@ def _assemble_long_plan(
             PlannedDay(day=day.day, title=day.title, knowledge_points=day.knowledge_points,
                        objective=day.objective, minutes=day.minutes,
                        prerequisites=day.prerequisites, actions=day.actions,
+                       module=day.module, node_kind=day.node_kind,
+                       knowledge_nodes=day.knowledge_nodes, knowledge_relations=day.knowledge_relations,
+                       prerequisite_mode=day.prerequisite_mode,
+                       recommended_prerequisites=day.recommended_prerequisites,
+                       completion_criteria=day.completion_criteria,
+                       progress_weight=day.progress_weight,
                        task_ids=task_ids_by_day[day.day])
             for day in schedule.days
         ],
@@ -1283,6 +1347,14 @@ def build_resource_plan(
                         objective=day.objective,
                         minutes=day.minutes,
                         prerequisites=day.prerequisites,
+                        module=day.module,
+                        knowledge_nodes=day.knowledge_nodes,
+                        knowledge_relations=day.knowledge_relations,
+                        node_kind=day.node_kind,
+                        prerequisite_mode=day.prerequisite_mode,
+                        recommended_prerequisites=day.recommended_prerequisites,
+                        completion_criteria=day.completion_criteria,
+                        progress_weight=day.progress_weight,
                         task_ids=day.task_keys,
                         actions=day.actions,
                     )
@@ -1346,7 +1418,9 @@ def build_resource_plan(
             }
             last_error = PlanBuildError(exc.code, "规划输出格式异常，请重试生成")
         except ValidationError as exc:
-            field_errors = exc.errors()
+            field_errors = exc.errors(include_input=False, include_url=False)
+            logger.warning("plan schema rejected attempt=%s fields=%s", attempt + 1,
+                           [(item['loc'], item['type']) for item in field_errors[:8]])
             feedback = {
                 "kind": "plan_schema_invalid",
                 "errors": field_errors[:8] if isinstance(field_errors, list) else [str(exc)[:240]],

@@ -1,4 +1,5 @@
-import { API_BASE, streamSSE } from "./api.ts";
+import { API_BASE, streamSSE, streamSSEGet } from "./api.ts";
+import { readCollaboration } from "./collaboration.ts";
 import { requireOk } from "./api-error.ts";
 import type {
   ResourceExecutionEvent,
@@ -37,6 +38,7 @@ export async function createResourcePlan(request: {
       learning_baseline: request.learning_baseline,
       learning_path_preferences: request.learning_path_preferences,
       student_id: getStudentId(),
+      collaboration: readCollaboration(),
     }),
   });
 }
@@ -85,6 +87,11 @@ export async function streamResourcePlanExecution(
   onEvent: (event: ResourceExecutionEvent) => void,
   options?: { signal?: AbortSignal; confirm?: boolean },
 ): Promise<void> {
+  if (plan.status === "running") {
+    await streamSSEGet(`/api/agents/resource-plans/${encodeURIComponent(plan.plan_id)}/events?student_id=${encodeURIComponent(getStudentId())}`,
+      ({ event, data }) => onEvent({ event, ...data }), options?.signal);
+    return;
+  }
   await streamSSE(
     `/api/agents/resource-plans/${encodeURIComponent(plan.plan_id)}/execute`,
     {

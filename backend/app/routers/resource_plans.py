@@ -63,6 +63,9 @@ from app.services.learning_baseline import require_learning_baseline
 from app.services.knowledge_gate import KnowledgeGateResult, check_knowledge_gate
 from app.services.media.task import ensure_video_render_tasks
 from app.schemas.resource import LearningBaseline
+from app.services.evidence import collect_evidence, evidence_retriever
+from app.services.orchestration_profiles import resolve_policy
+from app.services.artifact_versions import review_matches
 
 router = APIRouter(dependencies=[Depends(require_account_student_scope)])
 RESOURCE_PLAN_MAX_CONCURRENCY = min(30, max(1, settings.AGENT_MAX_CONCURRENCY))
@@ -111,8 +114,8 @@ def _is_learning_path(req: ResourceRequest, request_text: str) -> bool:
     return req.planning_mode == "learning_path" or bool(analyze_request(request_text)["multi_day_intent"])
 
 
-def _require_knowledge(query: str, student_id: str) -> KnowledgeGateResult:
-    result = check_knowledge_gate(query, student_id, 10)
+def _require_knowledge(query: str, student_id: str, policy=None) -> KnowledgeGateResult:
+    result = collect_evidence(query, student_id, 10, policy=policy) if policy is not None else check_knowledge_gate(query, student_id, 10)
     if result.matched:
         return result
     status_code = 503 if result.status == "kb_unavailable" else 409
@@ -152,8 +155,10 @@ async def _owned(db: AsyncSession, plan_id: str, student_id: str):
                 reviews = dict(execution.get("reviews") or {})
                 for task in plan.tasks:
                     review = dict(reviews.get(task.task_id) or {})
-                    task.status = "ready" if review.get("approved") else "pending"
-                    task.review = TaskReview.model_validate(review) if review.get("approved") else None
+                    resource = next((r for r in reversed(execution.get("resources") or []) if r.get("task_id") == task.task_id), {})
+                    approved = review_matches(resource, review)
+                    task.status = "ready" if approved else "pending"
+                    task.review = TaskReview.model_validate(review) if approved else None
                 row.status = "approved"
                 row.last_error = "上次执行进程已中断，成功资料已保留，正在继续失败项"
             row.artifact = plan.model_dump(mode="json")
@@ -175,7 +180,7 @@ def _execution_snapshot_is_fully_ready(plan: PlanArtifact, execution: dict) -> b
         and not coverage.get("missing_task_ids")
         and not coverage.get("failed_task_ids")
         and task_ids.issubset(ready_ids)
-        and all(dict(reviews.get(task_id) or {}).get("approved") is True for task_id in task_ids)
+        and all(review_matches(next((r for r in reversed(execution.get("resources") or []) if r.get("task_id") == task_id), {}), reviews.get(task_id)) for task_id in task_ids)
     )
 
 
@@ -209,7 +214,7 @@ async def create_plan(
 ) -> PlanRecordResponse:
     request_text = _request_text(req)
     baseline = require_learning_baseline(req.learning_baseline) if _is_learning_path(req, request_text) else None
-    gate = await asyncio.to_thread(_require_knowledge, req.topic, req.student_id)
+    gate = await asyncio.to_thread(_require_knowledge, req.topic, req.student_id, req.collaboration.sources.model_dump())
     profile, kb_context = await asyncio.to_thread(
         load_plan_context,
         req.student_id,
@@ -235,6 +240,9 @@ async def create_plan(
         raise HTTPException(status_code=exc.http_status, detail=exc.payload()) from exc
 
     plan.student_id = req.student_id
+    plan.collaboration = req.collaboration
+    plan.delivery = "learning_path" if _is_learning_path(req, request_text) else "resources"
+    plan.request_contract = req.model_dump(exclude={"student_id", "attachment_evidence"})
     row = await create_record(db, plan, request_text)
     return to_response(row)
 
@@ -292,7 +300,7 @@ async def replan(
         baseline = LearningBaseline.model_validate(req.learning_baseline or existing) if (req.learning_baseline or existing) else None
         if bool(analyze_request(request_text)["multi_day_intent"]):
             baseline = require_learning_baseline(baseline)
-        gate = await asyncio.to_thread(_require_knowledge, request_text.splitlines()[0], row.student_id)
+        gate = await asyncio.to_thread(_require_knowledge, request_text.splitlines()[0], row.student_id, existing_plan.collaboration.sources.model_dump())
         profile, _ = await asyncio.to_thread(
             load_plan_context,
             row.student_id,
@@ -309,6 +317,9 @@ async def replan(
             learning_path_preferences=existing_plan.learning_path_preferences,
             plan_id=row.id,
         )
+        plan.collaboration = existing_plan.collaboration
+        plan.delivery = existing_plan.delivery
+        plan.request_contract = existing_plan.request_contract
         row = await replace_with_replan(db, row, plan, req.version)
     except PlanBuildError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.payload()) from exc
@@ -340,7 +351,7 @@ def _execution_snapshot(state: dict) -> dict:
     for resource in candidate_resources:
         task_id = str(resource.get("task_id") or "")
         review = dict(reviews.get(task_id) or {})
-        if not task_id or not review.get("approved"):
+        if not task_id or not review_matches(resource, review):
             continue
         if int(resource.get("retry_count") or 0) != int(review.get("retry_count") or 0):
             continue
@@ -377,6 +388,10 @@ def _execution_snapshot(state: dict) -> dict:
             "review": review,
         }
     return {
+        "orchestration": dict(state.get("orchestration") or {}),
+        "delivery_status": str(state.get("delivery_status") or ""),
+        "bindings": list(state.get("bindings") or []),
+        "consistency": dict(state.get("consistency") or {}),
         "resources": resources,
         "schedule": list(state.get("schedule") or []),
         "task_progress": task_progress,
@@ -386,6 +401,7 @@ def _execution_snapshot(state: dict) -> dict:
         "repair_task_ids": list(state.get("repair_task_ids") or []),
         "retry_round": int(state.get("retry_round") or 0),
         "trace_run_id": str(state.get("trace_run_id") or ""),
+        "skill_review_history": dict(state.get("skill_review_history") or {}),
     }
 
 
@@ -407,7 +423,8 @@ def _terminalize_execution(
     for task in plan.tasks:
         has_resource = task.task_id in generated_ids
         review = dict(reviews.get(task.task_id) or {})
-        approved = has_resource and bool(review.get("approved"))
+        candidate = next((r for r in reversed(resources) if r.get("task_id") == task.task_id), {})
+        approved = has_resource and review_matches(candidate, review)
         issues = [str(issue) for issue in review.get("issues") or []]
         blocking_issues = review_blocking_issues(review)
         blocking_fingerprints = [str(item) for item in review.get("blocking_fingerprints") or []]
@@ -437,6 +454,7 @@ def _terminalize_execution(
         if gate_status == "blocked":
             gate_status = "review_unavailable"
         normalized_review = {
+            **review,
             "approved": approved,
             "score": float(review.get("score") or 0.0) if has_resource else 0.0,
             "issues": issues,
@@ -909,13 +927,15 @@ async def execute_plan(
     if not plan.validation.valid:
         raise HTTPException(status_code=409, detail="规划尚未通过验证")
     gate = await asyncio.to_thread(
-        _require_knowledge, row.request_text.splitlines()[0], row.student_id
+        _require_knowledge, row.request_text.splitlines()[0], row.student_id, plan.collaboration.sources.model_dump()
     )
     plan, task_kb_context = await asyncio.to_thread(
         bind_plan_task_sources,
         plan,
         gate.context,
         student_id=row.student_id,
+        retriever=evidence_retriever(plan.collaboration.sources.model_dump()),
+        sources_per_task=resolve_policy(plan.collaboration.model_dump(), [t.model_dump() for t in plan.tasks])["sources_per_task"],
     )
     original_status = row.status
     if original_status == "running":
@@ -952,6 +972,7 @@ async def execute_plan(
         # failures.
         "max_run_seconds": max(300.0, min(1800.0, float(task_count * 45))),
     }
+    execution_state["retry_policy"] = resolve_policy(plan.collaboration.model_dump(), [t.model_dump() for t in plan.tasks])["retry_policy"]
     try:
         row = await claim_execution(
             db,
@@ -975,7 +996,16 @@ async def execute_plan(
     state["kb_context"] = task_kb_context
     state["custom_agents"] = custom_agents
     state["knowledge_gate_enforced"] = True
+    from app.services.execution_streams import start_execution, subscribe
+    start_execution(plan_id, state, planned_resource_app)
     return StreamingResponse(
-        stream_and_persist_planned_execution(planned_resource_app, state, row, db),
+        subscribe(plan_id),
         media_type="text/event-stream",
     )
+
+
+@router.get("/resource-plans/{plan_id}/events")
+async def plan_events(plan_id: str, student_id: str, db: AsyncSession = Depends(get_db)):
+    await _owned(db, plan_id, student_id)
+    from app.services.execution_streams import subscribe
+    return StreamingResponse(subscribe(plan_id), media_type="text/event-stream")

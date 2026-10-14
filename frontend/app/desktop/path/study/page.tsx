@@ -1,2 +1,6 @@
-// 桌面端复用共享页（共用 lib/hooks/后端）；外壳由 ShellSwitch 按 /desktop 前缀套桌面壳。
-export { default } from "@/app/path/study/page";
+import { Suspense } from "react";
+import FocusStudyRouter from "@/components/desktop/focus-study";
+
+export default function Page() {
+  return <Suspense fallback={<div className="p-8">正在恢复学习记录…</div>}><FocusStudyRouter /></Suspense>;
+}

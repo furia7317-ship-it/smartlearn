@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BookMarked,
   Bot,
   ClipboardCheck,
-  Code2,
   Library,
   LoaderCircle,
   LogOut,
@@ -85,6 +84,7 @@ function UserLink() {
 
 function LogoutButton() {
   const { logout } = useAuth();
+  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
   return (
@@ -98,7 +98,7 @@ function LogoutButton() {
         if (submitting) return;
         setSubmitting(true);
         await logout();
-        window.location.assign("/");
+        router.replace("/");
       }}
     >
       {submitting ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <LogOut className="size-4" aria-hidden />}
@@ -142,14 +142,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="web-topbar__tools">
           <span className="web-live-dot" title="学习服务在线" aria-label="学习服务在线" />
-          <Link
-            href="/code-lab"
-            className={cn("web-utility-button", isActive("/code-lab") && "is-active")}
-            aria-label="代码挑战"
-            title="代码挑战"
-          >
-            <Code2 className="size-4" />
-          </Link>
           <Link
             href="/video-learning"
             className={cn("web-utility-button", isActive("/video-learning") && "is-active")}

@@ -4,7 +4,6 @@ import {
   useEffect,
   useMemo,
   useState,
-  type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -25,7 +24,6 @@ import {
   Medal,
   Settings2,
   ShieldCheck,
-  Sparkles,
   Target,
   UserRound,
   X,
@@ -50,6 +48,7 @@ import {
 import { buildProfileInsights, type ProfileEvidenceRow } from "@/lib/profile-insights";
 import { setUserSettings } from "@/lib/user-settings";
 import { cn } from "@/lib/utils";
+import { APP_NAVIGATION_EVENT, appDestination } from "@/lib/app-navigation";
 import { getDesktopViewSwap } from "@/lib/web-motion";
 
 import styles from "./profile.module.css";
@@ -67,13 +66,7 @@ const PROFILE_TABS: Array<{ value: ProfileTab; label: string }> = [
 const DEFAULT_MOTTO = "管理个人头脑，并查看由诊断、练习和学习行为形成的知识掌握图谱；聚焦基础，稳步提升，构建系统化的知识体系。";
 const DEFAULT_STRENGTHS = ["逻辑思维", "系统构建", "稳步提升"];
 
-const graphPositions = [
-  { x: 50, y: 13 },
-  { x: 17, y: 42 },
-  { x: 83, y: 42 },
-  { x: 26, y: 81 },
-  { x: 74, y: 81 },
-];
+
 
 function isProfileTab(value: string | null): value is ProfileTab {
   return PROFILE_TABS.some((tab) => tab.value === value);
@@ -100,7 +93,17 @@ function evidenceIcon(kind: ProfileEvidenceRow["kind"]) {
 
 export default function DesktopProfilePage() {
   const { user } = useAuth();
-  const orchestrator = useOrchestratorContext();
+  const orchestrator = useOrchestratorContext((state) => ({
+    profile: state.profile,
+    practiceAttempts: state.practiceAttempts,
+    taskEvidence: state.taskEvidence,
+    completedMaterials: state.completedMaterials,
+    watchedVideos: state.watchedVideos,
+    subjectPaths: state.subjectPaths,
+    hydrated: state.hydrated,
+    mode: state.mode,
+    trainingEvidence: state.trainingEvidence,
+  }));
   const localSettings = useUserSettings();
   const reducedMotion = useReducedMotion();
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
@@ -134,11 +137,13 @@ export default function DesktopProfilePage() {
     subjectPaths: orchestrator.subjectPaths,
     assessments,
     papers,
+    training: orchestrator.trainingEvidence,
   }), [
     assessments,
     orchestrator.completedMaterials,
     orchestrator.practiceAttempts,
     orchestrator.profile,
+    orchestrator.trainingEvidence,
     orchestrator.subjectPaths,
     orchestrator.taskEvidence,
     orchestrator.watchedVideos,
@@ -146,9 +151,6 @@ export default function DesktopProfilePage() {
   ]);
 
   const { summary, focus } = insights;
-  const mastery = summary.mastery;
-  const weakest = [...orchestrator.profile].sort((a, b) => a.value - b.value)[0];
-  const weakestLabel = weakest?.label || "栈与队列";
   const dataReady = orchestrator.hydrated && historyLoaded;
   const viewSwap = getDesktopViewSwap(Boolean(reducedMotion));
 
@@ -191,25 +193,25 @@ export default function DesktopProfilePage() {
   }, [user?.id]);
 
   useEffect(() => {
-    const syncFromUrl = () => {
-      const params = new URLSearchParams(window.location.search);
+    const syncFromUrl = (href = window.location.href) => {
+      const params = new URL(href, window.location.href).searchParams;
       const tab = params.get("tab");
       setActiveTab(isProfileTab(tab) ? tab : "overview");
       setGraphOpen(params.get("view") === "graph");
     };
     syncFromUrl();
-    window.addEventListener("popstate", syncFromUrl);
-    return () => window.removeEventListener("popstate", syncFromUrl);
+    const onPopState = () => syncFromUrl();
+    const onNavigate = (event: Event) => {
+      const target = appDestination((event as CustomEvent).detail);
+      if (target?.href.startsWith("/desktop/profile/")) syncFromUrl(target.href);
+    };
+    window.addEventListener("popstate", onPopState);
+    window.addEventListener(APP_NAVIGATION_EVENT, onNavigate);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener(APP_NAVIGATION_EVENT, onNavigate);
+    };
   }, []);
-
-  const graphNodes = useMemo(() => {
-    const labels = ["数组与链表", "栈与队列", "树与二叉树", "哈希表", "排序与搜索"];
-    return labels.map((label, index) => ({
-      label,
-      score: Math.max(38, Math.min(88, mastery + [6, -8, 2, -2, -10][index])),
-      ...graphPositions[index],
-    }));
-  }, [mastery]);
 
   const filteredEvidence = evidenceKind === "all"
     ? insights.evidence
@@ -371,8 +373,6 @@ export default function DesktopProfilePage() {
                   summary={summary}
                   focus={focus}
                   recentEvidence={recentEvidence}
-                  graphNodes={graphNodes}
-                  weakestLabel={weakestLabel}
                   onOpenGraph={openGraph}
                   onOpenRecords={() => selectTab("records")}
                 />
@@ -517,7 +517,6 @@ export default function DesktopProfilePage() {
 
 type Summary = ReturnType<typeof buildProfileInsights>["summary"];
 type Focus = ReturnType<typeof buildProfileInsights>["focus"];
-type GraphNode = { label: string; score: number; x: number; y: number };
 
 function SectionTitle({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
@@ -533,8 +532,6 @@ function OverviewTab({
   summary,
   focus,
   recentEvidence,
-  graphNodes,
-  weakestLabel,
   onOpenGraph,
   onOpenRecords,
 }: {
@@ -542,8 +539,6 @@ function OverviewTab({
   summary: Summary;
   focus: Focus;
   recentEvidence: ProfileEvidenceRow[];
-  graphNodes: GraphNode[];
-  weakestLabel: string;
   onOpenGraph: () => void;
   onOpenRecords: () => void;
 }) {
@@ -551,15 +546,7 @@ function OverviewTab({
     <div className={styles.overviewGrid}>
       <div className={styles.primaryColumn}>
         <section className={styles.panel}>
-          <SectionTitle
-            aside={
-              <span className={styles.heatLegend}>
-                最近 30 天活跃力图 <i /> <i /> <i /> <i /> <i />
-              </span>
-            }
-          >
-            成长轨迹
-          </SectionTitle>
+          <SectionTitle>成长轨迹</SectionTitle>
 
           <div className={styles.activityStrip} aria-label="最近 30 天学习活跃度">
             {summary.activityLevels.map((level, index) => (
@@ -591,7 +578,7 @@ function OverviewTab({
           <SectionTitle aside={<small>截至今天</small>}>本月小结</SectionTitle>
           <div className={styles.metrics}>
             <div><Clock3 aria-hidden /><span>学习时长</span><strong>{dataReady ? summary.studyHoursLabel : "—"}<small> 小时</small></strong><em>{dataReady ? `日均 ${summary.dailyAverageLabel} 小时` : "同步中"}</em></div>
-            <div><Target aria-hidden /><span>知识点掌握度</span><strong>{summary.mastery}<small>%</small></strong><em>{summary.masteryDelta === 0 ? "最近暂无变化" : `较上月 ${summary.masteryDelta > 0 ? "↑" : "↓"} ${Math.abs(summary.masteryDelta)}%`}</em></div>
+            <div><Target aria-hidden /><span>知识点掌握度</span><strong>{summary.mastery}<small>%</small></strong><em>{summary.masteryDelta === 0 ? "最近暂无变化" : `较上次画像 ${summary.masteryDelta > 0 ? "↑" : "↓"} ${Math.abs(summary.masteryDelta)}%`}</em></div>
             <div><ListChecks aria-hidden /><span>完成练习</span><strong>{dataReady ? summary.completedQuestions : "—"}<small> 题</small></strong><em>{summary.accuracy === null ? "暂无评分记录" : `正确率 ${summary.accuracy}%`}</em></div>
           </div>
         </section>
@@ -621,25 +608,7 @@ function OverviewTab({
 
         <section className={cn(styles.panel, styles.masteryPanel)}>
           <SectionTitle aside={<button type="button" onClick={onOpenGraph}>查看完整图谱 <ChevronRight aria-hidden /></button>}>知识掌握图谱</SectionTitle>
-          <div className={styles.masteryMap} aria-label="数据结构知识掌握概览">
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-              {graphNodes.map((node) => <line key={node.label} x1="50" y1="53" x2={node.x} y2={node.y} />)}
-            </svg>
-            <div className={styles.masteryRoot}><strong>数据结构</strong><small>{summary.mastery}%</small></div>
-            {graphNodes.map((node) => (
-              <div
-                key={node.label}
-                className={styles.masteryNode}
-                style={{ "--node-x": `${node.x}%`, "--node-y": `${node.y}%` } as CSSProperties}
-              >
-                <strong>{node.label}</strong><small>{node.score}%</small>
-              </div>
-            ))}
-          </div>
-          <div className={styles.aiJudgement}>
-            <h3><Sparkles aria-hidden /> AI 判断</h3>
-            <p>整体掌握良好。建议先复习{weakestLabel}的边界条件，再完成一组综合练习。</p>
-          </div>
+          <KnowledgeMasteryGraph compact />
         </section>
       </aside>
     </div>
@@ -770,7 +739,7 @@ function SettingsTab({
         <dl className={styles.identityList}>
           <div><dt><UserRound aria-hidden /> 显示名称</dt><dd>{displayName}</dd></div>
           <div><dt><GraduationCap aria-hidden /> 专业与年级</dt><dd>{major} · {grade}</dd></div>
-          <div><dt><Sparkles aria-hidden /> 个人签名</dt><dd>{motto}</dd></div>
+          <div><dt><Edit3 aria-hidden /> 个人签名</dt><dd>{motto}</dd></div>
         </dl>
         <button type="button" className={styles.editAction} onClick={onEdit}><Edit3 aria-hidden /> 编辑个人资料</button>
       </section>

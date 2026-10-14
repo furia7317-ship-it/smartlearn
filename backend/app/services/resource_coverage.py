@@ -7,6 +7,7 @@ from typing import Any
 
 from app.schemas.resource_plan import PlanArtifact
 from app.services.resource_quality import extract_resource_text, is_term_covered
+from app.services.artifact_versions import review_matches
 
 
 def _reviewed_copy(
@@ -22,10 +23,12 @@ def _reviewed_copy(
     # belongs only to the candidate with the same retry_count; applying it to
     # older candidates can accidentally publish the pre-rework version.
     review_matches_candidate = bool(review) and resource_retry == review_retry
-    copied["review_approved"] = bool(
-        review.get("approved", False)
-        if review_matches_candidate
-        else copied.get("review_approved", False)
+    copied["review_approved"] = review_matches(resource, review) if review else bool(copied.get("review_approved", False))
+    # Never trust coverage claims supplied by generated content or a stale
+    # review. This certificate belongs to the approved candidate hash only.
+    copied["_semantic_covered_requirements"] = (
+        list(review.get("semantic_coverage") or [])
+        if review and copied["review_approved"] and review.get("content_hash") else []
     )
     copied["review_score"] = float(
         (
@@ -87,7 +90,8 @@ def _outline_gaps(task, resource: dict[str, Any]) -> list[str]:
             if term not in must_cover:
                 must_cover.append(term)
     text = extract_resource_text(resource)
-    return [term for term in must_cover if not is_term_covered(term, text)]
+    covered = set(resource.get("_semantic_covered_requirements") or [])
+    return [term for term in must_cover if term not in covered and not is_term_covered(term, text)]
 
 
 def audit_plan_coverage(
@@ -109,13 +113,7 @@ def audit_plan_coverage(
         gaps = _outline_gaps(task, resource)
         if gaps:
             outline_gaps[task.task_id] = gaps
-        released_after_rework = (
-            resource.get("review_auto_released") is True
-            or resource.get("review_gate_status") == "approved_after_rework_limit"
-        )
-        if resource.get("review_approved") is True and (
-            not gaps or released_after_rework
-        ):
+        if resource.get("review_approved") is True and not gaps:
             ready.append(task.task_id)
         else:
             failed.append(task.task_id)

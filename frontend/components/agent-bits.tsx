@@ -37,6 +37,7 @@ import type { AgentId, AgentStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const AGENT_ICONS: Record<AgentId, LucideIcon> = {
+  learning_data: Library,
   profiler: UserRoundSearch,
   outliner: ListTree,
   supervisor: Workflow,

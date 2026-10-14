@@ -4,7 +4,7 @@ import test from "node:test";
 
 const source = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("desktop shell has a transform-only route transition that respects reduced motion", async () => {
+test("desktop shell has a nonblocking compositor route transition that respects reduced motion", async () => {
   const [transition, shell] = await Promise.all([
     source("../components/layout/desktop-page-transition.tsx"),
     source("../components/layout/desktop-shell.tsx"),
@@ -12,11 +12,12 @@ test("desktop shell has a transform-only route transition that respects reduced 
 
   assert.match(transition, /useReducedMotion/);
   assert.match(transition, /useAnimationControls/);
+  assert.match(transition, /useEffect/);
   assert.match(transition, /requestAnimationFrame/);
   assert.match(transition, /initial=\{false\}/);
   assert.match(
     transition,
-    /if \(reducedMotion\)[\s\S]{0,240}?controls\.set\([\s\S]{0,240}?return;/,
+    /if \(reducedMotion \|\| suppressMotion\)[\s\S]{0,240}?controls\.set\([\s\S]{0,240}?return;/,
     "reduced motion must jump to the settled state and skip the animation",
   );
   assert.doesNotMatch(transition, /AnimatePresence/);
@@ -35,7 +36,7 @@ test("desktop shell has a transform-only route transition that respects reduced 
   assert.match(shell, /DesktopPageTransition/);
   assert.match(
     shell,
-    /<main[\s\S]{0,160}?<DesktopPageTransition>\s*\{children\}\s*<\/DesktopPageTransition>/,
+    /<main[\s\S]{0,200}?<DesktopPageTransition>\s*\{children\}\s*<\/DesktopPageTransition>/,
     "the desktop <main> must mount the route transition around its children",
   );
 });
@@ -55,9 +56,22 @@ test("desktop route motion normalizes trailing slashes and stays still on transf
   assert.equal(normalizeRouteKey("/"), "/");
   assert.equal(normalizeRouteKey(null), "/");
 
-  assert.equal(getDesktopPageEnter("/desktop/studio/").x, 0, "studio hosts a fixed webview overlay");
-  assert.ok(getDesktopPageEnter("/desktop/market").x > 0, "market now uses the shared desktop shell");
-  assert.ok(getDesktopPageEnter("/desktop/path").x > 0);
+  assert.equal(getDesktopPageEnter("/desktop/studio/").y, 0, "studio hosts a fixed webview overlay");
+  assert.ok(getDesktopPageEnter("/desktop/market").y > 0, "market keeps a small compositor-only offset");
+  assert.equal(getDesktopPageEnter("/desktop/path").y, 0, "the graph canvas must not inherit a route transform");
+  assert.equal(getDesktopPageEnter("/desktop/resources/books/").y, 0, "nested resource views preserve their measured positions");
+  assert.equal(getDesktopPageEnter("/desktop/profile").y, 0, "the profile knowledge graph must not inherit a route transform");
+  assert.ok(getDesktopPageEnter("/desktop/pathology").y > 0, "route prefixes must respect path boundaries");
+});
+
+test("page transitions follow content navigation without restarting during filtering", async () => {
+  const { getPageNavigationKey } = await import("../lib/web-motion.ts");
+  const task = getPageNavigationKey("/desktop/training/workspace/", "id=task-a");
+  assert.notEqual(task, getPageNavigationKey("/desktop/training/workspace/", "id=task-b"));
+  assert.equal(task, getPageNavigationKey("/desktop/training/workspace", "q=tree&id=task-a&sort=recent"));
+  assert.notEqual(getPageNavigationKey("/desktop/practice/", "page=1"), getPageNavigationKey("/desktop/practice/", "page=2"));
+  assert.notEqual(getPageNavigationKey("/desktop/", ""), getPageNavigationKey("/desktop/path/", ""));
+  assert.equal(getPageNavigationKey("/desktop/profile/", "tab=overview"), getPageNavigationKey("/desktop/profile/", "tab=records"), "local tabs play their own transition");
 });
 
 test("desktop view swaps degrade to a no-op when the user asks for reduced motion", async () => {
@@ -112,48 +126,25 @@ test("desktop rail marks the active route with a shared sliding indicator", asyn
   assert.match(globals, /\.desktop-rail-link\s*\{[^}]*position:\s*relative/s);
 });
 
-test("desktop rail navigation closes and reopens a transform-only book", async () => {
-  const [shell, book, globals, motion] = await Promise.all([
+test("desktop rail navigation provides immediate feedback without a blocking book overlay", async () => {
+  const [shell, globals, motion] = await Promise.all([
     source("../components/layout/desktop-shell.tsx"),
-    source("../components/layout/desktop-book-transition.tsx"),
     source("../app/globals.css"),
     import("../lib/web-motion.ts"),
   ]);
 
   assert.match(shell, /navigateFromRail/);
-  assert.match(shell, /DesktopBookTransition/);
-  assert.match(shell, /bookPhase/);
-  assert.match(
-    shell,
-    /className="relative flex min-w-0 flex-1 flex-col"[\s\S]*?<DesktopBookTransition/,
-    "the book transition must be contained by the right-hand content area",
-  );
-  assert.match(book, /data-phase=\{phase\}/);
-  assert.match(book, /desktop-book-transition__turning-cover/);
-  assert.match(globals, /@keyframes desktop-book-close/);
-  assert.match(globals, /@keyframes desktop-book-open/);
+  assert.match(shell, /prefetch=\{false\}/);
+  assert.match(shell, /setPendingHref\(href\)[\s\S]{0,180}?router\.push\(href\)/);
+  assert.match(shell, /data-navigation-pending=\{pending \? "true" : undefined\}/);
+  assert.match(shell, /onMouseEnter=\{\(\) => onPrefetch\(item\)\}/);
+  assert.doesNotMatch(shell, /requestIdleCallback|IDLE_PREFETCH_MODULES/);
+  assert.doesNotMatch(shell, /DesktopBookTransition|bookPhase/);
+  assert.ok(motion.DESKTOP_PAGE_DURATION >= 0.18 && motion.DESKTOP_PAGE_DURATION <= 0.32);
   assert.match(
     globals,
-    /\.desktop-book-transition\s*\{[^}]*position:\s*absolute/s,
-    "the book transition must not cover the persistent navigation rail",
+    /\.desktop-page-transition\[data-transition="running"\]\s*\{[^}]*will-change:\s*transform, opacity/s,
   );
-  assert.doesNotMatch(
-    globals,
-    /\.desktop-book-transition\s*\{[^}]*position:\s*fixed/s,
-  );
-  assert.match(
-    globals,
-    /\.desktop-book-transition__turning-cover\s*\{[^}]*will-change:\s*transform/s,
-  );
-  assert.doesNotMatch(
-    globals.match(/@keyframes desktop-book-(?:close|open)[\s\S]*?(?=@keyframes desktop-book-overlay-in)/)?.[0] ?? "",
-    /(width|height|top|left|filter|box-shadow)\s*:/,
-    "book keyframes must stay on the compositor",
-  );
-  assert.ok(motion.DESKTOP_BOOK_CLOSE_DURATION_MS <= 400);
-  assert.ok(motion.DESKTOP_BOOK_OPEN_DURATION_MS <= 450);
-  assert.ok(motion.DESKTOP_BOOK_CLOSE_DURATION_MS <= 240);
-  assert.ok(motion.DESKTOP_BOOK_OPEN_DURATION_MS <= 280);
 });
 
 test("heavy desktop pages animate only their outermost view container", async () => {
@@ -167,7 +158,7 @@ test("heavy desktop pages animate only their outermost view container", async ()
     assert.match(page, /getDesktopViewSwap/);
     assert.match(page, /useReducedMotion/);
   }
-  assert.match(path, /<motion\.div key=\{view\}/);
+  assert.match(path, /<motion\.div key=\{`\$\{activeWorkspaceTab\}:\$\{view\}`\}/);
   assert.match(studio, /<motion\.div key=\{conversationGroup\}/);
   assert.match(studio, /<motion\.div key=\{activeTab\}[^>]*min-h-0/, "the studio flex chain needs min-h-0 restored");
 

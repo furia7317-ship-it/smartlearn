@@ -211,6 +211,22 @@ async def _save_material_once(
 
 def material_summary(m: GeneratedMaterial) -> dict[str, Any]:
     """列表摘要，不返回 data 大字段。"""
+    external_video = None
+    if isinstance(m.data, dict):
+        raw_video = m.data.get("video")
+        if isinstance(raw_video, dict):
+            url = str(raw_video.get("url") or "").strip()
+            bvid = str(raw_video.get("bvid") or "").strip()
+            if url or bvid:
+                external_video = {
+                    "bvid": bvid,
+                    "title": str(raw_video.get("title") or m.title).strip(),
+                    "url": url,
+                    "embed_url": str(raw_video.get("embed_url") or "").strip(),
+                    "author": str(raw_video.get("author") or "").strip(),
+                    "duration": str(raw_video.get("duration") or "").strip(),
+                    "summary": str(raw_video.get("summary") or "").strip(),
+                }
     return {
         "id": m.id,
         "type": m.type,
@@ -220,6 +236,10 @@ def material_summary(m: GeneratedMaterial) -> dict[str, Any]:
         "sources": m.sources,
         "knowledge_points": m.knowledge_points,
         "source": m.source,
+        # Resource Center needs only this safe public summary to expose the
+        # original learning-video link.  Full generated material data remains
+        # behind the authenticated detail endpoint.
+        "external_video": external_video,
         "exam_id": m.exam_id,
         "review_approved": _material_is_approved(m),
         "created_at": str(m.created_at),

@@ -7,8 +7,8 @@ const projectRoot = path.resolve(frontendRoot, "..");
 const python = path.join(frontendRoot, "runtime", "python", "python.exe");
 const script = path.join(projectRoot, "backend", "scripts", "build_packaged_knowledge_seed.py");
 const knowledgeDir = path.join(projectRoot, "knowledge");
-const outputDir = path.join(frontendRoot, "runtime", "assets", "chroma_seed_cs2026_v1");
-const embeddingModel = path.join(frontendRoot, "runtime", "assets", "models", "bge-small-zh-v1.5");
+const outputDir = path.join(frontendRoot, "runtime", "assets", "chroma_seed_cs2026_cloud_v1");
+const embeddingModel = process.env.EMBEDDING_MODEL || "Qwen/Qwen3-VL-Embedding-8B";
 
 const result = spawnSync(
   python,
